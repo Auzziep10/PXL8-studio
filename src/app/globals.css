@@ -105,6 +105,16 @@
   }
 }
 
+@layer utilities {
+  .perspective-container {
+    perspective: 1000px;
+  }
+  .glass-panel {
+    @apply bg-zinc-900/40 backdrop-blur-lg;
+  }
+}
+
+
 .checkerboard {
   background-image:
     linear-gradient(45deg, hsl(var(--secondary)) 25%, transparent 25%),
