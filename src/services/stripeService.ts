@@ -20,11 +20,3 @@ export async function createCheckoutSession(cartItems: CartItem[], total: number
   
   return { success: true, sessionId: mockSessionId };
 }
-
-// Helper to format currency
-export function formatCurrency(amount: number): string {
-    return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-    }).format(amount);
-}
