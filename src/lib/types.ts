@@ -12,6 +12,14 @@ export interface User {
 
 export type OrderStatus = 'Pending' | 'Processing' | 'Printed' | 'Shipped' | 'Delivered' | 'Cancelled';
 
+export interface ShippingAddress {
+    street: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+}
+
 export interface Order {
   id: string;
   orderId: string;
@@ -21,9 +29,7 @@ export interface Order {
   status: OrderStatus;
   items: CartItem[];
   total: number;
-  shippingAddress: {
-    zip: string;
-  };
+  shippingAddress: ShippingAddress;
   trackingId: string;
   printReadyUrl: string;
   previewUrl: string;
@@ -86,3 +92,12 @@ export interface GangSheetItem {
     x: number; // inches
     y: number; // inches
 }
+
+export interface ShippingRate {
+    id: string;
+    carrier: string;
+    service: string;
+    rate: number;
+    deliveryDays: string | null;
+}
+export type CartEntry = CartItem;
