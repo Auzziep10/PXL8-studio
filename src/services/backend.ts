@@ -1,9 +1,9 @@
 'use server';
 
+import { isCloudEnabled } from "@/lib/constants";
+
 // This is a mock backend service for demonstration purposes.
 // In a real application, this would interact with a database and cloud storage.
-
-export const isCloudEnabled = false; // Set to true to simulate cloud storage interactions
 
 async function checkHealth() {
   // Simulate checking database and storage connections
@@ -27,5 +27,4 @@ async function checkHealth() {
 }
 
 export const backend = {
-  checkHealth,
-};
+  checkHealth

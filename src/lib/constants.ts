@@ -9,3 +9,5 @@ export const SHEET_DIMENSIONS: Record<SheetSize, { width: number; height: number
     [SheetSize.XL]: { width: 22, height: 120, price: 100.00 },
     [SheetSize.XXL]: { width: 22, height: 240, price: 180.00 },
 };
+
+export const isCloudEnabled = false; // Set to true to simulate cloud storage interactions
