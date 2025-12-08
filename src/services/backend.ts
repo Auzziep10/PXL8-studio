@@ -28,3 +28,4 @@ async function checkHealth() {
 
 export const backend = {
   checkHealth
+};
