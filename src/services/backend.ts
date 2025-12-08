@@ -1,13 +1,14 @@
 'use server';
 
-import { isCloudEnabled } from "@/lib/constants";
-
 // This is a mock backend service for demonstration purposes.
 // In a real application, this would interact with a database and cloud storage.
 
-async function checkHealth() {
+export async function checkHealth() {
   // Simulate checking database and storage connections
   await new Promise(resolve => setTimeout(resolve, 500));
+  
+  // The isCloudEnabled constant is now imported from constants
+  const { isCloudEnabled } = await import("@/lib/constants");
 
   if (isCloudEnabled) {
     return {
@@ -26,6 +27,4 @@ async function checkHealth() {
   }
 }
 
-export const backend = {
-  checkHealth
-};
+    
