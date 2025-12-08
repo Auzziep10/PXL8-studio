@@ -19,10 +19,11 @@ import {
   Wand2,
   ZoomIn,
   ZoomOut,
-  AlertTriangle,
+  Settings,
+  X,
 } from 'lucide-react';
 import { mockSheetSizes } from '@/lib/data';
-import type { ArtworkOnCanvas, SheetSize, Artwork } from '@/lib/types';
+import type { ArtworkOnCanvas, SheetSize } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 import Image from 'next/image';
 import { useToast } from '@/hooks/use-toast';
@@ -30,8 +31,99 @@ import { analyzeArtwork } from '@/app/actions';
 import AiAnalysisPanel from './ai-analysis-panel';
 import { useCart } from '@/hooks/use-cart.tsx';
 import { cn } from '@/lib/utils';
+import { Sheet as Drawer, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useIsMobile } from '@/hooks/use-mobile';
+
 
 const DPI = 300; // Standard print DPI
+
+function ArtworkItem({ artwork, onAnalyze, onRemove, isSelected }: { artwork: ArtworkOnCanvas; onAnalyze: () => void; onRemove: () => void; isSelected: boolean }) {
+    return (
+        <div className={cn("flex items-center gap-2 p-2 rounded-md border", isSelected ? "border-primary bg-primary/10" : "bg-secondary")}>
+            <Image src={artwork.imageUrl} alt={artwork.name} width={40} height={40} className="rounded-sm" />
+            <div className="flex-1 text-sm overflow-hidden">
+                <p className="font-medium truncate">{artwork.name}</p>
+                <p className="text-xs text-muted-foreground">{artwork.width.toFixed(2)}" x {artwork.height.toFixed(2)}"</p>
+            </div>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAnalyze} disabled={artwork.analysisLoading}>
+              <Wand2 className={cn("h-4 w-4", artwork.analysisLoading && "animate-spin")} />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
+                <Trash2 className="h-4 w-4"/>
+            </Button>
+        </div>
+    )
+}
+
+function ArtworkPanel({ artworks, selectedArtworkId, onFileChange, onArtworkSelect, onAnalyze, onRemove }: { artworks: ArtworkOnCanvas[], selectedArtworkId: string | null, onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void, onArtworkSelect: (id: string) => void, onAnalyze: (id: string) => void, onRemove: (id: string) => void }) {
+    return (
+        <div className="flex-grow flex flex-col border rounded-lg p-2 gap-2 overflow-hidden">
+            <Label htmlFor="artwork-upload-button" className="w-full">
+            <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-secondary hover:bg-muted">
+                <div className="flex flex-col items-center justify-center pt-5 pb-6">
+                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
+                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
+                    <p className="text-xs text-muted-foreground">PNG, JPG (300 DPI recommended)</p>
+                </div>
+                <Input id="artwork-upload-button" type="file" className="hidden" onChange={onFileChange} multiple accept="image/png, image/jpeg"/>
+            </div>
+        </Label>
+        <ScrollArea className='flex-1'>
+            <div className="space-y-2 pr-2">
+            {artworks.map(art => (
+                <div key={art.id} onClick={() => onArtworkSelect(art.id)}>
+                    <ArtworkItem 
+                        artwork={art} 
+                        onAnalyze={() => onAnalyze(art.id)}
+                        onRemove={() => onRemove(art.id)}
+                        isSelected={selectedArtworkId === art.id}
+                    />
+                </div>
+            ))}
+            </div>
+        </ScrollArea>
+        </div>
+    )
+}
+
+function ToolsPanel({ selectedArtwork, onUpdateSize, onDuplicate, onAnalyze }: { selectedArtwork: ArtworkOnCanvas | undefined, onUpdateSize: (id: string, width: number) => void, onDuplicate: (id: string) => void, onAnalyze: (id: string) => void }) {
+    if (!selectedArtwork) {
+        return (
+            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
+                <p>Select an artwork to see tools and AI analysis.</p>
+            </div>
+        )
+    }
+
+    return (
+        <div className='space-y-4'>
+            <div>
+                <Label>Width (inches)</Label>
+                <Input 
+                    type="number" 
+                    value={selectedArtwork.width.toFixed(2)}
+                    onChange={(e) => onUpdateSize(selectedArtwork.id, parseFloat(e.target.value))}
+                />
+            </div>
+            <div>
+                <Label>Height (inches)</Label>
+                <Input 
+                   type="number"
+                   value={selectedArtwork.height.toFixed(2)}
+                   readOnly
+                   className='bg-muted'
+                />
+            </div>
+             <div className="flex gap-2 pt-2">
+                <Button variant="outline" className="w-full" onClick={() => onDuplicate(selectedArtwork.id)}>
+                    <Copy className="mr-2"/> Duplicate
+                </Button>
+            </div>
+            <AiAnalysisPanel artwork={selectedArtwork} onAnalyze={() => onAnalyze(selectedArtwork.id)} />
+        </div>
+    )
+}
+
 
 export default function GangSheetBuilder() {
   const [selectedSheet, setSelectedSheet] = useState<SheetSize>(
@@ -42,6 +134,10 @@ export default function GangSheetBuilder() {
   const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(
     null
   );
+  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
+  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
+  const isMobile = useIsMobile();
+
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const dragInfo = useRef<{
@@ -285,78 +381,82 @@ export default function GangSheetBuilder() {
 
     toast({ title: 'Added to Cart', description: `${selectedSheet.name} gang sheet.` });
   };
+
+  const handleRemoveArtwork = (id: string) => {
+    setArtworks(artworks.filter(a => a.id !== id))
+    if(selectedArtworkId === id) {
+        setSelectedArtworkId(null);
+    }
+  }
   
   const selectedArtwork = artworks.find(art => art.id === selectedArtworkId);
 
+  const leftPanelContent = (
+    <Card className="w-[350px] flex flex-col bg-card border-r h-full shadow-none border-none rounded-none">
+        <CardHeader>
+            <CardTitle>Sheet & Artworks</CardTitle>
+        </CardHeader>
+        <CardContent className="flex-grow flex flex-col gap-4 overflow-hidden">
+            <div className="space-y-2">
+                <Label htmlFor="sheet-size">Sheet Size</Label>
+                <Select
+                    value={selectedSheet.name}
+                    onValueChange={(val) =>
+                    setSelectedSheet(mockSheetSizes.find((s) => s.name === val)!)
+                    }
+                >
+                    <SelectTrigger id="sheet-size">
+                    <SelectValue placeholder="Select sheet size" />
+                    </SelectTrigger>
+                    <SelectContent>
+                    {mockSheetSizes.map((size) => (
+                        <SelectItem key={size.name} value={size.name}>
+                        {size.name} (${size.price.toFixed(2)})
+                        </SelectItem>
+                    ))}
+                    </SelectContent>
+                </Select>
+            </div>
+            <ArtworkPanel 
+                artworks={artworks} 
+                selectedArtworkId={selectedArtworkId}
+                onFileChange={handleFileChange}
+                onArtworkSelect={setSelectedArtworkId}
+                onAnalyze={handleAnalyze}
+                onRemove={handleRemoveArtwork}
+            />
+        </CardContent>
+    </Card>
+  );
+
+  const rightPanelContent = (
+    <Card className="w-[350px] flex flex-col bg-card border-l h-full shadow-none border-none rounded-none">
+        <CardHeader>
+            <CardTitle>Tools & Analysis</CardTitle>
+        </CardHeader>
+        <CardContent className='flex-1 overflow-y-auto'>
+            <ToolsPanel
+                selectedArtwork={selectedArtwork}
+                onUpdateSize={updateArtworkSize}
+                onDuplicate={handleDuplicateArtwork}
+                onAnalyze={handleAnalyze}
+            />
+        </CardContent>
+    </Card>
+  );
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-muted">
+    <div className="flex h-[calc(100vh-3.5rem)] bg-muted overflow-hidden">
        <div style={{ display: 'none' }}>
         {artworks.map((art) => (
           <img id={`img-${art.id}`} src={art.imageUrl} key={art.id} alt={art.name} crossOrigin="anonymous"/>
         ))}
       </div>
-      <aside className="w-[350px] flex flex-col bg-card border-r">
-        <CardHeader>
-          <CardTitle>Sheet & Artworks</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow flex flex-col gap-4 overflow-hidden">
-          <div className="space-y-2">
-            <Label htmlFor="sheet-size">Sheet Size</Label>
-            <Select
-              value={selectedSheet.name}
-              onValueChange={(val) =>
-                setSelectedSheet(mockSheetSizes.find((s) => s.name === val)!)
-              }
-            >
-              <SelectTrigger id="sheet-size">
-                <SelectValue placeholder="Select sheet size" />
-              </SelectTrigger>
-              <SelectContent>
-                {mockSheetSizes.map((size) => (
-                  <SelectItem key={size.name} value={size.name}>
-                    {size.name} (${size.price.toFixed(2)})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="flex-grow flex flex-col border rounded-lg p-2 gap-2 overflow-hidden">
-             <Label htmlFor="artwork-upload-button" className="w-full">
-                <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-secondary hover:bg-muted">
-                    <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                        <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                        <p className="text-xs text-muted-foreground">PNG, JPG (300 DPI recommended)</p>
-                    </div>
-                    <Input id="artwork-upload-button" type="file" className="hidden" onChange={handleFileChange} multiple accept="image/png, image/jpeg"/>
-                </div>
-            </Label>
-            <ScrollArea className='flex-1'>
-              <div className="space-y-2 pr-2">
-                {artworks.map(art => (
-                  <div key={art.id} className={cn("flex items-center gap-2 p-2 rounded-md border", selectedArtworkId === art.id ? "border-primary bg-primary/10" : "bg-secondary")}>
-                    <Image src={art.imageUrl} alt={art.name} width={40} height={40} className="rounded-sm" />
-                    <div className="flex-1 text-sm overflow-hidden">
-                        <p className="font-medium truncate">{art.name}</p>
-                        <p className="text-xs text-muted-foreground">{art.width.toFixed(2)}" x {art.height.toFixed(2)}"</p>
-                    </div>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleAnalyze(art.id)} disabled={art.analysisLoading}>
-                      <Wand2 className={cn("h-4 w-4", art.analysisLoading && "animate-spin")} />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setArtworks(artworks.filter(a => a.id !== art.id))}>
-                        <Trash2 className="h-4 w-4"/>
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        </CardContent>
-      </aside>
+      
+      {!isMobile && <aside className="w-[350px] h-full">{leftPanelContent}</aside>}
 
       <main className="flex-1 flex flex-col relative">
-        <div className="flex-1 overflow-auto checkerboard p-8" onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+        <div className="flex-1 overflow-auto checkerboard p-8" onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
           <canvas
             ref={canvasRef}
             width={canvasWidth}
@@ -366,6 +466,18 @@ export default function GangSheetBuilder() {
             onMouseMove={handleMouseMove}
           />
         </div>
+        <div className="absolute top-4 left-4">
+            {isMobile && (
+                 <Drawer open={isLeftPanelOpen} onOpenChange={setIsLeftPanelOpen}>
+                    <DrawerTrigger asChild>
+                        <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
+                    </DrawerTrigger>
+                    <DrawerContent side="left" className="p-0">
+                        {leftPanelContent}
+                    </DrawerContent>
+                 </Drawer>
+            )}
+        </div>
         <div className="absolute bottom-4 left-4 flex items-center gap-2">
             <Button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} variant="outline" size="icon"><ZoomOut className="h-4 w-4"/></Button>
             <span className="p-2 bg-background/80 rounded-md border text-sm">{Math.round(zoom * 100)}%</span>
@@ -374,46 +486,23 @@ export default function GangSheetBuilder() {
          <div className="absolute bottom-4 right-4">
             <Button size="lg" onClick={handleAddToCart}>Add to Cart</Button>
         </div>
+        <div className="absolute top-4 right-4">
+            {isMobile && (
+                 <Drawer open={isRightPanelOpen} onOpenChange={setIsRightPanelOpen}>
+                    <DrawerTrigger asChild>
+                        <Button variant="outline" size="icon"><Wand2 className="h-4 w-4"/></Button>
+                    </DrawerTrigger>
+                    <DrawerContent side="right" className="p-0">
+                        {rightPanelContent}
+                    </DrawerContent>
+                 </Drawer>
+            )}
+        </div>
       </main>
       
-      <aside className="w-[350px] flex flex-col bg-card border-l">
-        <CardHeader>
-            <CardTitle>Tools & Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className='flex-1 overflow-y-auto'>
-            {selectedArtwork ? (
-                <div className='space-y-4'>
-                    <div>
-                        <Label>Width (inches)</Label>
-                        <Input 
-                            type="number" 
-                            value={selectedArtwork.width.toFixed(2)}
-                            onChange={(e) => updateArtworkSize(selectedArtwork.id, parseFloat(e.target.value))}
-                        />
-                    </div>
-                    <div>
-                        <Label>Height (inches)</Label>
-                        <Input 
-                           type="number"
-                           value={selectedArtwork.height.toFixed(2)}
-                           readOnly
-                           className='bg-muted'
-                        />
-                    </div>
-                     <div className="flex gap-2 pt-2">
-                        <Button variant="outline" className="w-full" onClick={() => handleDuplicateArtwork(selectedArtwork.id)}>
-                            <Copy className="mr-2"/> Duplicate
-                        </Button>
-                    </div>
-                    <AiAnalysisPanel artwork={selectedArtwork} onAnalyze={() => handleAnalyze(selectedArtwork.id)} />
-                </div>
-            ) : (
-                <div className="flex items-center justify-center h-full text-center text-muted-foreground">
-                    <p>Select an artwork to see tools and AI analysis.</p>
-                </div>
-            )}
-        </CardContent>
-      </aside>
+      {!isMobile && <aside className="w-[350px] h-full">{rightPanelContent}</aside>}
     </div>
   );
 }
+
+    
