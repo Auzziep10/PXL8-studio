@@ -517,7 +517,6 @@ function CartPageContents() {
 
 
 export default function CartPage() {
-    // This top-level component now ensures the context is provided.
     return (
         <CartProvider>
             <CartPageContents />
