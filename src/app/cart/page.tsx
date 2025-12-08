@@ -6,8 +6,8 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { mockSheetSizes, mockUsers } from '@/lib/data';
-import { SheetSize, ShippingRate, OrderStatus, User, CartItem as CartEntry, ShippingAddress } from '@/lib/types';
+import { mockUsers } from '@/lib/data';
+import { ShippingRate, User, ShippingAddress } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -15,8 +15,6 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
-import { SHEET_DIMENSIONS } from '@/lib/constants';
-
 
 interface CheckoutFormData {
     firstName: string;
@@ -103,6 +101,7 @@ function CartPageContents() {
         if (formData.zip.length >= 5 && formData.state && formData.city) {
             fetchRates();
         }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [formData.zip, formData.city, formData.state, cartItems]);
 
     const fetchRates = async () => {
@@ -236,7 +235,7 @@ function CartPageContents() {
                                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                                         onClick={() => setPreviewImage(item.compositeImageUrl)}
                                     >
-                                        <Image src={item.compositeImageUrl} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
+                                        <Image src={item.compositeImageUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <ZoomIn className="w-5 h-5 text-white" />
                                         </div>
@@ -518,6 +517,7 @@ function CartPageContents() {
 
 
 export default function CartPage() {
+    // This top-level component now ensures the context is provided.
     return (
         <CartProvider>
             <CartPageContents />
