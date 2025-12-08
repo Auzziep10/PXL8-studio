@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { useCart, CartProvider } from '@/hooks/use-cart';
+import { useCart } from '@/hooks/use-cart';
 import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, User as UserIcon, MapPin, Mail, Phone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -29,7 +29,7 @@ interface CheckoutFormData {
     password?: string;
 }
 
-function CartPageContents() {
+export default function CartPage() {
     const { items: cartItems, removeItem, updateItemQuantity, clearCart } = useCart();
     const { toast } = useToast();
     
@@ -515,11 +515,4 @@ function CartPageContents() {
     );
 }
 
-
-export default function CartPage() {
-    return (
-        <CartProvider>
-            <CartPageContents />
-        </CartProvider>
-    )
-}
+    
