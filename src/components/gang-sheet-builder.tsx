@@ -654,7 +654,6 @@ export default function GangSheetBuilder() {
       </div>
     </div>
   );
-};
+}
 
-export default GangSheetBuilder;
-```
+    
