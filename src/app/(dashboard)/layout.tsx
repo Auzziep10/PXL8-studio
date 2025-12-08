@@ -46,13 +46,16 @@ export default function DashboardLayout({
           <SidebarMenu>
             {navItems.filter(item => item.roles.includes(userRole)).map((item) => (
               <SidebarMenuItem key={item.href}>
-                <Link href={item.href} passHref legacyBehavior>
+                <Link href={item.href} passHref>
                   <SidebarMenuButton
+                    asChild
                     isActive={pathname === item.href}
                     tooltip={{ children: item.label }}
                   >
-                    <item.icon />
-                    <span>{item.label}</span>
+                    <span>
+                      <item.icon />
+                      <span>{item.label}</span>
+                    </span>
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
@@ -62,18 +65,22 @@ export default function DashboardLayout({
         <SidebarFooter>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <Link href="#" passHref legacyBehavior>
-                        <SidebarMenuButton tooltip={{ children: 'Settings' }}>
-                            <Settings />
-                            <span>Settings</span>
+                    <Link href="#" passHref>
+                        <SidebarMenuButton asChild tooltip={{ children: 'Settings' }}>
+                            <span>
+                                <Settings />
+                                <span>Settings</span>
+                            </span>
                         </SidebarMenuButton>
                     </Link>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                    <Link href="#" passHref legacyBehavior>
-                        <SidebarMenuButton tooltip={{ children: 'Logout' }}>
-                            <LogOut />
-                            <span>Logout</span>
+                    <Link href="#" passHref>
+                        <SidebarMenuButton asChild tooltip={{ children: 'Logout' }}>
+                            <span>
+                                <LogOut />
+                                <span>Logout</span>
+                            </span>
                         </SidebarMenuButton>
                     </Link>
                 </SidebarMenuItem>
