@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -80,8 +81,8 @@ export default function DashboardLayout({
         </SidebarFooter>
       </Sidebar>
       <SidebarInset>
-        <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-            <SidebarTrigger />
+        <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+            <SidebarTrigger className="sm:hidden" />
             <div className='flex-1'>
                 <h1 className="text-xl font-semibold capitalize">
                     {pathname.split('/').pop()}

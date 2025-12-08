@@ -1,13 +1,14 @@
+
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Box, UploadCloud } from 'lucide-react';
+import { ArrowRight, Box } from 'lucide-react';
 import Link from 'next/link';
 
 export default function Home() {
   return (
     <div className="relative isolate overflow-hidden bg-background">
-      <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:px-8 lg:pt-40">
-        <div className="mx-auto max-w-2xl lg:mx-0 lg:max-w-xl lg:flex-shrink-0 lg:pt-8">
-          <div className="mt-24 sm:mt-32 lg:mt-16">
+      <div className="mx-auto max-w-7xl px-6 pb-24 pt-10 sm:pb-32 lg:flex lg:items-center lg:gap-x-10 lg:px-8 lg:pt-40">
+        <div className="mx-auto max-w-2xl lg:mx-0 lg:flex-auto">
+          <div className="flex">
             <div className="inline-flex space-x-6">
               <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-semibold leading-6 text-primary ring-1 ring-inset ring-primary/20">
                 PXL8 DTF Platform
@@ -33,10 +34,9 @@ export default function Home() {
             </Button>
           </div>
         </div>
-        <div className="mx-auto mt-16 flex max-w-2xl sm:mt-24 lg:ml-10 lg:mr-0 lg:mt-0 lg:max-w-none lg:flex-none xl:ml-32">
-          <div className="max-w-3xl flex-none sm:max-w-5xl lg:max-w-none">
+        <div className="mt-16 sm:mt-24 lg:mt-0 lg:flex-shrink-0 lg:flex-grow">
             <div className="-m-2 rounded-xl bg-muted/5 p-2 ring-1 ring-inset ring-border/10 lg:-m-4 lg:rounded-2xl lg:p-4">
-              <div className="relative aspect-[780/540] w-[48.75rem] rounded-2xl bg-card shadow-2xl ring-1 ring-border/10 checkerboard">
+              <div className="aspect-w-16 aspect-h-9 rounded-2xl bg-card shadow-2xl ring-1 ring-border/10 checkerboard">
                 <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
                    <div className="flex flex-col items-center gap-4 text-center">
                     <div className="p-4 bg-background/50 backdrop-blur-sm rounded-full border border-dashed border-primary/50">
@@ -48,7 +48,6 @@ export default function Home() {
                 </div>
               </div>
             </div>
-          </div>
         </div>
       </div>
       <div
