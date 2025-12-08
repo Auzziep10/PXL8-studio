@@ -214,7 +214,7 @@ export default function AdminPage() {
     if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
         const found = orders.find(o => 
             o.orderId === searchTerm || 
-            (Array.isArray(o.items) && o.items.some(i => (i.artworks[0] as any).id === searchTerm))
+            (Array.isArray(o.items) && o.items.some(i => i.artworks && i.artworks.length > 0 && i.artworks[0].id.includes(searchTerm)))
         );
         if (found) {
             setSelectedOrderId(found.orderId);
@@ -245,7 +245,7 @@ export default function AdminPage() {
         const id = (order.orderId || '').toLowerCase();
         const name = (order.customerName || '').toLowerCase();
         const items = Array.isArray(order.items) ? order.items : [];
-        const hasTracking = items.some(i => (i.artworks[0] as any).id.includes(term));
+        const hasTracking = items.some(i => i.artworks && i.artworks.length > 0 && (i.artworks[0] as any).id.includes(term));
         
         return id.includes(term) || name.includes(term) || hasTracking;
     });
