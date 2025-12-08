@@ -1,14 +1,17 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SheetSize, GangSheetItem } from '@/lib/types';
+import { SheetSize, GangSheetItem, CartItem } from '@/lib/types';
 import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
 import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown } from 'lucide-react';
 import { analyzeArtwork } from '@/services/geminiService';
 import { useCart } from '@/hooks/use-cart';
+import { useToast } from '@/hooks/use-toast';
 
 export default function GangSheetBuilder() {
   const { addItem: addToCart } = useCart();
+  const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<SheetSize>(SheetSize.MEDIUM);
   const [items, setItems] = useState<GangSheetItem[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -217,18 +220,25 @@ export default function GangSheetBuilder() {
   const handleMouseUp = () => {
       setDraggingId(null);
   };
+  
+  const handleMouseLeave = () => {
+    setDraggingId(null);
+  }
 
   useEffect(() => {
       if (draggingId) {
           window.addEventListener('mousemove', handleMouseMove);
           window.addEventListener('mouseup', handleMouseUp);
+          window.addEventListener('mouseleave', handleMouseLeave);
       } else {
           window.removeEventListener('mousemove', handleMouseMove);
           window.removeEventListener('mouseup', handleMouseUp);
+          window.removeEventListener('mouseleave', handleMouseLeave);
       }
       return () => {
           window.removeEventListener('mousemove', handleMouseMove);
           window.removeEventListener('mouseup', handleMouseUp);
+          window.removeEventListener('mouseleave', handleMouseLeave);
       };
   }, [draggingId, handleMouseMove]);
 
@@ -254,7 +264,7 @@ export default function GangSheetBuilder() {
     if (!ctx) throw new Error('No canvas context');
 
     const BASE_DPI = 300;
-    const MAX_DIMENSION = 2048; // Limit dimensions for browser/storage compatibility
+    const MAX_DIMENSION = 4096; // Increased for better quality
 
     const wPixels = sheetConfig.width * BASE_DPI;
     const hPixels = sheetConfig.height * BASE_DPI;
@@ -309,24 +319,9 @@ export default function GangSheetBuilder() {
     setIsGenerating(true);
     try {
         const compositeUrl = await generateCompositeSheet();
-        const trackingId = `TRK-${Math.floor(Math.random() * 1000000)}`;
         
-        const sheetItem: GangSheetItem = {
-            id: Date.now().toString(),
-            trackingId: trackingId,
-            file: null,
-            previewUrl: compositeUrl, 
-            printReadyUrl: undefined, 
-            width: SHEET_DIMENSIONS[selectedSize].width,
-            height: SHEET_DIMENSIONS[selectedSize].height,
-            quantity: 1, 
-            originalWidthPx: SHEET_DIMENSIONS[selectedSize].width * 300, 
-            originalHeightPx: SHEET_DIMENSIONS[selectedSize].height * 300,
-            x: 0,
-            y: 0
-        };
         const config = SHEET_DIMENSIONS[selectedSize];
-        addToCart({
+        const cartItem: CartItem = {
           id: `sheet-${Date.now()}`,
           sheetSize: {
             name: `${config.width}" x ${config.height}"`,
@@ -335,13 +330,37 @@ export default function GangSheetBuilder() {
             price: config.price
           },
           compositeImageUrl: compositeUrl,
-          artworks: [], // The new structure doesn't seem to need this.
+          artworks: items.map(i => ({
+            id: i.id,
+            name: i.file?.name || 'artwork',
+            imageUrl: i.previewUrl,
+            width: i.width,
+            height: i.height,
+            dpi: i.originalWidthPx / i.width,
+            x: i.x,
+            y: i.y,
+            canvasWidth: i.width * PPI,
+            canvasHeight: i.height * PPI,
+            quantity: i.quantity,
+          })),
           quantity: 1,
+        };
+
+        addToCart(cartItem);
+        toast({
+          title: "Added to Cart",
+          description: `${cartItem.sheetSize.name} gang sheet.`
         });
+        setItems([]);
+
 
     } catch (e) {
         console.error("Error generating sheet", e);
-        alert("Failed to generate print file. The canvas might be too large for this browser.");
+        toast({
+            variant: "destructive",
+            title: "Error Generating Sheet",
+            description: "Could not generate the print file. The canvas might be too large."
+        });
     } finally {
         setIsGenerating(false);
     }
@@ -367,7 +386,7 @@ export default function GangSheetBuilder() {
               </h3>
               <div className="space-y-3">
                 {Object.entries(SHEET_DIMENSIONS).map(([key, config]) => (
-                  <label key={key} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSize === key ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
+                  <label key={key} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSize === key ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
                     <div className="flex items-center relative z-10">
                       <input
                         type="radio"
@@ -375,12 +394,12 @@ export default function GangSheetBuilder() {
                         value={key}
                         checked={selectedSize === key}
                         onChange={(e) => setSelectedSize(e.target.value as SheetSize)}
-                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-zinc-600 bg-zinc-800"
+                        className="h-4 w-4 text-primary focus:ring-primary border-zinc-600 bg-zinc-800"
                       />
                       <span className="ml-3 font-medium text-gray-200">{config.width}" x {config.height}"</span>
                     </div>
-                    <span className="font-bold text-emerald-400 relative z-10">${config.price}</span>
-                    {selectedSize === key && <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent pointer-events-none" />}
+                    <span className="font-bold text-accent relative z-10">${config.price}</span>
+                    {selectedSize === key && <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />}
                   </label>
                 ))}
               </div>
@@ -406,10 +425,10 @@ export default function GangSheetBuilder() {
               {items.length === 0 ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-orange-500 hover:bg-orange-500/5 transition-colors cursor-pointer group"
+                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
                 >
                   <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-orange-400" />
+                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
                   </div>
                   <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
                   <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
@@ -461,7 +480,7 @@ export default function GangSheetBuilder() {
                                                      updateItem(item.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
                                                  }
                                               }}
-                                              className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                                              className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                             />
                                             <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
                                         </div>
@@ -529,7 +548,7 @@ export default function GangSheetBuilder() {
             <button
                 disabled={items.length === 0 || isSheetOverflowing || isGenerating}
                 onClick={handleProcessAndAddToCart}
-                className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all transform hover:-translate-y-0.5"
+                className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
             >
                 {isGenerating ? 'Generating...' : `Add to Cart - $${sheetConfig.price}`}
                 {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
@@ -552,14 +571,13 @@ export default function GangSheetBuilder() {
             </div>
 
             {/* The Sheet Canvas */}
-            <div className="relative builder-scroll overflow-y-auto max-h-[80vh] shadow-2xl bg-zinc-950 border border-white/10 z-10 rounded-sm">
-                 <div className="sticky top-0 z-20 w-full h-6 bg-zinc-900 border-b border-white/10 text-zinc-500 text-[10px] flex items-end justify-between px-2 font-mono">
-                    <span>0"</span>
-                    <span>{sheetConfig.width}" Width</span>
-                 </div>
-
+            <div 
+                className="relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center"
+                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
+            >
                  <div 
-                    className="relative bg-checkerboard-dark sheet-canvas"
+                    className="relative bg-checkerboard-dark sheet-canvas shadow-2xl bg-zinc-950 border border-white/10 rounded-sm"
                     style={{
                         width: `${displayWidth}px`,
                         height: `${displayHeight}px`,
@@ -619,14 +637,11 @@ export default function GangSheetBuilder() {
                         );
                     })}
                     
-                    {/* Ruler Right */}
-                    <div className="absolute -right-12 top-0 bottom-0 flex flex-col justify-center items-center">
-                        <div className="h-full w-px bg-zinc-700 relative"></div>
-                        <span className="bg-zinc-800 border border-white/10 text-zinc-400 text-xs px-2 py-1 rounded absolute whitespace-nowrap shadow-lg" style={{ transform: 'rotate(90deg)' }}>
-                            {sheetConfig.height}" Height
-                        </span>
-                    </div>
                  </div>
+            </div>
+            <div className="w-full flex justify-between text-zinc-500 text-xs mt-2 font-mono">
+                <span>0"</span>
+                <span>{sheetConfig.width}"</span>
             </div>
             
             <div className="mt-4 text-xs text-zinc-500 flex items-center">
@@ -640,3 +655,6 @@ export default function GangSheetBuilder() {
     </div>
   );
 };
+
+export default GangSheetBuilder;
+```
