@@ -10,7 +10,14 @@ export interface User {
   ltv: number;
 }
 
-export type OrderStatus = 'Pending' | 'Processing' | 'Printed' | 'Shipped' | 'Delivered' | 'Cancelled';
+export enum OrderStatus {
+  PENDING = 'Pending',
+  PROCESSING = 'Processing',
+  PRINTED = 'Printed',
+  SHIPPED = 'Shipped',
+  DELIVERED = 'Delivered',
+  CANCELLED = 'Cancelled',
+}
 
 export interface ShippingAddress {
     street: string;
@@ -83,6 +90,8 @@ export interface GangSheetItem {
     file: File | null;
     previewUrl: string;
     printReadyUrl?: string;
+    originalUrl?: string;
+    originalFileName?: string;
     trackingId?: string;
     width: number; // inches
     height: number; // inches

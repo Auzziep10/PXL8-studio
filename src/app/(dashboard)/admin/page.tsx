@@ -25,16 +25,16 @@ const AssetCard: React.FC<{ item: GangSheetItem; index: number; onPreview: (url:
     
     // Check available assets
     const hasPrintReady = !!item.printReadyUrl;
-    const hasOriginal = !!item.previewUrl; // Assuming previewUrl is the original
+    const hasOriginal = !!item.originalUrl;
     
     // Determine which URL to show in preview
     // Priority: Print Ready (Default) -> Preview -> Original (If toggled)
     const displayUrl = (hasPrintReady && !showOriginal) 
         ? item.printReadyUrl 
-        : (showOriginal && hasOriginal ? item.previewUrl : item.previewUrl);
+        : (showOriginal && item.originalUrl ? item.originalUrl : item.previewUrl);
     
     // Determine download link
-    const downloadUrl = (showOriginal && hasOriginal) ? item.previewUrl : (item.printReadyUrl || item.previewUrl);
+    const downloadUrl = (showOriginal && item.originalUrl) ? item.originalUrl : (item.printReadyUrl || item.previewUrl);
     
     return (
         <div className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden shadow-sm hover:border-white/20 transition-colors">
@@ -43,10 +43,10 @@ const AssetCard: React.FC<{ item: GangSheetItem; index: number; onPreview: (url:
                 <div>
                      <div className="flex items-center gap-2 mb-1">
                         <span className="text-white font-bold text-sm">Sheet #{index + 1}</span>
-                        {(item.file?.name) && (
-                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-white/5 text-zinc-400 text-xs truncate max-w-[200px] flex items-center" title={item.file?.name}>
+                        {(item.originalFileName || item.file?.name) && (
+                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-white/5 text-zinc-400 text-xs truncate max-w-[200px] flex items-center" title={item.originalFileName || item.file?.name}>
                                 <FileText className="w-3 h-3 mr-1 opacity-50" />
-                                {item.file?.name}
+                                {item.originalFileName || item.file?.name}
                              </span>
                         )}
                      </div>
@@ -214,7 +214,7 @@ export default function AdminPage() {
     if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
         const found = orders.find(o => 
             o.orderId === searchTerm || 
-            (Array.isArray(o.items) && o.items.some(i => i.artworks.some(a => a.id === searchTerm)))
+            (Array.isArray(o.items) && o.items.some(i => (i.artworks[0] as any).id === searchTerm))
         );
         if (found) {
             setSelectedOrderId(found.orderId);
@@ -245,7 +245,7 @@ export default function AdminPage() {
         const id = (order.orderId || '').toLowerCase();
         const name = (order.customerName || '').toLowerCase();
         const items = Array.isArray(order.items) ? order.items : [];
-        const hasTracking = items.some(i => i.artworks.some(a => a.id.includes(term)));
+        const hasTracking = items.some(i => (i.artworks[0] as any).id.includes(term));
         
         return id.includes(term) || name.includes(term) || hasTracking;
     });
@@ -297,21 +297,21 @@ export default function AdminPage() {
 
   const getStatusColor = (status: OrderStatus) => {
     switch (status) {
-        case 'Pending': return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
-        case 'Processing': return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
-        case 'Printed': return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
-        case 'Shipped': return 'bg-primary/20 text-primary border-primary/30';
-        case 'Delivered': return 'bg-accent/20 text-accent border-accent/30';
+        case OrderStatus.PENDING: return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
+        case OrderStatus.PROCESSING: return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
+        case OrderStatus.PRINTED: return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
+        case OrderStatus.SHIPPED: return 'bg-primary/20 text-primary border-primary/30';
+        case OrderStatus.DELIVERED: return 'bg-accent/20 text-accent border-accent/30';
         default: return 'bg-zinc-800 text-zinc-400 border-zinc-700';
     }
   };
 
   const statusWorkflow: OrderStatus[] = [
-    'Pending',
-    'Processing',
-    'Printed',
-    'Shipped',
-    'Delivered'
+    OrderStatus.PENDING,
+    OrderStatus.PROCESSING,
+    OrderStatus.PRINTED,
+    OrderStatus.SHIPPED,
+    OrderStatus.DELIVERED,
   ];
 
   const getNextStatus = (current: OrderStatus): OrderStatus | null => {
@@ -629,7 +629,7 @@ export default function AdminPage() {
                                          </div>
                                          <div className="space-y-6">
                                             {Array.isArray(selectedOrder.items) && selectedOrder.items.map((item, idx) => (
-                                                <AssetCard key={idx} item={{...item.artworks[0], file: null, printReadyUrl: selectedOrder.printReadyUrl, originalUrl: selectedOrder.previewUrl, originalFileName: 'user-upload.png' }} index={idx} onPreview={setPreviewImage} />
+                                                <AssetCard key={idx} item={{...(item.artworks[0] as any), file: null, printReadyUrl: selectedOrder.printReadyUrl, originalUrl: selectedOrder.previewUrl, originalFileName: 'user-upload.png' }} index={idx} onPreview={setPreviewImage} />
                                             ))}
                                          </div>
                                     </div>
