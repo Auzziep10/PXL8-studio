@@ -306,6 +306,10 @@ export default function GangSheetBuilder() {
     dragInfo.current.isDragging = false;
   };
 
+  const handleMouseLeave = () => {
+    dragInfo.current.isDragging = false;
+  };
+
   const handleDuplicateArtwork = (artworkId: string) => {
     const artworkToDuplicate = artworks.find(art => art.id === artworkId);
     if (!artworkToDuplicate) return;
@@ -504,5 +508,3 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
-
-    
