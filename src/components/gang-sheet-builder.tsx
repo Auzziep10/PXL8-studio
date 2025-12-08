@@ -1,510 +1,642 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Copy,
-  Trash2,
-  UploadCloud,
-  Wand2,
-  ZoomIn,
-  ZoomOut,
-  Settings,
-  X,
-} from 'lucide-react';
-import { mockSheetSizes } from '@/lib/data';
-import type { ArtworkOnCanvas, SheetSize } from '@/lib/types';
-import { ScrollArea } from './ui/scroll-area';
-import Image from 'next/image';
-import { useToast } from '@/hooks/use-toast';
-import { analyzeArtwork } from '@/app/actions';
-import AiAnalysisPanel from './ai-analysis-panel';
-import { useCart } from '@/hooks/use-cart.tsx';
-import { cn } from '@/lib/utils';
-import { Sheet as Drawer, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { useIsMobile } from '@/hooks/use-mobile';
-
-
-const DPI = 300; // Standard print DPI
-
-function ArtworkItem({ artwork, onAnalyze, onRemove, isSelected }: { artwork: ArtworkOnCanvas; onAnalyze: () => void; onRemove: () => void; isSelected: boolean }) {
-    return (
-        <div className={cn("flex items-center gap-2 p-2 rounded-md border", isSelected ? "border-primary bg-primary/10" : "bg-secondary")}>
-            <Image src={artwork.imageUrl} alt={artwork.name} width={40} height={40} className="rounded-sm" />
-            <div className="flex-1 text-sm overflow-hidden">
-                <p className="font-medium truncate">{artwork.name}</p>
-                <p className="text-xs text-muted-foreground">{artwork.width.toFixed(2)}" x {artwork.height.toFixed(2)}"</p>
-            </div>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onAnalyze} disabled={artwork.analysisLoading}>
-              <Wand2 className={cn("h-4 w-4", artwork.analysisLoading && "animate-spin")} />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={onRemove}>
-                <Trash2 className="h-4 w-4"/>
-            </Button>
-        </div>
-    )
-}
-
-function ArtworkPanel({ artworks, selectedArtworkId, onFileChange, onArtworkSelect, onAnalyze, onRemove }: { artworks: ArtworkOnCanvas[], selectedArtworkId: string | null, onFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void, onArtworkSelect: (id: string) => void, onAnalyze: (id: string) => void, onRemove: (id: string) => void }) {
-    return (
-        <div className="flex-grow flex flex-col border rounded-lg p-2 gap-2 overflow-hidden">
-            <Label htmlFor="artwork-upload-button" className="w-full">
-            <div className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer bg-secondary hover:bg-muted">
-                <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                    <UploadCloud className="w-8 h-8 mb-2 text-muted-foreground" />
-                    <p className="mb-2 text-sm text-muted-foreground"><span className="font-semibold">Click to upload</span> or drag and drop</p>
-                    <p className="text-xs text-muted-foreground">PNG, JPG (300 DPI recommended)</p>
-                </div>
-                <Input id="artwork-upload-button" type="file" className="hidden" onChange={onFileChange} multiple accept="image/png, image/jpeg"/>
-            </div>
-        </Label>
-        <ScrollArea className='flex-1'>
-            <div className="space-y-2 pr-2">
-            {artworks.map(art => (
-                <div key={art.id} onClick={() => onArtworkSelect(art.id)}>
-                    <ArtworkItem 
-                        artwork={art} 
-                        onAnalyze={() => onAnalyze(art.id)}
-                        onRemove={() => onRemove(art.id)}
-                        isSelected={selectedArtworkId === art.id}
-                    />
-                </div>
-            ))}
-            </div>
-        </ScrollArea>
-        </div>
-    )
-}
-
-function ToolsPanel({ selectedArtwork, onUpdateSize, onDuplicate, onAnalyze }: { selectedArtwork: ArtworkOnCanvas | undefined, onUpdateSize: (id: string, width: number) => void, onDuplicate: (id: string) => void, onAnalyze: (id: string) => void }) {
-    if (!selectedArtwork) {
-        return (
-            <div className="flex items-center justify-center h-full text-center text-muted-foreground">
-                <p>Select an artwork to see tools and AI analysis.</p>
-            </div>
-        )
-    }
-
-    return (
-        <div className='space-y-4'>
-            <div>
-                <Label>Width (inches)</Label>
-                <Input 
-                    type="number" 
-                    value={selectedArtwork.width.toFixed(2)}
-                    onChange={(e) => onUpdateSize(selectedArtwork.id, parseFloat(e.target.value))}
-                />
-            </div>
-            <div>
-                <Label>Height (inches)</Label>
-                <Input 
-                   type="number"
-                   value={selectedArtwork.height.toFixed(2)}
-                   readOnly
-                   className='bg-muted'
-                />
-            </div>
-             <div className="flex gap-2 pt-2">
-                <Button variant="outline" className="w-full" onClick={() => onDuplicate(selectedArtwork.id)}>
-                    <Copy className="mr-2"/> Duplicate
-                </Button>
-            </div>
-            <AiAnalysisPanel artwork={selectedArtwork} onAnalyze={() => onAnalyze(selectedArtwork.id)} />
-        </div>
-    )
-}
-
+import { SheetSize, GangSheetItem } from '@/lib/types';
+import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown } from 'lucide-react';
+import { analyzeArtwork } from '@/services/geminiService';
+import { useCart } from '@/hooks/use-cart';
 
 export default function GangSheetBuilder() {
-  const [selectedSheet, setSelectedSheet] = useState<SheetSize>(
-    mockSheetSizes[2]
-  );
-  const [artworks, setArtworks] = useState<ArtworkOnCanvas[]>([]);
-  const [zoom, setZoom] = useState(0.5);
-  const [selectedArtworkId, setSelectedArtworkId] = useState<string | null>(
-    null
-  );
-  const [isLeftPanelOpen, setIsLeftPanelOpen] = useState(false);
-  const [isRightPanelOpen, setIsRightPanelOpen] = useState(false);
-  const isMobile = useIsMobile();
+  const { addItem: addToCart } = useCart();
+  const [selectedSize, setSelectedSize] = useState<SheetSize>(SheetSize.MEDIUM);
+  const [items, setItems] = useState<GangSheetItem[]>([]);
+  const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  
+  // Duplication State
+  const [duplicateCount, setDuplicateCount] = useState(1);
+  
+  // Analysis State
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
+  const [printabilityScore, setPrintabilityScore] = useState<number | null>(null);
+  
+  // Dragging State
+  const [draggingId, setDraggingId] = useState<string | null>(null);
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(0.25);
 
+  const sheetConfig = SHEET_DIMENSIONS[selectedSize];
 
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const dragInfo = useRef<{
-    isDragging: boolean;
-    artworkId: string | null;
-    offsetX: number;
-    offsetY: number;
-  }>({ isDragging: false, artworkId: null, offsetX: 0, offsetY: 0 });
-
-  const { toast } = useToast();
-  const cart = useCart();
-  const addItem = cart.addItem;
-
-  const canvasWidth = selectedSheet.width * DPI * zoom;
-  const canvasHeight = selectedSheet.height * DPI * zoom;
-
-  const drawCanvas = useCallback(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    artworks.forEach((art) => {
-      const img = document.getElementById(
-        `img-${art.id}`
-      ) as HTMLImageElement;
-      if (img) {
-        ctx.drawImage(img, art.x, art.y, art.canvasWidth, art.canvasHeight);
-
-        // Collision detection
-        const isOutOfBounds =
-          art.x < 0 ||
-          art.y < 0 ||
-          art.x + art.canvasWidth > canvas.width ||
-          art.y + art.canvasHeight > canvas.height;
-
-        let isOverlapping = false;
-        for (const otherArt of artworks) {
-          if (art.id === otherArt.id) continue;
-          if (
-            art.x < otherArt.x + otherArt.canvasWidth &&
-            art.x + art.canvasWidth > otherArt.x &&
-            art.y < otherArt.y + otherArt.canvasHeight &&
-            art.y + art.canvasHeight > otherArt.y
-          ) {
-            isOverlapping = true;
-            break;
-          }
-        }
-
-        if (isOutOfBounds || isOverlapping) {
-          ctx.strokeStyle = '#FF0000';
-          ctx.lineWidth = 4 * zoom;
-          ctx.strokeRect(art.x, art.y, art.canvasWidth, art.canvasHeight);
-        }
-
-        if (art.id === selectedArtworkId) {
-            ctx.strokeStyle = 'hsl(var(--primary))';
-            ctx.lineWidth = 4 * zoom;
-            ctx.strokeRect(art.x, art.y, art.canvasWidth, art.canvasHeight);
-        }
-      }
-    });
-  }, [artworks, zoom, canvasWidth, canvasHeight, selectedArtworkId]);
-
+  // --- Auto-Scaling for Preview ---
   useEffect(() => {
-    drawCanvas();
-  }, [drawCanvas]);
+    const handleResize = () => {
+        if (!containerRef.current) return;
+        const containerW = containerRef.current.clientWidth;
+        const availableW = Math.max(0, containerW - 90); 
+        const sheetPxW = sheetConfig.width * PPI;
+        
+        let newScale = availableW / sheetPxW;
+        newScale = Math.min(Math.max(newScale, 0.05), 1.0);
+        
+        setScale(newScale);
+    };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files) {
-      Array.from(e.target.files).forEach((file) => {
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          const img = new window.Image();
-          img.onload = () => {
-            const newArtwork: ArtworkOnCanvas = {
-              id: `${Date.now()}-${Math.random()}`,
-              name: file.name,
-              imageUrl: img.src,
-              width: img.naturalWidth / DPI,
-              height: img.naturalHeight / DPI,
-              dpi: DPI,
-              x: 0,
-              y: 0,
-              canvasWidth: img.naturalWidth * zoom,
-              canvasHeight: img.naturalHeight * zoom,
-              quantity: 1,
-            };
-            setArtworks((prev) => [...prev, newArtwork]);
-          };
-          img.src = event.target?.result as string;
-        };
-        reader.readAsDataURL(file);
-      });
+    handleResize();
+    const resizeObserver = new ResizeObserver(handleResize);
+    if (containerRef.current) {
+        resizeObserver.observe(containerRef.current);
     }
-  };
+    return () => resizeObserver.disconnect();
+  }, [selectedSize, sheetConfig.width]); 
 
-  const updateArtworkSize = (id: string, newWidthInches: number) => {
-    setArtworks(artworks.map(art => {
-      if (art.id === id) {
-        const aspectRatio = art.height / art.width;
-        const newHeightInches = newWidthInches * aspectRatio;
-        return {
-          ...art,
-          width: newWidthInches,
-          height: newHeightInches,
-          canvasWidth: newWidthInches * DPI * zoom,
-          canvasHeight: newHeightInches * DPI * zoom,
-        };
-      }
-      return art;
-    }));
-  };
+  const displayWidth = sheetConfig.width * PPI * scale;
+  const displayHeight = sheetConfig.height * PPI * scale;
 
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
+  // --- Auto-Positioning Algorithm ---
+  const findOpenPosition = (width: number, height: number, existingItems: GangSheetItem[]): {x: number, y: number} => {
+    const margin = 0.25; // inch margin
+    const step = 0.5; // check every half inch
 
-    const clickedArtwork = [...artworks].reverse().find(art => 
-        mouseX >= art.x && mouseX <= art.x + art.canvasWidth &&
-        mouseY >= art.y && mouseY <= art.y + art.canvasHeight
-    );
+    // Simple scan: Top to bottom, left to right
+    for (let y = margin; y < sheetConfig.height - height; y += step) {
+        for (let x = margin; x < sheetConfig.width - width; x += step) {
+            
+            // Check collision with all existing items at this position
+            const collision = existingItems.some(item => {
+                return !(
+                    x + width + margin <= item.x ||    // New is to left of Existing
+                    x >= item.x + item.width + margin || // New is to right of Existing
+                    y + height + margin <= item.y ||   // New is above Existing
+                    y >= item.y + item.height + margin   // New is below Existing
+                );
+            });
 
-    if (clickedArtwork) {
-        setSelectedArtworkId(clickedArtwork.id);
-        dragInfo.current = {
-            isDragging: true,
-            artworkId: clickedArtwork.id,
-            offsetX: mouseX - clickedArtwork.x,
-            offsetY: mouseY - clickedArtwork.y,
-        };
-    } else {
-        setSelectedArtworkId(null);
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!dragInfo.current.isDragging || !dragInfo.current.artworkId) return;
-
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const mouseX = e.clientX - rect.left;
-    const mouseY = e.clientY - rect.top;
-
-    setArtworks(currentArtworks =>
-      currentArtworks.map(art =>
-        art.id === dragInfo.current.artworkId
-          ? {
-              ...art,
-              x: mouseX - dragInfo.current.offsetX,
-              y: mouseY - dragInfo.current.offsetY,
+            if (!collision) {
+                return { x, y };
             }
-          : art
-      )
-    );
+        }
+    }
+    // Fallback: Place at 0,0 (Overlap will be visually flagged)
+    return { x: 0, y: 0 };
   };
+
+  // --- File Upload ---
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    event.target.value = '';
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const img = new Image();
+      img.onload = async () => {
+        const PRINT_DPI = 300;
+        const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
+        const h = parseFloat((img.height / PRINT_DPI).toFixed(2));
+
+        const pos = findOpenPosition(w, h, items);
+
+        const newItem: GangSheetItem = {
+          id: Date.now().toString(),
+          file: file,
+          previewUrl: e.target?.result as string,
+          width: w,
+          height: h,
+          quantity: 1,
+          originalWidthPx: img.width,
+          originalHeightPx: img.height,
+          x: pos.x,
+          y: pos.y
+        };
+
+        setItems(prev => [...prev, newItem]);
+        setSelectedItemId(newItem.id);
+        setDuplicateCount(1); // Reset duplicate count on new upload
+        
+        // AI Analysis
+        setIsAnalyzing(true);
+        const base64Data = (e.target?.result as string).split(',')[1];
+        const result = await analyzeArtwork(base64Data, file.type);
+        setAiFeedback(result.feedback);
+        setPrintabilityScore(result.score);
+        setIsAnalyzing(false);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  // --- Item Management ---
+  const updateItem = (id: string, updates: Partial<GangSheetItem>) => {
+    setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
+  };
+
+  const removeItem = (id: string) => {
+      setItems(prev => prev.filter(item => item.id !== id));
+      if (selectedItemId === id) setSelectedItemId(null);
+  };
+
+  const handleBulkDuplicate = (itemToClone: GangSheetItem, count: number) => {
+      const newItems: GangSheetItem[] = [];
+      // We must check against both original items AND the newly added duplicates 
+      // so they don't stack on top of each other.
+      let currentItemsForCheck = [...items];
+
+      for (let i = 0; i < count; i++) {
+          const pos = findOpenPosition(itemToClone.width, itemToClone.height, currentItemsForCheck);
+          
+          const newItem: GangSheetItem = {
+              ...itemToClone,
+              id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`,
+              x: pos.x,
+              y: pos.y
+          };
+          newItems.push(newItem);
+          currentItemsForCheck.push(newItem);
+      }
+      setItems(prev => [...prev, ...newItems]);
+      setDuplicateCount(1); // Reset after adding
+  };
+
+  // --- Drag and Drop Handlers ---
+  const handleMouseDown = (e: React.MouseEvent, id: string) => {
+      e.stopPropagation();
+      e.preventDefault();
+      
+      const item = items.find(i => i.id === id);
+      if (!item) return;
+
+      setSelectedItemId(id);
+      setDraggingId(id);
+
+      // Calculate click offset within the item (in pixels relative to item top-left)
+      const rect = (e.target as Element).closest('.draggable-item')?.getBoundingClientRect();
+      if (rect) {
+          setDragOffset({
+              x: e.clientX - rect.left,
+              y: e.clientY - rect.top
+          });
+      }
+  };
+
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+      if (!draggingId || !containerRef.current) return;
+      
+      // We need to convert mouse movement (pixels) to sheet coordinates (inches)
+      const sheetRect = containerRef.current.querySelector('.sheet-canvas')?.getBoundingClientRect();
+      if (!sheetRect) return;
+
+      const mouseX = e.clientX - sheetRect.left - dragOffset.x;
+      const mouseY = e.clientY - sheetRect.top - dragOffset.y;
+
+      let newX = mouseX / (PPI * scale);
+      let newY = mouseY / (PPI * scale);
+
+      const item = items.find(i => i.id === draggingId);
+      if (item) {
+          // Clamp Left/Right
+          newX = Math.max(0, Math.min(newX, sheetConfig.width - item.width));
+          // Clamp Top
+          newY = Math.max(0, newY); 
+      }
+
+      setItems(prev => prev.map(i => {
+          if (i.id === draggingId) {
+              return { ...i, x: newX, y: newY };
+          }
+          return i;
+      }));
+
+  }, [draggingId, dragOffset, scale, sheetConfig.width, items]);
 
   const handleMouseUp = () => {
-    dragInfo.current.isDragging = false;
+      setDraggingId(null);
   };
 
-  const handleMouseLeave = () => {
-    dragInfo.current.isDragging = false;
-  };
-
-  const handleDuplicateArtwork = (artworkId: string) => {
-    const artworkToDuplicate = artworks.find(art => art.id === artworkId);
-    if (!artworkToDuplicate) return;
-
-    const newArtwork: ArtworkOnCanvas = {
-      ...artworkToDuplicate,
-      id: `${Date.now()}-${Math.random()}`,
-      x: artworkToDuplicate.x + 20, // Simple offset
-      y: artworkToDuplicate.y + 20,
-    };
-    
-    setArtworks(prev => [...prev, newArtwork]);
-    setSelectedArtworkId(newArtwork.id); // Select the new one
-  };
-  
-  const handleAnalyze = async (artworkId: string) => {
-    const artwork = artworks.find(a => a.id === artworkId);
-    if (!artwork) return;
-
-    setArtworks(arts => arts.map(a => a.id === artworkId ? { ...a, analysisLoading: true } : a));
-
-    const result = await analyzeArtwork({
-      artworkDataUri: artwork.imageUrl,
-      artworkDescription: artwork.name,
-    });
-    
-    if (result.success && result.data) {
-      setArtworks(arts => arts.map(a => a.id === artworkId ? { ...a, analysis: result.data, analysisLoading: false } : a));
-      toast({ title: 'Analysis Complete', description: `Printability Score: ${result.data.printabilityScore}/100`});
-    } else {
-      setArtworks(arts => arts.map(a => a.id === artworkId ? { ...a, analysisLoading: false } : a));
-      toast({ variant: 'destructive', title: 'Analysis Failed', description: result.error });
-    }
-  };
-
-  const handleAddToCart = () => {
-    const canvas = canvasRef.current;
-    if (!canvas || artworks.length === 0) {
-        toast({ variant: 'destructive', title: 'Cannot add to cart', description: 'Your sheet is empty.'});
-        return;
-    }
-
-    // Generate a temporary full-res image for the cart
-    const tempCanvas = document.createElement('canvas');
-    tempCanvas.width = selectedSheet.width * DPI;
-    tempCanvas.height = selectedSheet.height * DPI;
-    const tempCtx = tempCanvas.getContext('2d');
-    
-    if(!tempCtx) return;
-
-    artworks.forEach(art => {
-      const img = document.getElementById(`img-${art.id}`) as HTMLImageElement;
-      if (img) {
-        const originalX = (art.x / zoom)
-        const originalY = (art.y / zoom)
-        const originalWidth = art.width * DPI;
-        const originalHeight = art.height * DPI;
-        tempCtx.drawImage(img, originalX, originalY, originalWidth, originalHeight);
+  useEffect(() => {
+      if (draggingId) {
+          window.addEventListener('mousemove', handleMouseMove);
+          window.addEventListener('mouseup', handleMouseUp);
+      } else {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
       }
-    });
-    
-    const compositeImageUrl = tempCanvas.toDataURL('image/png');
+      return () => {
+          window.removeEventListener('mousemove', handleMouseMove);
+          window.removeEventListener('mouseup', handleMouseUp);
+      };
+  }, [draggingId, handleMouseMove]);
 
-    const cartItem = {
-      id: `sheet-${Date.now()}`,
-      sheetSize: selectedSheet,
-      compositeImageUrl,
-      artworks: artworks,
-      quantity: 1,
-    };
-    
-    addItem(cartItem);
-
-    toast({ title: 'Added to Cart', description: `${selectedSheet.name} gang sheet.` });
+  // --- Collision Detection Helper ---
+  const checkCollision = (currentItem: GangSheetItem) => {
+      return items.some(other => {
+          if (other.id === currentItem.id) return false;
+          return !(
+              currentItem.x + currentItem.width <= other.x ||
+              currentItem.x >= other.x + other.width ||
+              currentItem.y + currentItem.height <= other.y ||
+              currentItem.y >= other.y + other.height
+          );
+      });
   };
 
-  const handleRemoveArtwork = (id: string) => {
-    setArtworks(artworks.filter(a => a.id !== id))
-    if(selectedArtworkId === id) {
-        setSelectedArtworkId(null);
+  const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
+
+  // --- Generation ---
+  const generateCompositeSheet = async (): Promise<string> => {
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('No canvas context');
+
+    const BASE_DPI = 300;
+    const MAX_DIMENSION = 2048; // Limit dimensions for browser/storage compatibility
+
+    const wPixels = sheetConfig.width * BASE_DPI;
+    const hPixels = sheetConfig.height * BASE_DPI;
+
+    // Determine target size while maintaining aspect ratio
+    let targetW = wPixels;
+    let targetH = hPixels;
+
+    if (wPixels > MAX_DIMENSION || hPixels > MAX_DIMENSION) {
+        const ratio = Math.min(MAX_DIMENSION / wPixels, MAX_DIMENSION / hPixels);
+        targetW = Math.floor(wPixels * ratio);
+        targetH = Math.floor(hPixels * ratio);
     }
-  }
-  
-  const selectedArtwork = artworks.find(art => art.id === selectedArtworkId);
 
-  const leftPanelContent = (
-    <Card className="w-[350px] flex flex-col bg-card border-r h-full shadow-none border-none rounded-none">
-        <CardHeader>
-            <CardTitle>Sheet & Artworks</CardTitle>
-        </CardHeader>
-        <CardContent className="flex-grow flex flex-col gap-4 overflow-hidden">
-            <div className="space-y-2">
-                <Label htmlFor="sheet-size">Sheet Size</Label>
-                <Select
-                    value={selectedSheet.name}
-                    onValueChange={(val) =>
-                    setSelectedSheet(mockSheetSizes.find((s) => s.name === val)!)
-                    }
-                >
-                    <SelectTrigger id="sheet-size">
-                    <SelectValue placeholder="Select sheet size" />
-                    </SelectTrigger>
-                    <SelectContent>
-                    {mockSheetSizes.map((size) => (
-                        <SelectItem key={size.name} value={size.name}>
-                        {size.name} (${size.price.toFixed(2)})
-                        </SelectItem>
-                    ))}
-                    </SelectContent>
-                </Select>
-            </div>
-            <ArtworkPanel 
-                artworks={artworks} 
-                selectedArtworkId={selectedArtworkId}
-                onFileChange={handleFileChange}
-                onArtworkSelect={setSelectedArtworkId}
-                onAnalyze={handleAnalyze}
-                onRemove={handleRemoveArtwork}
-            />
-        </CardContent>
-    </Card>
-  );
+    canvas.width = targetW;
+    canvas.height = targetH;
+    
+    // Calculate scale factor relative to standard 300 DPI
+    const renderScale = targetW / wPixels;
 
-  const rightPanelContent = (
-    <Card className="w-[350px] flex flex-col bg-card border-l h-full shadow-none border-none rounded-none">
-        <CardHeader>
-            <CardTitle>Tools & Analysis</CardTitle>
-        </CardHeader>
-        <CardContent className='flex-1 overflow-y-auto'>
-            <ToolsPanel
-                selectedArtwork={selectedArtwork}
-                onUpdateSize={updateArtworkSize}
-                onDuplicate={handleDuplicateArtwork}
-                onAnalyze={handleAnalyze}
-            />
-        </CardContent>
-    </Card>
-  );
+    const imageCache: Record<string, HTMLImageElement> = {};
+    const uniqueUrls: string[] = Array.from(new Set(items.map(i => i.previewUrl)));
+    
+    await Promise.all(uniqueUrls.map(url => new Promise<void>((resolve, reject) => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous";
+        img.onload = () => { imageCache[url] = img; resolve(); };
+        img.onerror = () => {
+            console.warn(`Failed to load image for composition: ${url.substring(0, 50)}...`);
+            resolve(); // Resolve anyway to continue generating what we can
+        };
+        img.src = url;
+    })));
+
+    items.forEach(item => {
+        const img = imageCache[item.previewUrl];
+        if (img && (item.y + item.height <= sheetConfig.height)) {
+            ctx.drawImage(
+                img, 
+                item.x * BASE_DPI * renderScale, 
+                item.y * BASE_DPI * renderScale, 
+                item.width * BASE_DPI * renderScale, 
+                item.height * BASE_DPI * renderScale
+            );
+        }
+    });
+
+    return canvas.toDataURL('image/png');
+  };
+
+  const handleProcessAndAddToCart = async () => {
+    setIsGenerating(true);
+    try {
+        const compositeUrl = await generateCompositeSheet();
+        const trackingId = `TRK-${Math.floor(Math.random() * 1000000)}`;
+        
+        const sheetItem: GangSheetItem = {
+            id: Date.now().toString(),
+            trackingId: trackingId,
+            file: null,
+            previewUrl: compositeUrl, 
+            printReadyUrl: undefined, 
+            width: SHEET_DIMENSIONS[selectedSize].width,
+            height: SHEET_DIMENSIONS[selectedSize].height,
+            quantity: 1, 
+            originalWidthPx: SHEET_DIMENSIONS[selectedSize].width * 300, 
+            originalHeightPx: SHEET_DIMENSIONS[selectedSize].height * 300,
+            x: 0,
+            y: 0
+        };
+        const config = SHEET_DIMENSIONS[selectedSize];
+        addToCart({
+          id: `sheet-${Date.now()}`,
+          sheetSize: {
+            name: `${config.width}" x ${config.height}"`,
+            width: config.width,
+            height: config.height,
+            price: config.price
+          },
+          compositeImageUrl: compositeUrl,
+          artworks: [], // The new structure doesn't seem to need this.
+          quantity: 1,
+        });
+
+    } catch (e) {
+        console.error("Error generating sheet", e);
+        alert("Failed to generate print file. The canvas might be too large for this browser.");
+    } finally {
+        setIsGenerating(false);
+    }
+  };
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] bg-muted overflow-hidden">
-       <div style={{ display: 'none' }}>
-        {artworks.map((art) => (
-          <img id={`img-${art.id}`} src={art.imageUrl} key={art.id} alt={art.name} crossOrigin="anonymous"/>
-        ))}
-      </div>
-      
-      {!isMobile && <aside className="w-[350px] h-full">{leftPanelContent}</aside>}
+    <div className="min-h-screen pb-12 select-none">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-white">Gang Sheet Builder</h1>
+          <p className="mt-2 text-zinc-400">Upload designs and drag them to arrange.</p>
+        </div>
 
-      <main className="flex-1 flex flex-col relative">
-        <div className="flex-1 overflow-auto checkerboard p-8" onMouseUp={handleMouseUp} onMouseLeave={handleMouseLeave}>
-          <canvas
-            ref={canvasRef}
-            width={canvasWidth}
-            height={canvasHeight}
-            className="bg-background/80 shadow-2xl mx-auto"
-            onMouseDown={handleMouseDown}
-            onMouseMove={handleMouseMove}
-          />
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Controls */}
+          <div className="lg:col-span-1 space-y-6">
+            
+            {/* 1. Sheet Selection */}
+            <div className="glass-panel rounded-2xl p-6">
+              <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
+                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">1</span>
+                Select Sheet Size
+              </h3>
+              <div className="space-y-3">
+                {Object.entries(SHEET_DIMENSIONS).map(([key, config]) => (
+                  <label key={key} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSize === key ? 'border-orange-500 bg-orange-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
+                    <div className="flex items-center relative z-10">
+                      <input
+                        type="radio"
+                        name="sheetSize"
+                        value={key}
+                        checked={selectedSize === key}
+                        onChange={(e) => setSelectedSize(e.target.value as SheetSize)}
+                        className="h-4 w-4 text-orange-600 focus:ring-orange-500 border-zinc-600 bg-zinc-800"
+                      />
+                      <span className="ml-3 font-medium text-gray-200">{config.width}" x {config.height}"</span>
+                    </div>
+                    <span className="font-bold text-emerald-400 relative z-10">${config.price}</span>
+                    {selectedSize === key && <div className="absolute inset-0 bg-gradient-to-r from-orange-500/10 to-transparent pointer-events-none" />}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* 2. Upload & Item List */}
+            <div className="glass-panel rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">2</span>
+                     Designs
+                  </h3>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+                  >
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                  </button>
+              </div>
+              
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+
+              {items.length === 0 ? (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-orange-500 hover:bg-orange-500/5 transition-colors cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-orange-400" />
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
+                  <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
+                </div>
+              ) : (
+                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
+                  {items.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        onClick={() => setSelectedItemId(item.id)}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-zinc-800 border-primary ring-1 ring-primary/20' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}
+                      >
+                          <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-3">
+                                  <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
+                                      <img src={item.previewUrl} className="w-full h-full object-contain" alt={item.file?.name} />
+                                  </div>
+                                  <div className="min-w-0">
+                                      <p className="text-sm font-medium text-white truncate w-24" title={item.file?.name}>{item.file?.name}</p>
+                                      <p className="text-xs text-zinc-500">{item.width}" x {item.height}"</p>
+                                  </div>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                className="text-zinc-600 hover:text-red-400 transition-colors"
+                              >
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                          
+                          {/* Controls for selected item */}
+                          {selectedItemId === item.id && (
+                              <div className="mt-3 pt-3 border-t border-white/5 space-y-3 cursor-default" onClick={(e) => e.stopPropagation()}>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    <div>
+                                        <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                                            <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
+                                        </label>
+                                        <div className="relative">
+                                            <input 
+                                              type="number" 
+                                              step="0.1"
+                                              min="0.1"
+                                              value={item.width}
+                                              onChange={(e) => {
+                                                 const w = parseFloat(e.target.value);
+                                                 if (!isNaN(w) && w > 0) {
+                                                     const ratio = item.originalHeightPx / item.originalWidthPx;
+                                                     updateItem(item.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
+                                                 }
+                                              }}
+                                              className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none"
+                                            />
+                                            <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                                        </div>
+                                    </div>
+                                    <div>
+                                        <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                                            <ArrowUpDown className="w-3 h-3 mr-1" /> Height
+                                        </label>
+                                        <div className="relative">
+                                            <input 
+                                              type="number" 
+                                              value={item.height}
+                                              readOnly
+                                              className="block w-full rounded bg-zinc-900/50 border border-white/5 text-zinc-500 text-xs p-1.5 cursor-not-allowed outline-none"
+                                            />
+                                            <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                                        </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="flex items-center justify-between pt-2">
+                                       <label className="text-xs text-zinc-400 font-medium">Duplicate:</label>
+                                       <div className="flex items-center space-x-2">
+                                           <div className="flex items-center">
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setDuplicateCount(Math.max(1, duplicateCount - 1)); }}
+                                                    className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-l hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                                >
+                                                    -
+                                                </button>
+                                                <input 
+                                                    type="number" 
+                                                    value={duplicateCount}
+                                                    onClick={(e) => e.stopPropagation()}
+                                                    onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
+                                                    className="w-12 h-8 bg-zinc-900 border-y border-white/10 text-center text-sm text-white focus:outline-none"
+                                                />
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); setDuplicateCount(duplicateCount + 1); }}
+                                                    className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-r hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                                >
+                                                    +
+                                                </button>
+                                           </div>
+                                           <button 
+                                                onClick={(e) => { e.stopPropagation(); handleBulkDuplicate(item, duplicateCount); }}
+                                                className="h-8 px-3 bg-white text-black text-xs font-bold rounded hover:bg-zinc-200 transition-colors flex items-center"
+                                           >
+                                                <Copy className="w-3 h-3 mr-1" /> Add
+                                           </button>
+                                       </div>
+                                  </div>
+                                  <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500 mt-2">
+                                      <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
+                                      <span>X: {item.x.toFixed(2)}" Y: {item.y.toFixed(2)}"</span>
+                                  </div>
+                              </div>
+                          )}
+                      </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            
+            <button
+                disabled={items.length === 0 || isSheetOverflowing || isGenerating}
+                onClick={handleProcessAndAddToCart}
+                className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-white bg-gradient-to-r from-orange-600 to-orange-500 hover:from-orange-500 hover:to-orange-400 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all transform hover:-translate-y-0.5"
+            >
+                {isGenerating ? 'Generating...' : `Add to Cart - $${sheetConfig.price}`}
+                {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
+            </button>
+          </div>
+
+          {/* Right Preview */}
+          <div ref={containerRef} className="lg:col-span-2 glass-panel rounded-2xl border border-white/10 p-8 flex flex-col items-center relative overflow-hidden">
+            <div className="flex justify-between w-full max-w-2xl mb-4 z-10">
+                <span className="text-zinc-400 font-medium text-sm flex items-center">
+                    <Info className="w-4 h-4 mr-1 text-zinc-500" />
+                    Preview Scale: {(scale * 100).toFixed(0)}%
+                </span>
+                {isSheetOverflowing && (
+                    <span className="text-red-400 font-bold text-sm flex items-center animate-pulse">
+                        <AlertTriangle className="w-4 h-4 mr-1" />
+                        Items outside print area!
+                    </span>
+                )}
+            </div>
+
+            {/* The Sheet Canvas */}
+            <div className="relative builder-scroll overflow-y-auto max-h-[80vh] shadow-2xl bg-zinc-950 border border-white/10 z-10 rounded-sm">
+                 <div className="sticky top-0 z-20 w-full h-6 bg-zinc-900 border-b border-white/10 text-zinc-500 text-[10px] flex items-end justify-between px-2 font-mono">
+                    <span>0"</span>
+                    <span>{sheetConfig.width}" Width</span>
+                 </div>
+
+                 <div 
+                    className="relative bg-checkerboard-dark sheet-canvas"
+                    style={{
+                        width: `${displayWidth}px`,
+                        height: `${displayHeight}px`,
+                        transition: 'height 0.3s ease'
+                    }}
+                    onMouseDown={() => setSelectedItemId(null)} // Deselect if clicking background
+                 >
+                    {items.map((item) => {
+                        const isSelected = selectedItemId === item.id;
+                        const isColliding = checkCollision(item);
+                        const isOutOfBounds = (item.y + item.height) > sheetConfig.height || (item.x + item.width) > sheetConfig.width;
+
+                        return (
+                            <div
+                                key={item.id}
+                                className={`absolute draggable-item cursor-move group ${
+                                    isSelected ? 'z-50' : 'z-10'
+                                }`}
+                                style={{
+                                    left: `${item.x * PPI * scale}px`,
+                                    top: `${item.y * PPI * scale}px`,
+                                    width: `${item.width * PPI * scale}px`,
+                                    height: `${item.height * PPI * scale}px`,
+                                }}
+                                onMouseDown={(e) => handleMouseDown(e, item.id)}
+                            >
+                                {/* Image Container */}
+                                <div className={`w-full h-full relative ${
+                                    isColliding || isOutOfBounds ? 'border-2 border-red-500 bg-red-500/20' : 
+                                    isSelected ? 'border-2 border-primary bg-primary/5' : 
+                                    'border border-blue-400/30 hover:border-blue-400'
+                                }`}>
+                                    <img 
+                                        src={item.previewUrl} 
+                                        className="w-full h-full object-contain pointer-events-none" 
+                                        alt=""
+                                    />
+                                    
+                                    {/* Warnings */}
+                                    {(isColliding || isOutOfBounds) && (
+                                        <div className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl">
+                                            <AlertTriangle className="w-3 h-3" />
+                                        </div>
+                                    )}
+
+                                    {/* Resize Handles (Visual Only for now) */}
+                                    {isSelected && (
+                                        <>
+                                            <div className="absolute -top-1 -left-1 w-2 h-2 bg-white border border-primary"></div>
+                                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white border border-primary"></div>
+                                            <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-white border border-primary"></div>
+                                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-white border border-primary"></div>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+                        );
+                    })}
+                    
+                    {/* Ruler Right */}
+                    <div className="absolute -right-12 top-0 bottom-0 flex flex-col justify-center items-center">
+                        <div className="h-full w-px bg-zinc-700 relative"></div>
+                        <span className="bg-zinc-800 border border-white/10 text-zinc-400 text-xs px-2 py-1 rounded absolute whitespace-nowrap shadow-lg" style={{ transform: 'rotate(90deg)' }}>
+                            {sheetConfig.height}" Height
+                        </span>
+                    </div>
+                 </div>
+            </div>
+            
+            <div className="mt-4 text-xs text-zinc-500 flex items-center">
+                <Move className="w-4 h-4 mr-2" />
+                Click and drag images to arrange. Overlapping items will be highlighted red.
+            </div>
+
+          </div>
         </div>
-        <div className="absolute top-4 left-4">
-            {isMobile && (
-                 <Drawer open={isLeftPanelOpen} onOpenChange={setIsLeftPanelOpen}>
-                    <DrawerTrigger asChild>
-                        <Button variant="outline" size="icon"><Settings className="h-4 w-4"/></Button>
-                    </DrawerTrigger>
-                    <DrawerContent side="left" className="p-0">
-                        {leftPanelContent}
-                    </DrawerContent>
-                 </Drawer>
-            )}
-        </div>
-        <div className="absolute bottom-4 left-4 flex items-center gap-2">
-            <Button onClick={() => setZoom(z => Math.max(0.1, z - 0.1))} variant="outline" size="icon"><ZoomOut className="h-4 w-4"/></Button>
-            <span className="p-2 bg-background/80 rounded-md border text-sm">{Math.round(zoom * 100)}%</span>
-            <Button onClick={() => setZoom(z => Math.min(2, z + 0.1))} variant="outline" size="icon"><ZoomIn className="h-4 w-4"/></Button>
-        </div>
-         <div className="absolute bottom-4 right-4">
-            <Button size="lg" onClick={handleAddToCart}>Add to Cart</Button>
-        </div>
-        <div className="absolute top-4 right-4">
-            {isMobile && (
-                 <Drawer open={isRightPanelOpen} onOpenChange={setIsRightPanelOpen}>
-                    <DrawerTrigger asChild>
-                        <Button variant="outline" size="icon"><Wand2 className="h-4 w-4"/></Button>
-                    </DrawerTrigger>
-                    <DrawerContent side="right" className="p-0">
-                        {rightPanelContent}
-                    </DrawerContent>
-                 </Drawer>
-            )}
-        </div>
-      </main>
-      
-      {!isMobile && <aside className="w-[350px] h-full">{rightPanelContent}</aside>}
+      </div>
     </div>
   );
-}
+};

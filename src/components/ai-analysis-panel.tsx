@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
 import { ArtworkOnCanvas } from '@/lib/types';
 import { Badge } from './ui/badge';
+import { Label } from './ui/label';
 
 interface AiAnalysisPanelProps {
   artwork: ArtworkOnCanvas;

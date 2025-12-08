@@ -62,3 +62,27 @@ export interface CartItem {
   artworks: ArtworkOnCanvas[];
   quantity: number;
 }
+
+export enum SheetSizeEnum {
+  SMALL = '22x24',
+  MEDIUM = '22x36',
+  LARGE = '22x60',
+  XL = '22x120',
+  XXL = '22x240'
+}
+export { SheetSizeEnum as SheetSize };
+
+export interface GangSheetItem {
+    id: string;
+    file: File | null;
+    previewUrl: string;
+    printReadyUrl?: string;
+    trackingId?: string;
+    width: number; // inches
+    height: number; // inches
+    originalWidthPx: number;
+    originalHeightPx: number;
+    quantity: number;
+    x: number; // inches
+    y: number; // inches
+}
