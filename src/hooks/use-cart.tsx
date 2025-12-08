@@ -29,16 +29,34 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    localStorage.setItem('pxl8-cart', JSON.stringify(items));
+    try {
+      // Create a version of items without large image data for storage
+      const storableItems = items.map(({ artworks, compositeImageUrl, ...rest }) => rest);
+      localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
+    } catch (error) {
+      console.error('Failed to save cart to localStorage', error);
+      if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+        alert('Could not save cart changes. Your browser storage is full. Please clear some space or try a different browser.');
+      }
+    }
   }, [items]);
 
   const addItem = (item: CartItem) => {
     setItems((prevItems) => {
-      const existingItem = prevItems.find((i) => i.id === item.id);
-      if (existingItem) {
-        return prevItems.map((i) =>
-          i.id === item.id ? { ...i, quantity: i.quantity + item.quantity } : i
-        );
+      // Find item based on sheet size, assuming we can't have multiple custom sheets of same size yet
+      const existingItemIndex = prevItems.findIndex(i => i.sheetSize.name === item.sheetSize.name);
+
+      if (existingItemIndex > -1) {
+        const updatedItems = [...prevItems];
+        const existingItem = updatedItems[existingItemIndex];
+        updatedItems[existingItemIndex] = {
+          ...existingItem,
+          quantity: existingItem.quantity + item.quantity,
+          // If a new image is added for the same size, overwrite it.
+          compositeImageUrl: item.compositeImageUrl,
+          artworks: item.artworks
+        };
+        return updatedItems;
       }
       return [...prevItems, item];
     });
