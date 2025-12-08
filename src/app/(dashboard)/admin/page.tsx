@@ -13,7 +13,6 @@ import JSZip from 'jszip';
 import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
-import { mockOrders, mockUsers } from '@/lib/data';
 import { isCloudEnabled } from '@/lib/constants';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -121,8 +120,8 @@ const AssetCard: React.FC<{ item: GangSheetItem; index: number; onPreview: (url:
 };
 
 export default function AdminPage() {
-  const [orders, setOrders] = useState<Order[]>(mockOrders);
-  const [users, setUsers] = useState<User[]>(mockUsers);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);

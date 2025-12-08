@@ -6,7 +6,6 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { mockUsers } from '@/lib/data';
 import { ShippingRate, User, ShippingAddress } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
@@ -37,7 +36,7 @@ export default function CartPage() {
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     
     // In a real app, this would come from an auth context
-    const currentUser: User | null = mockUsers.find(u => u.id === 'user-1') || null;
+    const currentUser: User | null = null;
 
     // Coupon State
     const [couponCode, setCouponCode] = useState('');

@@ -21,7 +21,7 @@ import {
   ChartTooltipContent,
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
-import { mockOrders, getStatusColor } from '@/lib/data';
+import { getStatusColor } from '@/lib/data';
 import { Order } from '@/lib/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -43,7 +43,7 @@ const chartConfig = {
 };
 
 export default function CustomerDashboardPage() {
-  const userOrders = mockOrders.filter(o => o.customerId === 'user-1');
+  const userOrders: Order[] = [];
 
   return (
     <div className="grid gap-6">
@@ -54,7 +54,7 @@ export default function CustomerDashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$1,670.75</div>
+            <div className="text-2xl font-bold">$0.00</div>
             <p className="text-xs text-muted-foreground">
               Across {userOrders.length} orders
             </p>
@@ -66,9 +66,9 @@ export default function CustomerDashboardPage() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+1</div>
+            <div className="text-2xl font-bold">+0</div>
             <p className="text-xs text-muted-foreground">
-              1 Pending, 0 Processing
+              0 Pending, 0 Processing
             </p>
           </CardContent>
         </Card>
@@ -78,7 +78,7 @@ export default function CustomerDashboardPage() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+2</div>
+            <div className="text-2xl font-bold">+0</div>
             <p className="text-xs text-muted-foreground">
               Total items shipped this year
             </p>
@@ -133,7 +133,7 @@ export default function CustomerDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {userOrders.slice(0, 5).map((order: Order) => (
+                {userOrders.length > 0 ? userOrders.slice(0, 5).map((order: Order) => (
                   <TableRow key={order.orderId}>
                     <TableCell className="font-medium">
                       <Button variant="link" asChild className="p-0 h-auto">
@@ -149,7 +149,13 @@ export default function CustomerDashboardPage() {
                       ${order.total.toFixed(2)}
                     </TableCell>
                   </TableRow>
-                ))}
+                )) : (
+                  <TableRow>
+                    <TableCell colSpan={3} className="text-center text-muted-foreground py-8">
+                      You have no recent orders.
+                    </TableCell>
+                  </TableRow>
+                )}
               </TableBody>
             </Table>
           </CardContent>
