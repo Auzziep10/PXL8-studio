@@ -1,5 +1,6 @@
 'use client';
 
+import { useMemo } from 'react';
 import {
   Card,
   CardContent,
@@ -24,18 +25,12 @@ import {
 } from '@/components/ui/chart';
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts';
 import { getStatusColor } from '@/lib/data';
-import { Order } from '@/lib/types';
+import { Order, OrderStatus } from '@/lib/types';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-
-const chartData = [
-  { month: 'January', orders: 186 },
-  { month: 'February', orders: 305 },
-  { month: 'March', orders: 237 },
-  { month: 'April', orders: 73 },
-  { month: 'May', orders: 209 },
-  { month: 'June', orders: 214 },
-];
+import { useUser, useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, orderBy } from 'firebase/firestore';
+import { subMonths, format, getMonth, getYear } from 'date-fns';
 
 const chartConfig = {
   orders: {
@@ -45,7 +40,76 @@ const chartConfig = {
 };
 
 export default function CustomerDashboardPage() {
-  const userOrders: Order[] = [];
+  const { user } = useUser();
+  const firestore = useFirestore();
+
+  const userOrdersQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return query(
+      collection(firestore, `users/${user.uid}/orders`),
+      orderBy('orderDate', 'desc')
+    );
+  }, [user, firestore]);
+
+  const { data: userOrders, isLoading: areOrdersLoading } = useCollection<Order>(userOrdersQuery);
+
+  const dashboardStats = useMemo(() => {
+    if (!userOrders) {
+      return {
+        totalSpend: 0,
+        activeOrdersCount: 0,
+        pendingCount: 0,
+        processingCount: 0,
+        shippedItems: 0,
+        chartData: [],
+      };
+    }
+
+    const totalSpend = userOrders.reduce((acc, order) => acc + (order.total || 0), 0);
+
+    const activeOrders = userOrders.filter(
+      (o) =>
+        o.status === OrderStatus.PENDING || o.status === OrderStatus.PROCESSING
+    );
+    const activeOrdersCount = activeOrders.length;
+    const pendingCount = activeOrders.filter(o => o.status === OrderStatus.PENDING).length;
+    const processingCount = activeOrders.filter(o => o.status === OrderStatus.PROCESSING).length;
+    
+    const shippedItems = userOrders
+      .filter(o => o.status === OrderStatus.SHIPPED || o.status === OrderStatus.DELIVERED)
+      .reduce((acc, order) => acc + order.items.reduce((itemSum, item) => itemSum + item.quantity, 0), 0);
+
+    // Prepare data for the last 6 months
+    const now = new Date();
+    const monthLabels = Array.from({ length: 6 }).map((_, i) => {
+        const d = subMonths(now, 5 - i);
+        return {
+            month: format(d, 'MMM'),
+            key: `${getYear(d)}-${getMonth(d)}`
+        };
+    });
+    
+    const monthlyOrders = userOrders.reduce<Record<string, number>>((acc, order) => {
+        const orderDate = new Date(order.orderDate);
+        const key = `${getYear(orderDate)}-${getMonth(orderDate)}`;
+        acc[key] = (acc[key] || 0) + 1;
+        return acc;
+    }, {});
+
+    const chartData = monthLabels.map(m => ({
+        month: m.month,
+        orders: monthlyOrders[m.key] || 0
+    }));
+
+
+    return { totalSpend, activeOrdersCount, pendingCount, processingCount, shippedItems, chartData };
+  }, [userOrders]);
+
+
+  if (areOrdersLoading) {
+    // A loading state could be added here for better UX
+    return <div>Loading dashboard...</div>;
+  }
 
   return (
     <div className="grid gap-6">
@@ -56,9 +120,9 @@ export default function CustomerDashboardPage() {
             <DollarSign className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">$0.00</div>
+            <div className="text-2xl font-bold">${dashboardStats.totalSpend.toFixed(2)}</div>
             <p className="text-xs text-muted-foreground">
-              Across {userOrders.length} orders
+              Across {userOrders?.length || 0} orders
             </p>
           </CardContent>
         </Card>
@@ -68,9 +132,9 @@ export default function CustomerDashboardPage() {
             <ShoppingCart className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+0</div>
+            <div className="text-2xl font-bold">+{dashboardStats.activeOrdersCount}</div>
             <p className="text-xs text-muted-foreground">
-              0 Pending, 0 Processing
+              {dashboardStats.pendingCount} Pending, {dashboardStats.processingCount} Processing
             </p>
           </CardContent>
         </Card>
@@ -80,7 +144,7 @@ export default function CustomerDashboardPage() {
             <Package className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">+0</div>
+            <div className="text-2xl font-bold">+{dashboardStats.shippedItems}</div>
             <p className="text-xs text-muted-foreground">
               Total items shipped this year
             </p>
@@ -95,19 +159,19 @@ export default function CustomerDashboardPage() {
           </CardHeader>
           <CardContent className="pl-2">
             <ChartContainer config={chartConfig} className="h-[300px] w-full">
-              <BarChart accessibilityLayer data={chartData}>
+              <BarChart accessibilityLayer data={dashboardStats.chartData}>
                 <CartesianGrid vertical={false} />
                 <XAxis
                   dataKey="month"
                   tickLine={false}
                   tickMargin={10}
                   axisLine={false}
-                  tickFormatter={(value) => value.slice(0, 3)}
                 />
                  <YAxis
                   tickLine={false}
                   axisLine={false}
                   tickMargin={10}
+                  allowDecimals={false}
                 />
                 <ChartTooltip
                   cursor={false}
@@ -135,7 +199,7 @@ export default function CustomerDashboardPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {userOrders.length > 0 ? userOrders.slice(0, 5).map((order: Order) => (
+                {userOrders && userOrders.length > 0 ? userOrders.slice(0, 5).map((order: Order) => (
                   <TableRow key={order.orderId}>
                     <TableCell className="font-medium">
                       <Button variant="link" asChild className="p-0 h-auto">
@@ -148,7 +212,7 @@ export default function CustomerDashboardPage() {
                       </Badge>
                     </TableCell>
                     <TableCell className="text-right">
-                      ${order.total.toFixed(2)}
+                      ${(order.total || 0).toFixed(2)}
                     </TableCell>
                   </TableRow>
                 )) : (
