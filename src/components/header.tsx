@@ -7,8 +7,9 @@ import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
-import { useAuth, useUser } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
+import { doc } from 'firebase/firestore';
 
 const navLinks = [
   { href: '/build', label: 'Builder' },
@@ -22,14 +23,24 @@ export default function Header() {
   const cart = useCart();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
-  const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+  const firestore = useFirestore();
 
-  // In a real app, this would come from the user's document in Firestore
-  const userRole = 'admin';
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc(userDocRef);
+  const userRole = userProfile?.role || 'customer';
+
+  const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
+  
   const isAuthenticated = !!user;
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) {
+        await signOut(auth);
+    }
   };
 
   return (
