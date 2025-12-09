@@ -1,13 +1,14 @@
 import type { ImproveArtworkPrintabilityOutput } from '@/ai/flows/improve-artwork-printability';
+import type { User as FirebaseUser } from 'firebase/auth';
 
 export type UserRole = 'customer' | 'admin';
 
 export interface User {
   id: string;
-  name: string;
+  firstName: string;
+  lastName: string;
   email: string;
   role: UserRole;
-  ltv: number;
 }
 
 export enum OrderStatus {

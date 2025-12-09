@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, User, ShippingAddress, Order, OrderStatus } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -14,6 +14,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
+import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { doc } from 'firebase/firestore';
 
 interface CheckoutFormData {
     firstName: string;
@@ -35,47 +37,51 @@ export default function CartPage() {
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [previewImage, setPreviewImage] = useState<string | null>(null);
     
-    // In a real app, this would come from an auth context
-    const currentUser: User | null = null;
+    const { user: currentUser, isUserLoading } = useUser();
+    const firestore = useFirestore();
 
+    const userDocRef = useMemoFirebase(() => {
+        if (!firestore || !currentUser) return null;
+        return doc(firestore, 'users', currentUser.uid);
+    }, [firestore, currentUser]);
+
+    const { data: userProfile } = useDoc(userDocRef);
+    
     // Coupon State
     const [couponCode, setCouponCode] = useState('');
     const [isTestMode, setIsTestMode] = useState(false);
     const [couponError, setCouponError] = useState('');
     
     // Form State initialization
-    const [formData, setFormData] = useState<CheckoutFormData>(() => {
-        if (currentUser) {
-            const nameParts = currentUser.name.split(' ');
-            const firstName = nameParts[0] || '';
-            const lastName = nameParts.slice(1).join(' ') || '';
-            
-            return {
-                firstName,
-                lastName,
-                email: currentUser.email,
-                phone: '',
-                street: '',
-                city: '',
-                state: '',
-                zip: '',
-                createAccount: false, // Don't create account if already logged in
-                password: ''
-            };
-        }
-        return {
-            firstName: '',
-            lastName: '',
-            email: '',
-            phone: '',
-            street: '',
-            city: '',
-            state: '',
-            zip: '',
-            createAccount: true,
-            password: ''
-        };
+    const [formData, setFormData] = useState<CheckoutFormData>({
+        firstName: '',
+        lastName: '',
+        email: '',
+        phone: '',
+        street: '',
+        city: '',
+        state: '',
+        zip: '',
+        createAccount: !currentUser,
+        password: ''
     });
+
+    useEffect(() => {
+        if (currentUser && userProfile) {
+            setFormData(prev => ({
+                ...prev,
+                firstName: userProfile.firstName || '',
+                lastName: userProfile.lastName || '',
+                email: currentUser.email || '',
+                createAccount: false,
+            }));
+        } else {
+             setFormData(prev => ({
+                ...prev,
+                createAccount: true,
+             }));
+        }
+    }, [currentUser, userProfile]);
 
     // Shipping State
     const [availableRates, setAvailableRates] = useState<ShippingRate[]>([]);
@@ -162,7 +168,7 @@ export default function CartPage() {
     const handleCheckoutProcess = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (formData.createAccount && !formData.password) {
+        if (formData.createAccount && !currentUser && !formData.password) {
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
             return;
         }
@@ -183,7 +189,7 @@ export default function CartPage() {
                 const newOrder: Order = {
                     id: `ORD-${Date.now()}`,
                     orderId: `ORD-${Date.now()}`,
-                    customerId: currentUser?.id || `CUST-${Date.now()}`,
+                    customerId: currentUser?.uid || `GUEST-${Date.now()}`,
                     customerName: `${formData.firstName} ${formData.lastName}`,
                     orderDate: new Date().toISOString(),
                     status: OrderStatus.PENDING,
@@ -309,11 +315,13 @@ export default function CartPage() {
                         </div>
                         
                         <div className="p-6 space-y-6">
-                            {currentUser ? (
+                            {isUserLoading ? (
+                                <div className="h-10 bg-muted rounded-md animate-pulse" />
+                            ) : currentUser ? (
                                 <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 flex items-center">
                                     <UserIcon className="w-5 h-5 text-emerald-500 mr-3" />
                                     <div>
-                                        <p className="text-sm font-medium text-white">Logged in as {currentUser.name}</p>
+                                        <p className="text-sm font-medium text-white">Logged in as {currentUser.displayName || currentUser.email}</p>
                                         <p className="text-xs text-zinc-400">Your information has been pre-filled.</p>
                                     </div>
                                 </div>
