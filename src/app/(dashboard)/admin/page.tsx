@@ -42,10 +42,10 @@ const AssetCard: React.FC<{ item: GangSheetItem; index: number; onPreview: (url:
                 <div>
                      <div className="flex items-center gap-2 mb-1">
                         <span className="text-white font-bold text-sm">Sheet #{index + 1}</span>
-                        {(item.originalFileName || item.file?.name) && (
-                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-white/5 text-zinc-400 text-xs truncate max-w-[200px] flex items-center" title={item.originalFileName || item.file?.name}>
+                        {(item.originalFileName || (item as any).file?.name) && (
+                             <span className="px-2 py-0.5 rounded bg-zinc-800 border border-white/5 text-zinc-400 text-xs truncate max-w-[200px] flex items-center" title={item.originalFileName || (item as any).file?.name}>
                                 <FileText className="w-3 h-3 mr-1 opacity-50" />
-                                {item.originalFileName || item.file?.name}
+                                {item.originalFileName || (item as any).file?.name}
                              </span>
                         )}
                      </div>
@@ -137,11 +137,25 @@ export default function AdminPage() {
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: SortDirection }>({ key: 'date', direction: 'desc' });
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
 
+  useEffect(() => {
+    const savedOrders = localStorage.getItem('pxl8-orders');
+    if (savedOrders) {
+      setOrders(JSON.parse(savedOrders));
+    }
+  }, []);
+
+  const saveOrders = (updatedOrders: Order[]) => {
+    setOrders(updatedOrders);
+    localStorage.setItem('pxl8-orders', JSON.stringify(updatedOrders));
+  };
+
+
   // Derive the selected order from the orders prop to ensure it stays in sync
   const selectedOrder = useMemo(() => orders.find(o => o.orderId === selectedOrderId) || null, [orders, selectedOrderId]);
   
   const updateStatus = (id: string, status: OrderStatus) => {
-    setOrders(prevOrders => prevOrders.map(o => o.orderId === id ? { ...o, status } : o));
+    const updatedOrders = orders.map(o => o.orderId === id ? { ...o, status } : o);
+    saveOrders(updatedOrders);
     setSelectedOrderId(null);
   }
 
@@ -556,7 +570,7 @@ export default function AdminPage() {
                         </thead>
                         <tbody className="divide-y divide-white/5 bg-zinc-900/10">
                             {processedOrders.length > 0 ? processedOrders.map((order) => (
-                            <tr key={order.id} className="hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => setSelectedOrderId(order.orderId)}>
+                            <tr key={order.orderId} className="hover:bg-white/5 transition-colors group cursor-pointer" onClick={() => setSelectedOrderId(order.orderId)}>
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center">
                                         <div className="flex-shrink-0 h-10 w-10 rounded-lg bg-zinc-800 flex items-center justify-center border border-white/10 text-primary font-bold text-xs">DTF</div>
@@ -657,7 +671,7 @@ export default function AdminPage() {
 
                     <div className="flex-grow overflow-y-auto space-y-4 pr-2 builder-scroll">
                         {orders.filter(o => o.customerId === selectedCustomerForArchive).length > 0 ? orders.filter(o => o.customerId === selectedCustomerForArchive).map((order: Order) => (
-                            <div key={order.id} className="glass-panel rounded-xl border border-white/10 overflow-hidden">
+                            <div key={order.orderId} className="glass-panel rounded-xl border border-white/10 overflow-hidden">
                                  <div className="p-4 bg-zinc-800/30 border-b border-white/5 flex justify-between items-center">
                                      <div className="flex items-center space-x-4">
                                          <div className="p-2 bg-zinc-900 rounded-lg border border-white/10">
@@ -699,5 +713,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

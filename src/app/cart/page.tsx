@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, User, ShippingAddress } from '@/lib/types';
+import { ShippingRate, User, ShippingAddress, Order, OrderStatus } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -179,6 +179,32 @@ export default function CartPage() {
             } else {
                 // Simulate a successful order placement in test mode
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                
+                const newOrder: Order = {
+                    id: `ORD-${Date.now()}`,
+                    orderId: `ORD-${Date.now()}`,
+                    customerId: currentUser?.id || `CUST-${Date.now()}`,
+                    customerName: `${formData.firstName} ${formData.lastName}`,
+                    orderDate: new Date().toISOString(),
+                    status: OrderStatus.PENDING,
+                    items: cartItems,
+                    total: total,
+                    shippingAddress: {
+                        street: formData.street,
+                        city: formData.city,
+                        state: formData.state,
+                        zip: formData.zip,
+                        country: 'US',
+                    },
+                    trackingId: '',
+                    printReadyUrl: '',
+                    previewUrl: '',
+                };
+
+                const existingOrders: Order[] = JSON.parse(localStorage.getItem('pxl8-orders') || '[]');
+                existingOrders.push(newOrder);
+                localStorage.setItem('pxl8-orders', JSON.stringify(existingOrders));
+
                 console.log('--- TEST MODE ORDER ---');
                 console.log('Customer:', formData);
                 console.log('Items:', cartItems);
