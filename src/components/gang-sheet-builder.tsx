@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -607,7 +608,10 @@ export default function GangSheetBuilder() {
                             </div>
                         </div>
                       </div>
-
+                      <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500">
+                          <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
+                          <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
+                      </div>
                       <div className="flex items-center justify-between pt-2">
                            <label className="text-xs text-zinc-400 font-medium">Duplicate:</label>
                            <div className="flex items-center space-x-2">
@@ -638,10 +642,6 @@ export default function GangSheetBuilder() {
                                     <Copy className="w-3 h-3 mr-1" /> Add
                                </button>
                            </div>
-                      </div>
-                      <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500 mt-2">
-                          <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
-                          <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
                       </div>
                       <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} />
                  </div>
