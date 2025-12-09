@@ -49,23 +49,28 @@ export default function DashboardLayout({
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  // Correctly check for admin role
+  // Correctly check for admin role from the `roles_admin` collection
   useEffect(() => {
-    if (user && firestore) {
-      setIsRoleLoading(true);
-      const adminDocRef = doc(firestore, 'roles_admin', user.uid);
-      getDoc(adminDocRef).then((docSnap) => {
-        setIsAdmin(docSnap.exists());
-        setIsRoleLoading(false);
-      }).catch(() => {
+    const checkAdminStatus = async () => {
+      if (user && firestore) {
+        const adminDocRef = doc(firestore, 'roles_admin', user.uid);
+        try {
+          const docSnap = await getDoc(adminDocRef);
+          setIsAdmin(docSnap.exists());
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          setIsAdmin(false);
+        } finally {
+          setIsRoleLoading(false);
+        }
+      } else if (!isUserLoading) {
+        // If there's no user and we are not loading, they are not an admin.
         setIsAdmin(false);
         setIsRoleLoading(false);
-      });
-    } else {
-      setIsAdmin(false);
-      setIsRoleLoading(false);
-    }
-  }, [user, firestore]);
+      }
+    };
+    checkAdminStatus();
+  }, [user, firestore, isUserLoading]);
   
 
   const navItems = [
@@ -107,7 +112,7 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {isUserLoading || isProfileLoading ? (
+            {isUserLoading || isProfileLoading || isRoleLoading ? (
               <div className="p-2 space-y-2">
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>

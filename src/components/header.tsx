@@ -7,7 +7,7 @@ import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
-import { useAuth, useUser, useFirestore, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc, getDoc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
@@ -29,22 +29,26 @@ export default function Header() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  // Correctly check for admin role
+  // Correctly check for admin role from the `roles_admin` collection
   useEffect(() => {
-    if (user && firestore) {
-      setIsRoleLoading(true);
-      const adminDocRef = doc(firestore, 'roles_admin', user.uid);
-      getDoc(adminDocRef).then((docSnap) => {
-        setIsAdmin(docSnap.exists());
-        setIsRoleLoading(false);
-      }).catch(() => {
+    const checkAdminStatus = async () => {
+      if (user && firestore) {
+        const adminDocRef = doc(firestore, 'roles_admin', user.uid);
+        try {
+          const docSnap = await getDoc(adminDocRef);
+          setIsAdmin(docSnap.exists());
+        } catch (error) {
+          console.error("Error checking admin status:", error);
+          setIsAdmin(false);
+        } finally {
+          setIsRoleLoading(false);
+        }
+      } else if (!isUserLoading) {
         setIsAdmin(false);
         setIsRoleLoading(false);
-      });
-    } else if (!isUserLoading) {
-      setIsAdmin(false);
-      setIsRoleLoading(false);
-    }
+      }
+    };
+    checkAdminStatus();
   }, [user, firestore, isUserLoading]);
 
 
