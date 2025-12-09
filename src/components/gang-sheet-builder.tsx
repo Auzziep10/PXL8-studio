@@ -77,14 +77,20 @@ export default function GangSheetBuilder() {
         // Create a version of the items that does NOT include the large imageUrl data
         const storableItems = sheetData.items.map(item => {
             const { imageUrl, analysis, ...rest } = item;
-            // We can keep the analysis results, but clear the large image data from it too
+            
             const storableAnalysis = analysis ? { ...analysis, imageDataUri: '' } : undefined;
-            return { ...rest, analysis: storableAnalysis };
+            
+            const itemToStore: any = { ...rest };
+            if (storableAnalysis) {
+              itemToStore.analysis = storableAnalysis;
+            }
+
+            return itemToStore;
         });
 
         const storableSheetData = {
             ...sheetData,
-            items: storableItems,
+            items: JSON.parse(JSON.stringify(storableItems)), // Deep clone to remove undefined
             updatedAt: serverTimestamp()
         };
         
@@ -97,7 +103,14 @@ export default function GangSheetBuilder() {
                     title: 'Save Failed',
                     description: 'Your sheet layout is too complex to auto-save. Please simplify to continue.'
                 });
-            } else {
+            } else if (err.message && err.message.includes('invalid data')) {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Save Error',
+                    description: 'Your sheet contains invalid data and could not be saved.'
+                });
+            }
+            else {
                 toast({
                     variant: 'destructive',
                     title: 'Save Failed',
