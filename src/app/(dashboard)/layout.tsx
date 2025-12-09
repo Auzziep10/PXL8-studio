@@ -79,24 +79,13 @@ export default function DashboardLayout({
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
-  if (isUserLoading || !user) { 
+  if (isUserLoading || isProfileLoading) { 
     return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
         </div>
     );
   }
-
-  // Pass isAdmin and isProfileLoading props to children
-  const childrenWithProps = Children.map(children, child => {
-    if (React.isValidElement(child)) {
-      // For the admin page, we specifically pass the props it needs.
-      if (pathname === '/admin') {
-        return cloneElement(child, { isAdmin, isProfileLoading } as { isAdmin: boolean, isProfileLoading: boolean });
-      }
-    }
-    return child;
-  });
 
   return (
     <SidebarProvider>
@@ -179,7 +168,7 @@ export default function DashboardLayout({
             </Button>
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-6">
-          {childrenWithProps}
+          {children}
         </div>
       </SidebarInset>
     </SidebarProvider>

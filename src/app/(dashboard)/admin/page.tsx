@@ -24,7 +24,7 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, updateDoc, doc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -157,10 +157,26 @@ const AssetCard: React.FC<{
   );
 };
 
-export default function AdminPage({ isAdmin, isProfileLoading }: { isAdmin?: boolean, isProfileLoading?: boolean }) {
+export default function AdminPage() {
   const firestore = useFirestore();
   const { user } = useUser();
-  
+
+  // Self-contained authorization
+  const [isAdmin, setIsAdmin] = useState(false);
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
+  useEffect(() => {
+    if (userProfile && userProfile.role === 'admin') {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [userProfile]);
+
   const ordersQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'orders')) : null),
     [firestore]
