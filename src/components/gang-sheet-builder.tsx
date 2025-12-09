@@ -505,65 +505,6 @@ export default function GangSheetBuilder() {
               </div>
             </div>
 
-            {/* 2. Upload & Item List */}
-            <div className="glass-panel rounded-2xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center">
-                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">2</span>
-                     Designs
-                  </h3>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
-                  >
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                  </button>
-              </div>
-              
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
-
-              {items.length === 0 ? (
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
-                  <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
-                  {items.map((item, index) => (
-                      <div 
-                        key={item.id} 
-                        onClick={() => setSelectedItemId(item.id)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-zinc-800 border-primary ring-1 ring-primary/20' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}
-                      >
-                          <div className="flex items-start justify-between">
-                              <div className="flex items-center space-x-3">
-                                  <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
-                                      <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
-                                  </div>
-                                  <div className="min-w-0">
-                                      <p className="text-sm font-medium text-white truncate w-24" title={item.name}>{item.name}</p>
-                                      <p className="text-xs text-zinc-500">{item.width}" x {item.height}"</p>
-                                  </div>
-                              </div>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                                className="text-zinc-600 hover:text-red-400 transition-colors"
-                              >
-                                  <Trash2 className="w-4 h-4" />
-                              </button>
-                          </div>
-                      </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
             {selectedItem && (
                  <div className="glass-panel rounded-2xl p-6 space-y-4">
                      <div className="flex justify-between items-center">
@@ -646,6 +587,65 @@ export default function GangSheetBuilder() {
                       <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} />
                  </div>
             )}
+
+            {/* 2. Upload & Item List */}
+            <div className="glass-panel rounded-2xl p-6">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">2</span>
+                     Designs
+                  </h3>
+                  <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+                  >
+                      <Plus className="w-3 h-3 mr-1" /> Add New
+                  </button>
+              </div>
+              
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+
+              {items.length === 0 ? (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
+                >
+                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
+                  </div>
+                  <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
+                  <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
+                  {items.map((item, index) => (
+                      <div 
+                        key={item.id} 
+                        onClick={() => setSelectedItemId(item.id)}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-zinc-800 border-primary ring-1 ring-primary/20' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}
+                      >
+                          <div className="flex items-start justify-between">
+                              <div className="flex items-center space-x-3">
+                                  <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
+                                      <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
+                                  </div>
+                                  <div className="min-w-0">
+                                      <p className="text-sm font-medium text-white truncate w-24" title={item.name}>{item.name}</p>
+                                      <p className="text-xs text-zinc-500">{item.width}" x {item.height}"</p>
+                                  </div>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                className="text-zinc-600 hover:text-red-400 transition-colors"
+                              >
+                                  <Trash2 className="w-4 h-4" />
+                              </button>
+                          </div>
+                      </div>
+                  ))}
+                </div>
+              )}
+            </div>
             
             <button
                 disabled={items.length === 0 || isSheetOverflowing || isGenerating || !isLoaded}
