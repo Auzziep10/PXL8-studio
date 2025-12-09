@@ -227,7 +227,7 @@ export default function AdminPage() {
     if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
         const found = orders.find(o => 
             o.orderId === searchTerm || 
-            (Array.isArray(o.items) && o.items.some(i => i.artworks && i.artworks.length > 0 && i.artworks[0].id.includes(searchTerm)))
+            (Array.isArray(o.items) && o.items.some(i => i.artworks && i.artworks.length > 0 && (i.artworks[0] as any).id.includes(searchTerm)))
         );
         if (found) {
             setSelectedOrderId(found.orderId);
@@ -258,7 +258,7 @@ export default function AdminPage() {
         const id = (order.orderId || '').toLowerCase();
         const name = (order.customerName || '').toLowerCase();
         const items = Array.isArray(order.items) ? order.items : [];
-        const hasTracking = items.some(i => i.artworks && i.artworks.length > 0 && (i.artworks[0] as any).id.includes(term));
+        const hasTracking = items.some(i => i.artworks && i.artworks.length > 0 && i.artworks[0] && (i.artworks[0] as any).id.includes(term));
         
         return id.includes(term) || name.includes(term) || hasTracking;
     });
@@ -564,7 +564,7 @@ export default function AdminPage() {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider">Customer</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider">Sheet Info</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('totalPrice')}>Total</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={()={() => handleSort('status')}}>Status</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('status')}>Status</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-zinc-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
