@@ -79,7 +79,7 @@ export default function DashboardLayout({
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
-  if (isUserLoading || isProfileLoading || !user) {
+  if (isUserLoading || !user) { // Removed isProfileLoading from here
     return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -87,8 +87,8 @@ export default function DashboardLayout({
     );
   }
 
-  // Pass isAdmin prop to children
-  const childrenWithProps = cloneElement(children as React.ReactElement, { isAdmin });
+  // Pass isAdmin and isProfileLoading props to children
+  const childrenWithProps = cloneElement(children as React.ReactElement, { isAdmin, isProfileLoading });
 
   return (
     <SidebarProvider>

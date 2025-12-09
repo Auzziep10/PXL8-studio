@@ -157,7 +157,7 @@ const AssetCard: React.FC<{
   );
 };
 
-export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
+export default function AdminPage({ isAdmin, isProfileLoading }: { isAdmin?: boolean, isProfileLoading?: boolean }) {
   const firestore = useFirestore();
   const { user } = useUser();
   
@@ -495,6 +495,14 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
     printWindow.document.write(htmlContent);
     printWindow.document.close();
   };
+
+  if (isProfileLoading) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    );
+  }
 
   if (!isAdmin) {
     return (
