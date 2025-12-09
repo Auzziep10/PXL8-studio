@@ -188,7 +188,7 @@ export default function CartPage() {
         const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
         const orderId = `ORD-${Date.now()}`;
         
-        const newOrderData = {
+        const newOrderData: Omit<Order, 'id'> = {
             orderId: orderId,
             customerId: customerId,
             customerName: `${formData.firstName} ${formData.lastName}`,
@@ -228,8 +228,8 @@ export default function CartPage() {
 
         try {
             if (firestore) {
-                // Save to the centralized orders collection for admin access
-                await addDoc(collection(firestore, 'orders'), {
+                const centralOrdersRef = collection(firestore, 'orders');
+                const centralOrderDoc = await addDoc(centralOrdersRef, {
                     ...newOrderData,
                     createdAt: serverTimestamp()
                 });
@@ -237,9 +237,9 @@ export default function CartPage() {
                 // If user is logged in, also save a reference in their own subcollection
                 if (currentUser) {
                     const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
-                    await addDoc(userOrdersRef, {
+                    await setDoc(doc(userOrdersRef, centralOrderDoc.id), {
                         ...newOrderData,
-                        createdAt: serverTimestamp()
+                         createdAt: serverTimestamp()
                     });
                 }
             }
@@ -550,7 +550,7 @@ export default function CartPage() {
                                     <Button onClick={handleRemoveCoupon} variant="ghost" size="icon" className="h-6 w-6 text-zinc-500 hover:text-white">
                                         <Trash2 className="w-3 h-3" />
                                     </Button>
-                                </div>
+                                 </div>
                             )}
                             {couponError && <p className="text-red-400 text-xs mt-1">{couponError}</p>}
                         </div>
