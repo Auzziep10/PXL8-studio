@@ -95,7 +95,7 @@ export default function DashboardLayout({
       <Sidebar className="pt-14">
         <SidebarHeader>
           <div className="flex items-center gap-2">
-            <PXL8Logo className="h-10 w-auto text-primary" />
+            <PXL8Logo className="h-10 w-auto" />
           </div>
         </SidebarHeader>
         <SidebarContent>
