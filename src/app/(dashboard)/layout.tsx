@@ -18,9 +18,11 @@ import { Home, LayoutGrid, User, Settings, LogOut } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
 import { useEffect, useState } from 'react';
+import { doc } from 'firebase/firestore';
+import type { User as AppUser } from '@/lib/types';
+
 
 export default function DashboardLayout({
   children,
@@ -34,7 +36,6 @@ export default function DashboardLayout({
   const firestore = useFirestore();
   
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -47,31 +48,15 @@ export default function DashboardLayout({
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
-  // Correctly check for admin role from the `roles_admin` collection
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (user && firestore) {
-        const adminDocRef = doc(firestore, 'roles_admin', user.uid);
-        try {
-          const docSnap = await getDoc(adminDocRef);
-          setIsAdmin(docSnap.exists());
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-          setIsAdmin(false);
-        } finally {
-          setIsRoleLoading(false);
-        }
-      } else if (!isUserLoading) {
-        // If there's no user and we are not loading, they are not an admin.
-        setIsAdmin(false);
-        setIsRoleLoading(false);
-      }
-    };
-    checkAdminStatus();
-  }, [user, firestore, isUserLoading]);
-  
+    if (userProfile && userProfile.role === 'admin') {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [userProfile]);
 
   const navItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
@@ -80,7 +65,7 @@ export default function DashboardLayout({
   
   const accessibleNavItems = navItems.filter(item => {
     if (item.roles.includes('admin') && isAdmin) return true;
-    if (item.roles.includes('customer')) return true; // All users see customer links
+    if (item.roles.includes('customer')) return true;
     return false;
   });
 
@@ -93,7 +78,7 @@ export default function DashboardLayout({
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
-  if (isUserLoading || isProfileLoading || isRoleLoading || !user) {
+  if (isUserLoading || isProfileLoading || !user) {
     return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -112,7 +97,7 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {isUserLoading || isProfileLoading || isRoleLoading ? (
+            {isUserLoading || isProfileLoading ? (
               <div className="p-2 space-y-2">
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>

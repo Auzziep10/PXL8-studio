@@ -7,10 +7,12 @@ import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
-import { useAuth, useUser, useFirestore } from '@/firebase';
+import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
+import type { User as AppUser } from '@/lib/types';
+
 
 const navLinks = [
   { href: '/build', label: 'Builder' },
@@ -27,29 +29,21 @@ export default function Header() {
   const firestore = useFirestore();
 
   const [isAdmin, setIsAdmin] = useState(false);
-  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  // Correctly check for admin role from the `roles_admin` collection
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
   useEffect(() => {
-    const checkAdminStatus = async () => {
-      if (user && firestore) {
-        const adminDocRef = doc(firestore, 'roles_admin', user.uid);
-        try {
-          const docSnap = await getDoc(adminDocRef);
-          setIsAdmin(docSnap.exists());
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-          setIsAdmin(false);
-        } finally {
-          setIsRoleLoading(false);
-        }
-      } else if (!isUserLoading) {
-        setIsAdmin(false);
-        setIsRoleLoading(false);
-      }
-    };
-    checkAdminStatus();
-  }, [user, firestore, isUserLoading]);
+    if (userProfile && userProfile.role === 'admin') {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
+  }, [userProfile]);
 
 
   const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
@@ -106,7 +100,7 @@ export default function Header() {
             </Link>
           </Button>
 
-          {isUserLoading || isRoleLoading ? (
+          {isUserLoading || isProfileLoading ? (
             <div className='w-8 h-8 bg-muted rounded-full animate-pulse' />
           ) : isAuthenticated ? (
             <>
