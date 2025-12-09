@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -30,12 +30,17 @@ interface CheckoutFormData {
     password?: string;
 }
 
+interface PreviewState {
+    url: string | null;
+    size: SheetSizeType | null;
+}
+
 export default function CartPage() {
     const { items: cartItems, removeItem, updateItemQuantity, clearCart } = useCart();
     const { toast } = useToast();
     
     const [isCheckingOut, setIsCheckingOut] = useState(false);
-    const [previewImage, setPreviewImage] = useState<string | null>(null);
+    const [previewState, setPreviewState] = useState<PreviewState>({ url: null, size: null });
     
     const { user: currentUser, isUserLoading } = useUser();
     const firestore = useFirestore();
@@ -226,6 +231,10 @@ export default function CartPage() {
             setIsCheckingOut(false);
         }
     };
+    
+    const handlePreview = (url: string, size: SheetSizeType) => {
+        setPreviewState({ url, size });
+    };
 
     if (cartItems.length === 0) {
         return (
@@ -249,10 +258,12 @@ export default function CartPage() {
             <h1 className="text-3xl font-bold text-white mb-8">Checkout</h1>
             
             <ImagePreviewModal 
-                isOpen={!!previewImage} 
-                onClose={() => setPreviewImage(null)} 
-                imageUrl={previewImage} 
+                isOpen={!!previewState.url} 
+                onClose={() => setPreviewState({ url: null, size: null })} 
+                imageUrl={previewState.url} 
                 title="Gang Sheet Preview"
+                sheetWidth={previewState.size?.width}
+                sheetHeight={previewState.size?.height}
             />
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -269,7 +280,7 @@ export default function CartPage() {
                                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
                                     <div 
                                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
-                                        onClick={() => setPreviewImage(item.compositeImageUrl)}
+                                        onClick={() => handlePreview(item.compositeImageUrl, item.sheetSize)}
                                     >
                                         <Image src={item.compositeImageUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
