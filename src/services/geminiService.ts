@@ -1,13 +1,15 @@
 "use server";
 
-import { improveArtworkPrintability } from "@/ai/flows/improve-artwork-printability";
+import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from "@/ai/flows/improve-artwork-printability";
 
-export async function analyzeArtwork(artworkDataUri: string, artworkDescription: string) {
+export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
   try {
-    const result = await improveArtworkPrintability({ artworkDataUri: `data:${artworkDescription};base64,${artworkDataUri}`, artworkDescription });
-    return { success: true, feedback: result.feedback, score: result.printabilityScore };
+    const result = await improveArtworkPrintability(input);
+    return { success: true, data: result };
   } catch (error) {
     console.error("Error analyzing artwork:", error);
-    return { success: false, feedback: "Failed to analyze artwork.", score: 0 };
+    return { success: false, error: "Failed to analyze artwork." };
   }
 }
+
+    

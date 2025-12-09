@@ -2,28 +2,23 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SheetSize, GangSheetItem, CartItem } from '@/lib/types';
+import { SheetSize, GangSheetItem, CartItem, ArtworkOnCanvas } from '@/lib/types';
 import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
 import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown } from 'lucide-react';
-import { analyzeArtwork } from '@/services/geminiService';
+import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
+import AiAnalysisPanel from './ai-analysis-panel';
 
 export default function GangSheetBuilder() {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<SheetSize>(SheetSize.MEDIUM);
-  const [items, setItems] = useState<GangSheetItem[]>([]);
+  const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   
   // Duplication State
   const [duplicateCount, setDuplicateCount] = useState(1);
-  
-  // Analysis State
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [aiFeedback, setAiFeedback] = useState<string | null>(null);
-  const [printabilityScore, setPrintabilityScore] = useState<number | null>(null);
   
   // Dragging State
   const [draggingId, setDraggingId] = useState<string | null>(null);
@@ -32,8 +27,10 @@ export default function GangSheetBuilder() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(0.25);
+  const [isGenerating, setIsGenerating] = useState(false);
 
   const sheetConfig = SHEET_DIMENSIONS[selectedSize];
+  const selectedItem = items.find(item => item.id === selectedItemId);
 
   // --- Auto-Scaling for Preview ---
   useEffect(() => {
@@ -61,7 +58,7 @@ export default function GangSheetBuilder() {
   const displayHeight = sheetConfig.height * PPI * scale;
 
   // --- Auto-Positioning Algorithm ---
-  const findOpenPosition = (width: number, height: number, existingItems: GangSheetItem[]): {x: number, y: number} => {
+  const findOpenPosition = (width: number, height: number, existingItems: ArtworkOnCanvas[]): {x: number, y: number} => {
     const margin = 0.25; // inch margin
     const step = 0.5; // check every half inch
 
@@ -104,38 +101,54 @@ export default function GangSheetBuilder() {
 
         const pos = findOpenPosition(w, h, items);
 
-        const newItem: GangSheetItem = {
+        const newItem: ArtworkOnCanvas = {
           id: Date.now().toString(),
-          file: file,
-          previewUrl: e.target?.result as string,
+          name: file.name,
+          imageUrl: e.target?.result as string,
           width: w,
           height: h,
           quantity: 1,
-          originalWidthPx: img.width,
-          originalHeightPx: img.height,
+          dpi: PRINT_DPI,
           x: pos.x,
-          y: pos.y
+          y: pos.y,
+          canvasWidth: w * PPI,
+          canvasHeight: h * PPI
         };
 
         setItems(prev => [...prev, newItem]);
         setSelectedItemId(newItem.id);
         setDuplicateCount(1); // Reset duplicate count on new upload
-        
-        // AI Analysis
-        setIsAnalyzing(true);
-        const base64Data = (e.target?.result as string).split(',')[1];
-        const result = await analyzeArtwork(base64Data, file.type);
-        setAiFeedback(result.feedback);
-        setPrintabilityScore(result.score);
-        setIsAnalyzing(false);
       };
       img.src = e.target?.result as string;
     };
     reader.readAsDataURL(file);
   };
 
+  const handleRunAnalysis = async () => {
+    if (!selectedItem) return;
+
+    updateItem(selectedItem.id, { analysisLoading: true });
+    
+    const result = await analyzeArtwork({ 
+        artworkDataUri: selectedItem.imageUrl,
+        artworkDescription: selectedItem.name,
+    });
+
+    if (result.success && result.data) {
+        updateItem(selectedItem.id, { analysis: result.data, analysisLoading: false });
+    } else {
+        toast({
+            variant: "destructive",
+            title: "Analysis Failed",
+            description: result.error || "Could not analyze the artwork."
+        });
+        updateItem(selectedItem.id, { analysisLoading: false });
+    }
+  }
+
+
   // --- Item Management ---
-  const updateItem = (id: string, updates: Partial<GangSheetItem>) => {
+  const updateItem = (id: string, updates: Partial<ArtworkOnCanvas>) => {
     setItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
   };
 
@@ -144,8 +157,8 @@ export default function GangSheetBuilder() {
       if (selectedItemId === id) setSelectedItemId(null);
   };
 
-  const handleBulkDuplicate = (itemToClone: GangSheetItem, count: number) => {
-      const newItems: GangSheetItem[] = [];
+  const handleBulkDuplicate = (itemToClone: ArtworkOnCanvas, count: number) => {
+      const newItems: ArtworkOnCanvas[] = [];
       // We must check against both original items AND the newly added duplicates 
       // so they don't stack on top of each other.
       let currentItemsForCheck = [...items];
@@ -153,11 +166,12 @@ export default function GangSheetBuilder() {
       for (let i = 0; i < count; i++) {
           const pos = findOpenPosition(itemToClone.width, itemToClone.height, currentItemsForCheck);
           
-          const newItem: GangSheetItem = {
+          const newItem: ArtworkOnCanvas = {
               ...itemToClone,
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`,
               x: pos.x,
-              y: pos.y
+              y: pos.y,
+              analysis: undefined, // Clear analysis for duplicates
           };
           newItems.push(newItem);
           currentItemsForCheck.push(newItem);
@@ -243,7 +257,7 @@ export default function GangSheetBuilder() {
   }, [draggingId, handleMouseMove]);
 
   // --- Collision Detection Helper ---
-  const checkCollision = (currentItem: GangSheetItem) => {
+  const checkCollision = (currentItem: ArtworkOnCanvas) => {
       return items.some(other => {
           if (other.id === currentItem.id) return false;
           return !(
@@ -264,7 +278,7 @@ export default function GangSheetBuilder() {
     if (!ctx) throw new Error('No canvas context');
 
     const BASE_DPI = 300;
-    const MAX_DIMENSION = 4096; // Increased for better quality
+    const MAX_DIMENSION = 4096 * 2; // Increased for better quality
 
     const wPixels = sheetConfig.width * BASE_DPI;
     const hPixels = sheetConfig.height * BASE_DPI;
@@ -286,7 +300,7 @@ export default function GangSheetBuilder() {
     const renderScale = targetW / wPixels;
 
     const imageCache: Record<string, HTMLImageElement> = {};
-    const uniqueUrls: string[] = Array.from(new Set(items.map(i => i.previewUrl)));
+    const uniqueUrls: string[] = Array.from(new Set(items.map(i => i.imageUrl)));
     
     await Promise.all(uniqueUrls.map(url => new Promise<void>((resolve, reject) => {
         const img = new Image();
@@ -300,7 +314,7 @@ export default function GangSheetBuilder() {
     })));
 
     items.forEach(item => {
-        const img = imageCache[item.previewUrl];
+        const img = imageCache[item.imageUrl];
         if (img && (item.y + item.height <= sheetConfig.height)) {
             ctx.drawImage(
                 img, 
@@ -330,19 +344,7 @@ export default function GangSheetBuilder() {
             price: config.price
           },
           compositeImageUrl: compositeUrl,
-          artworks: items.map(i => ({
-            id: i.id,
-            name: i.file?.name || 'artwork',
-            imageUrl: i.previewUrl,
-            width: i.width,
-            height: i.height,
-            dpi: i.originalWidthPx / i.width,
-            x: i.x,
-            y: i.y,
-            canvasWidth: i.width * PPI,
-            canvasHeight: i.height * PPI,
-            quantity: i.quantity,
-          })),
+          artworks: items,
           quantity: 1,
         };
 
@@ -352,6 +354,7 @@ export default function GangSheetBuilder() {
           description: `${cartItem.sheetSize.name} gang sheet.`
         });
         setItems([]);
+        setSelectedItemId(null);
 
 
     } catch (e) {
@@ -434,7 +437,7 @@ export default function GangSheetBuilder() {
                   <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
                 </div>
               ) : (
-                <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
+                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
                   {items.map((item, index) => (
                       <div 
                         key={item.id} 
@@ -444,10 +447,10 @@ export default function GangSheetBuilder() {
                           <div className="flex items-start justify-between">
                               <div className="flex items-center space-x-3">
                                   <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
-                                      <img src={item.previewUrl} className="w-full h-full object-contain" alt={item.file?.name} />
+                                      <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
                                   </div>
                                   <div className="min-w-0">
-                                      <p className="text-sm font-medium text-white truncate w-24" title={item.file?.name}>{item.file?.name}</p>
+                                      <p className="text-sm font-medium text-white truncate w-24" title={item.name}>{item.name}</p>
                                       <p className="text-xs text-zinc-500">{item.width}" x {item.height}"</p>
                                   </div>
                               </div>
@@ -458,92 +461,95 @@ export default function GangSheetBuilder() {
                                   <Trash2 className="w-4 h-4" />
                               </button>
                           </div>
-                          
-                          {/* Controls for selected item */}
-                          {selectedItemId === item.id && (
-                              <div className="mt-3 pt-3 border-t border-white/5 space-y-3 cursor-default" onClick={(e) => e.stopPropagation()}>
-                                  <div className="grid grid-cols-2 gap-2">
-                                    <div>
-                                        <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
-                                            <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
-                                        </label>
-                                        <div className="relative">
-                                            <input 
-                                              type="number" 
-                                              step="0.1"
-                                              min="0.1"
-                                              value={item.width}
-                                              onChange={(e) => {
-                                                 const w = parseFloat(e.target.value);
-                                                 if (!isNaN(w) && w > 0) {
-                                                     const ratio = item.originalHeightPx / item.originalWidthPx;
-                                                     updateItem(item.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
-                                                 }
-                                              }}
-                                              className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                                            />
-                                            <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
-                                            <ArrowUpDown className="w-3 h-3 mr-1" /> Height
-                                        </label>
-                                        <div className="relative">
-                                            <input 
-                                              type="number" 
-                                              value={item.height}
-                                              readOnly
-                                              className="block w-full rounded bg-zinc-900/50 border border-white/5 text-zinc-500 text-xs p-1.5 cursor-not-allowed outline-none"
-                                            />
-                                            <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
-                                        </div>
-                                    </div>
-                                  </div>
-
-                                  <div className="flex items-center justify-between pt-2">
-                                       <label className="text-xs text-zinc-400 font-medium">Duplicate:</label>
-                                       <div className="flex items-center space-x-2">
-                                           <div className="flex items-center">
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); setDuplicateCount(Math.max(1, duplicateCount - 1)); }}
-                                                    className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-l hover:bg-zinc-700 text-zinc-400 transition-colors"
-                                                >
-                                                    -
-                                                </button>
-                                                <input 
-                                                    type="number" 
-                                                    value={duplicateCount}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
-                                                    className="w-12 h-8 bg-zinc-900 border-y border-white/10 text-center text-sm text-white focus:outline-none"
-                                                />
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); setDuplicateCount(duplicateCount + 1); }}
-                                                    className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-r hover:bg-zinc-700 text-zinc-400 transition-colors"
-                                                >
-                                                    +
-                                                </button>
-                                           </div>
-                                           <button 
-                                                onClick={(e) => { e.stopPropagation(); handleBulkDuplicate(item, duplicateCount); }}
-                                                className="h-8 px-3 bg-white text-black text-xs font-bold rounded hover:bg-zinc-200 transition-colors flex items-center"
-                                           >
-                                                <Copy className="w-3 h-3 mr-1" /> Add
-                                           </button>
-                                       </div>
-                                  </div>
-                                  <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500 mt-2">
-                                      <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
-                                      <span>X: {item.x.toFixed(2)}" Y: {item.y.toFixed(2)}"</span>
-                                  </div>
-                              </div>
-                          )}
                       </div>
                   ))}
                 </div>
               )}
             </div>
+
+            {selectedItem && (
+                 <div className="glass-panel rounded-2xl p-6 space-y-4">
+                     <div className="flex justify-between items-center">
+                        <h3 className="text-lg font-semibold text-white">Selected Artwork</h3>
+                        <button onClick={() => setSelectedItemId(null)} className="text-zinc-500 hover:text-white">&times;</button>
+                     </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                            <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                                <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
+                            </label>
+                            <div className="relative">
+                                <input 
+                                  type="number" 
+                                  step="0.1"
+                                  min="0.1"
+                                  value={selectedItem.width}
+                                  onChange={(e) => {
+                                     const w = parseFloat(e.target.value);
+                                     if (!isNaN(w) && w > 0) {
+                                         const ratio = selectedItem.canvasHeight / selectedItem.canvasWidth;
+                                         updateItem(selectedItem.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
+                                     }
+                                  }}
+                                  className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                />
+                                <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                            </div>
+                        </div>
+                        <div>
+                            <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                                <ArrowUpDown className="w-3 h-3 mr-1" /> Height
+                            </label>
+                            <div className="relative">
+                                <input 
+                                  type="number" 
+                                  value={selectedItem.height}
+                                  readOnly
+                                  className="block w-full rounded bg-zinc-900/50 border border-white/5 text-zinc-500 text-xs p-1.5 cursor-not-allowed outline-none"
+                                />
+                                <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                            </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2">
+                           <label className="text-xs text-zinc-400 font-medium">Duplicate:</label>
+                           <div className="flex items-center space-x-2">
+                               <div className="flex items-center">
+                                    <button 
+                                        onClick={() => setDuplicateCount(Math.max(1, duplicateCount - 1))}
+                                        className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-l hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                    >
+                                        -
+                                    </button>
+                                    <input 
+                                        type="number" 
+                                        value={duplicateCount}
+                                        onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
+                                        className="w-12 h-8 bg-zinc-900 border-y border-white/10 text-center text-sm text-white focus:outline-none"
+                                    />
+                                    <button 
+                                        onClick={() => setDuplicateCount(duplicateCount + 1)}
+                                        className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-r hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                    >
+                                        +
+                                    </button>
+                               </div>
+                               <button 
+                                    onClick={() => handleBulkDuplicate(selectedItem, duplicateCount)}
+                                    className="h-8 px-3 bg-white text-black text-xs font-bold rounded hover:bg-zinc-200 transition-colors flex items-center"
+                               >
+                                    <Copy className="w-3 h-3 mr-1" /> Add
+                               </button>
+                           </div>
+                      </div>
+                      <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500 mt-2">
+                          <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
+                          <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
+                      </div>
+                      <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} />
+                 </div>
+            )}
             
             <button
                 disabled={items.length === 0 || isSheetOverflowing || isGenerating}
@@ -611,7 +617,7 @@ export default function GangSheetBuilder() {
                                     'border border-blue-400/30 hover:border-blue-400'
                                 }`}>
                                     <img 
-                                        src={item.previewUrl} 
+                                        src={item.imageUrl} 
                                         className="w-full h-full object-contain pointer-events-none" 
                                         alt=""
                                     />
@@ -655,3 +661,5 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
+
+    
