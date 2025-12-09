@@ -19,7 +19,7 @@ import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { useEffect, useState, cloneElement, Children } from 'react';
+import React, { useEffect, useState, cloneElement, Children } from 'react';
 import { doc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
