@@ -13,6 +13,8 @@
  *   their own document.
  * - /users/{userId}/orders/{orderId}: A subcollection for user-specific orders,
  *   inheriting ownership from the parent user document.
+ * - /users/{userId}/drafts/{draftId}: A subcollection for user-specific draft
+ *   documents, like in-progress gang sheets.
  * - /roles_admin/{userId}: A separate, client-inaccessible collection used as a
  *   lookup table. The existence of a document here grants a user admin privileges
  *   across the database.
@@ -118,6 +120,17 @@ service cloud.firestore {
       allow create: if isOwner(userId);
       allow update: if isExistingOwner(userId);
       allow delete: if isExistingOwner(userId);
+    }
+    
+    /**
+     * @description Stores user-specific draft documents, like gang sheets.
+     * @path /users/{userId}/drafts/{draftId}
+     * @allow (create, get, list, update, delete) A user managing their own drafts.
+     * @deny  (get) A user trying to read another user's drafts.
+     * @principle Enforces document ownership via path hierarchy for all draft operations.
+     */
+    match /users/{userId}/drafts/{draftId} {
+      allow read, write: if isOwner(userId);
     }
 
     /**

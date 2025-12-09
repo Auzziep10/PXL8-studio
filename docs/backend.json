@@ -110,8 +110,28 @@
             }
           ]
         }
+      },
+      {
+        "path": "/users/{userId}/drafts/{draftId}",
+        "definition": {
+          "entityName": "GangSheet",
+          "schema": {
+            "$ref": "#/backend/entities/GangSheet"
+          },
+          "description": "Stores user-specific draft documents, like gang sheets.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The Firebase Auth UID of the user who owns the draft."
+            },
+            {
+              "name": "draftId",
+              "description": "The unique identifier for the draft."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "This Firestore structure is designed to support the PXL8 DTF Platform, focusing on secure and scalable data management for users, orders, and related entities. The design prioritizes authorization independence by denormalizing authorization data where necessary, enabling atomic operations and simplifying security rules. It incorporates structural segregation to ensure collections contain documents with uniform security requirements, and utilizes consistent access modeling for predictable authorization. The structure explicitly models state and employs semantic naming for clarity and debuggability.\n\nKey structural decisions and justifications:\n\n*   **/users/{userId}:** Stores user profiles. Follows path-based ownership for private user data. The `userId` parameter corresponds to the Firebase Auth UID.\n*   **/roles_admin/{userId}:**  Indicates admin status. The existence of a document with the user's UID in this collection grants admin privileges.  This existence-based check simplifies admin role verification in security rules.\n*   **/users/{userId}/orders/{orderId}:** Stores order data for each user. This path-based ownership ensures only the user can access their own orders. Includes denormalized `userId` for authorization independence.\n\nThis design achieves Authorization Independence by avoiding hierarchical authorization dependencies.  For example, access to an order does not require reading the user document; it is solely based on the path and, optionally, data within the order document itself, which could include denormalized user data if needed. This enables atomic operations and makes security rules more robust and easier to debug.  The admin role is handled through the `/roles_admin/{userId}` collection, allowing straightforward role checks without complex data lookups.\n\nTo support the required QAPs (rules are not filters), the structure uses segregation to isolate data with different access requirements. Private user data is stored under `/users/{userId}`, ensuring only the user has access. Admin-related data is stored separately, preventing unauthorized access. This segregation simplifies list operations by ensuring that rules do not need to filter based on authorization criteria.\n"
+    "reasoning": "This Firestore structure is designed to support the PXL8 DTF Platform, focusing on secure and scalable data management for users, orders, and related entities. The design prioritizes authorization independence by denormalizing authorization data where necessary, enabling atomic operations and simplifying security rules. It incorporates structural segregation to ensure collections contain documents with uniform security requirements, and utilizes consistent access modeling for predictable authorization. The structure explicitly models state and employs semantic naming for clarity and debuggability.\n\nKey structural decisions and justifications:\n\n*   **/users/{userId}:** Stores user profiles. Follows path-based ownership for private user data. The `userId` parameter corresponds to the Firebase Auth UID.\n*   **/roles_admin/{userId}:**  Indicates admin status. The existence of a document with the user's UID in this collection grants admin privileges.  This existence-based check simplifies admin role verification in security rules.\n*   **/users/{userId}/orders/{orderId}:** Stores order data for each user. This path-based ownership ensures only the user can access their own orders. Includes denormalized `userId` for authorization independence.\n*   **/users/{userId}/drafts/{draftId}:** Stores user-specific draft documents. This path-based ownership ensures only the user can access their own drafts.\n\nThis design achieves Authorization Independence by avoiding hierarchical authorization dependencies.  For example, access to an order does not require reading the user document; it is solely based on the path and, optionally, data within the order document itself, which could include denormalized user data if needed. This enables atomic operations and makes security rules more robust and easier to debug.  The admin role is handled through the `/roles_admin/{userId}` collection, allowing straightforward role checks without complex data lookups.\n\nTo support the required QAPs (rules are not filters), the structure uses segregation to isolate data with different access requirements. Private user data is stored under `/users/{userId}`, ensuring only the user has access. Admin-related data is stored separately, preventing unauthorized access. This segregation simplifies list operations by ensuring that rules do not need to filter based on authorization criteria.\n"
   }
 }
