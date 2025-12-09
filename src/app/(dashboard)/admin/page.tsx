@@ -158,18 +158,9 @@ const AssetCard: React.FC<{
   );
 };
 
-export default function AdminPage() {
+export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
   const firestore = useFirestore();
-  const { user } = useUser();
   
-  const userProfileRef = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [user, firestore]);
-  
-  const { data: userProfile } = useDoc<AppUser>(userProfileRef);
-  const isAdmin = userProfile?.role === 'admin';
-
   const ordersQuery = useMemoFirebase(
     () => (firestore && isAdmin ? query(collectionGroup(firestore, 'orders')) : null),
     [firestore, isAdmin]
@@ -1015,5 +1006,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

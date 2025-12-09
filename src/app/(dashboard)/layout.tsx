@@ -19,7 +19,7 @@ import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, cloneElement } from 'react';
 import { doc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
@@ -86,6 +86,9 @@ export default function DashboardLayout({
         </div>
     );
   }
+
+  // Pass isAdmin prop to children
+  const childrenWithProps = cloneElement(children as React.ReactElement, { isAdmin });
 
   return (
     <SidebarProvider>
@@ -169,7 +172,7 @@ export default function DashboardLayout({
             </Button>
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-6">
-          {children}
+          {childrenWithProps}
         </div>
       </SidebarInset>
     </SidebarProvider>
