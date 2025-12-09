@@ -181,14 +181,14 @@ export default function AdminPage() {
 
   // Firestore Queries
   const ordersQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'orders')) : null),
-    [firestore]
+    () => (firestore && user ? query(collection(firestore, 'orders')) : null),
+    [firestore, user]
   );
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
   const usersQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'users')) : null),
-    [firestore]
+    () => (firestore && user ? query(collection(firestore, 'users')) : null),
+    [firestore, user]
   );
   const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
 
