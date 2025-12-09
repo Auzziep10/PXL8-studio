@@ -1,10 +1,10 @@
+
 import type { SVGProps } from 'react';
 import Image from 'next/image';
 
 export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
   // The className is passed down from where the component is used,
   // which might control the size (e.g., h-8 w-auto).
-  // We extract just the width and height for the Image component.
   // A default is provided for safety.
   const width = props.width || 110;
   const height = props.height || 40;
