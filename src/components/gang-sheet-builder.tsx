@@ -4,13 +4,27 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SheetSize, GangSheetItem, CartItem, ArtworkOnCanvas } from '@/lib/types';
 import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import AiAnalysisPanel from './ai-analysis-panel';
+import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { Button } from './ui/button';
 
-const LOCAL_STORAGE_KEY = 'pxl8-gang-sheet';
+// Debounce function to limit how often we save to Firestore
+function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+
+  return (...args: Parameters<F>): void => {
+    if (timeout) {
+      clearTimeout(timeout);
+    }
+    timeout = setTimeout(() => func(...args), waitFor);
+  };
+}
+
 
 export default function GangSheetBuilder() {
   const { addItem: addToCart } = useCart();
@@ -19,6 +33,63 @@ export default function GangSheetBuilder() {
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+
+  // Reference to the user's gang sheet document in Firestore
+  const gangSheetDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, `users/${user.uid}/drafts/gang-sheet`);
+  }, [firestore, user]);
+
+  // Load data from Firestore
+  const { data: savedSheet, isLoading: isSheetLoading } = useDoc(gangSheetDocRef);
+
+  // State to track if data has been loaded from Firestore
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  // Effect to load data from Firestore ONCE
+  useEffect(() => {
+    if (savedSheet && !isLoaded) {
+      setItems(savedSheet.items || []);
+      setSelectedSize(savedSheet.selectedSize || SheetSize.MEDIUM);
+      setIsLoaded(true); // Mark as loaded to prevent re-loading
+    } else if (!isSheetLoading && !savedSheet) {
+      // If there's no saved sheet, we can mark it as loaded
+      setIsLoaded(true);
+    }
+  }, [savedSheet, isSheetLoading, isLoaded]);
+
+
+  // Debounced save function
+  const debouncedSaveToFirestore = useCallback(
+    debounce((sheetData: { items: ArtworkOnCanvas[], selectedSize: SheetSize }) => {
+      if (gangSheetDocRef) {
+        setDoc(gangSheetDocRef, { 
+          ...sheetData,
+          updatedAt: serverTimestamp()
+        }, { merge: true }).catch((err) => {
+            console.error("Failed to save sheet:", err);
+            toast({
+                variant: 'destructive',
+                title: 'Save Failed',
+                description: 'Could not save your sheet to the cloud.'
+            });
+        });
+      }
+    }, 1500), // Save 1.5 seconds after the last change
+    [gangSheetDocRef, toast]
+  );
+  
+  // Effect to save data to Firestore when it changes
+  useEffect(() => {
+    // Only save if the user is logged in and data has been loaded
+    if (user && isLoaded) {
+      debouncedSaveToFirestore({ items, selectedSize });
+    }
+  }, [items, selectedSize, user, isLoaded, debouncedSaveToFirestore]);
+
+
   // Duplication State
   const [duplicateCount, setDuplicateCount] = useState(1);
   
@@ -33,34 +104,6 @@ export default function GangSheetBuilder() {
 
   const sheetConfig = SHEET_DIMENSIONS[selectedSize];
   const selectedItem = items.find(item => item.id === selectedItemId);
-
-  // --- State Persistence ---
-  useEffect(() => {
-    try {
-      const savedItems = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedItems) {
-        setItems(JSON.parse(savedItems));
-      }
-    } catch (error) {
-        console.error("Failed to load items from localStorage", error);
-    }
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
-    } catch (error) {
-        console.error("Failed to save items to localStorage", error);
-        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-             toast({
-                variant: 'destructive',
-                title: 'Storage Full',
-                description: 'Could not save your sheet. Browser storage is full.'
-             });
-        }
-    }
-  }, [items, toast]);
-
 
   // --- Auto-Scaling for Preview ---
   useEffect(() => {
@@ -383,9 +426,13 @@ export default function GangSheetBuilder() {
           title: "Added to Cart",
           description: `${cartItem.sheetSize.name} gang sheet.`
         });
+        // Clear the sheet for the next build
         setItems([]);
         setSelectedItemId(null);
-
+        // Also clear from Firestore for the logged-in user
+        if (gangSheetDocRef) {
+          setDoc(gangSheetDocRef, { items: [], selectedSize: SheetSize.MEDIUM }, { merge: true });
+        }
 
     } catch (e) {
         console.error("Error generating sheet", e);
@@ -398,6 +445,17 @@ export default function GangSheetBuilder() {
         setIsGenerating(false);
     }
   };
+
+  if (isUserLoading || !isLoaded) {
+    return (
+        <div className="flex items-center justify-center min-h-[60vh]">
+            <div className="flex flex-col items-center space-y-4">
+                <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+                <p className="text-zinc-400">Loading your sheet...</p>
+            </div>
+        </div>
+    )
+  }
 
   return (
     <div className="min-h-screen pb-12 select-none">
@@ -413,10 +471,18 @@ export default function GangSheetBuilder() {
             
             {/* 1. Sheet Selection */}
             <div className="glass-panel rounded-2xl p-6">
-              <h3 className="text-lg font-semibold mb-4 text-white flex items-center">
-                <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">1</span>
-                Select Sheet Size
-              </h3>
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-white flex items-center">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">1</span>
+                    Select Sheet Size
+                  </h3>
+                  {user && (
+                    <div className="flex items-center text-xs text-zinc-500">
+                        <Save className="w-3 h-3 mr-1.5 text-accent" />
+                        <span>Auto-saved to cloud</span>
+                    </div>
+                  )}
+              </div>
               <div className="space-y-3">
                 {Object.entries(SHEET_DIMENSIONS).map(([key, config]) => (
                   <label key={key} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSize === key ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
@@ -582,7 +648,7 @@ export default function GangSheetBuilder() {
             )}
             
             <button
-                disabled={items.length === 0 || isSheetOverflowing || isGenerating}
+                disabled={items.length === 0 || isSheetOverflowing || isGenerating || !isLoaded}
                 onClick={handleProcessAndAddToCart}
                 className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
             >
@@ -691,7 +757,5 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
-
-    
 
     
