@@ -19,7 +19,7 @@ import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { useEffect, useState, cloneElement } from 'react';
+import { useEffect, useState, cloneElement, Children } from 'react';
 import { doc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 
@@ -79,7 +79,7 @@ export default function DashboardLayout({
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
-  if (isUserLoading || !user) { // Removed isProfileLoading from here
+  if (isUserLoading || !user) { 
     return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -88,7 +88,15 @@ export default function DashboardLayout({
   }
 
   // Pass isAdmin and isProfileLoading props to children
-  const childrenWithProps = cloneElement(children as React.ReactElement, { isAdmin, isProfileLoading });
+  const childrenWithProps = Children.map(children, child => {
+    if (React.isValidElement(child)) {
+      // For the admin page, we specifically pass the props it needs.
+      if (pathname === '/admin') {
+        return cloneElement(child, { isAdmin, isProfileLoading } as { isAdmin: boolean, isProfileLoading: boolean });
+      }
+    }
+    return child;
+  });
 
   return (
     <SidebarProvider>
