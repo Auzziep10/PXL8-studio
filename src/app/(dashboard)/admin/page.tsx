@@ -159,7 +159,7 @@ const AssetCard: React.FC<{
 
 export default function AdminPage() {
   const firestore = useFirestore();
-  const { user } = useUser();
+  const { user, isUserLoading } = useUser();
 
   // Self-contained authorization
   const [isAdmin, setIsAdmin] = useState(false);
@@ -499,7 +499,7 @@ export default function AdminPage() {
     printWindow.document.close();
   };
 
-  if (isProfileLoading) {
+  if (isProfileLoading || isUserLoading) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center">
              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -1012,20 +1012,31 @@ export default function AdminPage() {
                 </div>
                 <div className="space-y-6">
                   {Array.isArray(selectedOrder.items) &&
-                    selectedOrder.items.map((item, idx) => (
-                      <AssetCard
-                        key={idx}
-                        item={{
-                          ...(item.artworks[0] as any),
-                          file: null,
-                          printReadyUrl: selectedOrder.printReadyUrl,
-                          originalUrl: selectedOrder.previewUrl,
-                          originalFileName: 'user-upload.png',
-                        }}
-                        index={idx}
-                        onPreview={setPreviewImage}
-                      />
-                    ))}
+                    selectedOrder.items.map((item, idx) => {
+                      const gangSheetItem: GangSheetItem = {
+                        id: item.id,
+                        file: null,
+                        printReadyUrl: item.compositeImageUrl,
+                        originalUrl: item.compositeImageUrl, // Use composite for original as well if no other source
+                        previewUrl: item.compositeImageUrl,
+                        originalFileName: `sheet-${idx + 1}.png`,
+                        width: item.sheetSize.width,
+                        height: item.sheetSize.height,
+                        quantity: item.quantity,
+                        originalHeightPx: 0,
+                        originalWidthPx: 0,
+                        x: 0,
+                        y: 0,
+                      };
+                      return (
+                        <AssetCard
+                          key={idx}
+                          item={gangSheetItem}
+                          index={idx}
+                          onPreview={setPreviewImage}
+                        />
+                      );
+                    })}
                 </div>
               </div>
             </div>
