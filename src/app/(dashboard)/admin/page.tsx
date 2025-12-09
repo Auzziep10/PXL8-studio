@@ -232,14 +232,13 @@ export default function AdminPage() {
     setSelectedOrderId(null);
   };
 
-  // Group customers logic (now from allUsers)
   const customers = useMemo(() => {
     if (!Array.isArray(allUsers)) return [];
 
     return allUsers.filter(user => {
       const term = searchTerm.toLowerCase();
-      const name = `${user.firstName} ${user.lastName}`.toLowerCase();
-      const email = user.email.toLowerCase();
+      const name = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+      const email = (user.email || '').toLowerCase();
       return name.includes(term) || email.includes(term);
     });
   }, [allUsers, searchTerm]);
