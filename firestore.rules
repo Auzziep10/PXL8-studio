@@ -121,6 +121,26 @@ service cloud.firestore {
     function isOrderDataImmutableOnUpdate() {
       return request.resource.data.userId == resource.data.userId;
     }
+    
+    /**
+     * isAdmin
+     * Checks if the user has an admin role document.
+     * This is a secure way to check for admin privileges.
+     */
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+    }
+
+    //-------------------------------------------------------------------------//
+    // Collection: roles_admin
+    //-------------------------------------------------------------------------//
+    /**
+     * @description Stores admin role flags. Only admins can read/write.
+     * This collection is for internal role management.
+     */
+    match /roles_admin/{userId} {
+      allow read, write: if isAdmin();
+    }
 
     //-------------------------------------------------------------------------//
     // Collection: users
@@ -135,15 +155,18 @@ service cloud.firestore {
      * @principle Restricts access to a user's own data tree and allows self-creation of a profile.
      */
     match /users/{userId} {
-      // Users can get their own document, but listing the entire /users collection is denied to prevent enumeration.
-      allow get: if isOwner(userId);
-      allow list: if false;
+      // Users can get their own document. Admins can read any user profile.
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Only admins can list all users.
+      allow list: if isAdmin();
 
       // A user can create their own profile document, establishing their presence.
       allow create: if isOwner(userId) && hasValidUserDataOnCreate(userId);
 
-      // A user can update their own profile. Key relational fields are immutable.
-      allow update: if isExistingOwner(userId) && isUserDataImmutableOnUpdate();
+      // A user can update their own profile. Admins can update any profile.
+      // Key relational fields are immutable.
+      allow update: if (isExistingOwner(userId) || isAdmin()) && isUserDataImmutableOnUpdate();
 
       // Deleting user profiles is disabled by default for data integrity.
       allow delete: if false;
@@ -173,32 +196,54 @@ service cloud.firestore {
         // Owner can delete their own existing gang sheet.
         allow delete: if isExistingOwner(userId);
       }
+      
+      //-----------------------------------------------------------------------//
+      // Subcollection: drafts
+      //-----------------------------------------------------------------------//
+      match /drafts/{draftId} {
+        allow read, write: if isOwner(userId);
+      }
 
       //-----------------------------------------------------------------------//
-      // Subcollection: orders
+      // Subcollection: orders (user-specific view)
       //-----------------------------------------------------------------------//
 
       /**
-       * @description Controls access to a user's private orders.
+       * @description Controls access to a user's private view of their orders.
        * @path /users/{userId}/orders/{orderId}
-       * @allow The owner ('user123') creating a new order in their own subcollection. (create)
-       * @allow The owner ('user123') listing all of their own orders. (list)
-       * @deny A different user ('user456') attempting to delete an order owned by 'user123'. (delete)
-       * @principle Enforces strict ownership for all operations within a user's private subcollection.
+       * @allow The owner ('user123') reading their own order record. (get, list)
+       * @deny A different user ('user456') attempting to read an order owned by 'user123'. (get)
+       * @principle Enforces strict read-only ownership for a user's personal order history.
        */
       match /orders/{orderId} {
-        // Owner can read their own orders and list their collection.
+        // Owner can read their own orders and list their collection for their dashboard.
         allow get, list: if isOwner(userId);
-
-        // Owner can create new orders, linking them via the internal userId field.
-        allow create: if isOwner(userId) && hasValidOrderDataOnCreate(userId);
-
-        // Owner can update an existing order. The ownership link is immutable.
-        allow update: if isExistingOwner(userId) && isOrderDataImmutableOnUpdate();
         
-        // Owner can delete their own existing order.
-        allow delete: if isExistingOwner(userId);
+        // Writes to this subcollection are handled by backend logic, not directly by user.
+        allow create, update, delete: if false; 
       }
     }
+    
+    //-------------------------------------------------------------------------//
+    // Collection: orders (central collection for admin)
+    //-------------------------------------------------------------------------//
+    
+    /**
+     * @description Controls access to the central `orders` collection for fulfillment.
+     * @path /orders/{orderId}
+     * @allow An admin user reading, listing, or updating any order. (get, list, update)
+     * @allow Any authenticated user creating a new order. (create)
+     * @deny Non-admins from listing or updating orders. (list, update)
+     */
+     match /orders/{orderId} {
+        // Admins have full read/update access for fulfillment.
+        allow get, list, update: if isAdmin();
+        
+        // Any signed-in user can create an order during checkout.
+        allow create: if isSignedIn();
+        
+        // Orders should not be deleted from the central log.
+        allow delete: if false;
+     }
   }
 }
