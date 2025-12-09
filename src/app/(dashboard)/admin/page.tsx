@@ -163,20 +163,15 @@ const AssetCard: React.FC<{
 export default function AdminPage() {
   const firestore = useFirestore();
   const { user } = useUser();
-  const [isAdmin, setIsAdmin] = useState(false);
+  
+  const userProfileRef = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [user, firestore]);
+  
+  const { data: userProfile } = useDoc<User>(userProfileRef);
+  const isAdmin = userProfile?.role === 'admin';
 
-  // Check for admin role
-  const adminRoleRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, `roles_admin/${user.uid}`);
-  }, [firestore, user]);
-  const { data: adminRoleDoc } = useDoc(adminRoleRef);
-
-  useEffect(() => {
-    setIsAdmin(!!adminRoleDoc);
-  }, [adminRoleDoc]);
-
-  // Securely query orders only if the user is an admin
   const ordersQuery = useMemoFirebase(
     () => (firestore && isAdmin ? query(collectionGroup(firestore, 'orders')) : null),
     [firestore, isAdmin]
