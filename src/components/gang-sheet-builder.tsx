@@ -1,6 +1,4 @@
 
-
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -203,10 +201,9 @@ export default function GangSheetBuilder() {
     try {
         const imageUrl = await uploadFileAndGetURL(file, user.uid);
     
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-          const img = new Image();
-          img.onload = async () => {
+        const img = new Image();
+        img.crossOrigin = "Anonymous"; // Important for loading images from another domain (Firebase Storage)
+        img.onload = () => {
             const PRINT_DPI = 300;
             const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
             const h = parseFloat((img.height / PRINT_DPI).toFixed(2));
@@ -231,10 +228,12 @@ export default function GangSheetBuilder() {
             setSelectedItemId(newItem.id);
             setDuplicateCount(1); // Reset duplicate count on new upload
             toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
-          };
-          img.src = e.target?.result as string;
         };
-        reader.readAsDataURL(file);
+        img.onerror = () => {
+            console.error("Failed to load image from storage for dimension calculation.");
+            toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the uploaded image to place it on the canvas.' });
+        };
+        img.src = imageUrl;
 
     } catch (error) {
         console.error("File upload failed:", error);
@@ -652,7 +651,7 @@ export default function GangSheetBuilder() {
                                </button>
                            </div>
                       </div>
-                      <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} />
+                      <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
                  </div>
             )}
 
@@ -833,8 +832,4 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
-
-    
-
-    
 
