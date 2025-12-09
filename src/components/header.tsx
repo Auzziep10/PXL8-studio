@@ -3,10 +3,12 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PXL8Logo } from '@/components/icons';
-import { LayoutGrid, ShoppingCart, User } from 'lucide-react';
+import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
+import { useAuth, useUser } from '@/firebase';
+import { signOut } from 'firebase/auth';
 
 const navLinks = [
   { href: '/build', label: 'Builder' },
@@ -18,11 +20,17 @@ const navLinks = [
 export default function Header() {
   const pathname = usePathname();
   const cart = useCart();
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
   const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
 
-  // In a real app, this would come from an auth context
-  const isAuthenticated = true; 
+  // In a real app, this would come from the user's document in Firestore
   const userRole = 'admin';
+  const isAuthenticated = !!user;
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
@@ -68,13 +76,21 @@ export default function Header() {
             </Link>
           </Button>
 
-          {isAuthenticated ? (
-             <Button variant="ghost" size="icon" asChild>
-             <Link href="/auth/login">
-                 <User className="h-5 w-5" />
-                 <span className="sr-only">Account</span>
-             </Link>
-          </Button>
+          {isUserLoading ? (
+            <div className='w-8 h-8 bg-muted rounded-full animate-pulse' />
+          ) : isAuthenticated ? (
+            <>
+              <Button variant="ghost" size="icon" asChild>
+                <Link href="/dashboard">
+                    <User className="h-5 w-5" />
+                    <span className="sr-only">Account</span>
+                </Link>
+              </Button>
+              <Button variant="ghost" size="icon" onClick={handleLogout}>
+                <LogOut className="h-5 w-5" />
+                <span className="sr-only">Logout</span>
+              </Button>
+            </>
           ) : (
             <Button asChild>
                 <Link href="/auth/login">Login</Link>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -18,6 +17,9 @@ import {
 import { Home, LayoutGrid, User, Settings, LogOut } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { doc } from 'firebase/firestore';
+import { signOut } from 'firebase/auth';
 
 export default function DashboardLayout({
   children,
@@ -25,13 +27,27 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  // In a real app, this would be from context
-  const userRole = 'admin'; 
+  const { user, isUserLoading } = useUser();
+  const auth = useAuth();
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile } = useDoc(userDocRef);
+
+  const userRole = userProfile?.role || 'customer';
 
   const navItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
     { href: '/admin', label: 'Fulfillment', icon: LayoutGrid, roles: ['admin'] },
   ];
+
+  const handleLogout = async () => {
+    await signOut(auth);
+  };
 
   return (
     <SidebarProvider>
@@ -44,7 +60,13 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {navItems.filter(item => item.roles.includes(userRole)).map((item) => (
+            {isUserLoading ? (
+              <div className="p-2 space-y-2">
+                 <div className="h-8 bg-muted rounded-md animate-pulse"/>
+                 <div className="h-8 bg-muted rounded-md animate-pulse"/>
+              </div>
+            ) : (
+              navItems.filter(item => item.roles.includes(userRole)).map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} passHref>
                   <SidebarMenuButton
@@ -59,7 +81,7 @@ export default function DashboardLayout({
                   </SidebarMenuButton>
                 </Link>
               </SidebarMenuItem>
-            ))}
+            )))}
           </SidebarMenu>
         </SidebarContent>
         <SidebarFooter>
@@ -75,28 +97,26 @@ export default function DashboardLayout({
                     </Link>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
-                    <Link href="#" passHref>
-                        <SidebarMenuButton asChild tooltip={{ children: 'Logout' }}>
-                            <span>
-                                <LogOut />
-                                <span>Logout</span>
-                            </span>
-                        </SidebarMenuButton>
-                    </Link>
+                    <SidebarMenuButton onClick={handleLogout} asChild tooltip={{ children: 'Logout' }}>
+                        <span>
+                            <LogOut />
+                            <span>Logout</span>
+                        </span>
+                    </SidebarMenuButton>
                 </SidebarMenuItem>
             </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset>
+      <SidebarInset className="pt-14">
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger className="sm:hidden" />
             <div className='flex-1'>
                 <h1 className="text-xl font-semibold capitalize">
-                    {pathname.split('/').pop()}
+                    {pathname.split('/').pop()?.replace('-', ' ')}
                 </h1>
             </div>
             <Button variant="outline" size="icon" asChild>
-                <Link href="/auth/login">
+                <Link href="/dashboard">
                     <User className="h-5 w-5" />
                     <span className="sr-only">My Account</span>
                 </Link>
