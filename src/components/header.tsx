@@ -7,9 +7,10 @@ import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
-import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
+import { useAuth, useUser, useFirestore, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { useEffect, useState } from 'react';
 
 const navLinks = [
   { href: '/build', label: 'Builder' },
@@ -25,13 +26,27 @@ export default function Header() {
   const auth = useAuth();
   const firestore = useFirestore();
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
-  const userRole = userProfile?.role || 'customer';
+  // Correctly check for admin role
+  useEffect(() => {
+    if (user && firestore) {
+      setIsRoleLoading(true);
+      const adminDocRef = doc(firestore, 'roles_admin', user.uid);
+      getDoc(adminDocRef).then((docSnap) => {
+        setIsAdmin(docSnap.exists());
+        setIsRoleLoading(false);
+      }).catch(() => {
+        setIsAdmin(false);
+        setIsRoleLoading(false);
+      });
+    } else if (!isUserLoading) {
+      setIsAdmin(false);
+      setIsRoleLoading(false);
+    }
+  }, [user, firestore, isUserLoading]);
+
 
   const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
   
@@ -65,7 +80,7 @@ export default function Header() {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
-          {isAuthenticated && userRole === 'admin' && (
+          {isAuthenticated && isAdmin && (
              <Button variant="ghost" size="icon" asChild>
                 <Link href="/admin">
                     <LayoutGrid className="h-5 w-5" />
@@ -87,7 +102,7 @@ export default function Header() {
             </Link>
           </Button>
 
-          {isUserLoading || isProfileLoading ? (
+          {isUserLoading || isRoleLoading ? (
             <div className='w-8 h-8 bg-muted rounded-full animate-pulse' />
           ) : isAuthenticated ? (
             <>

@@ -18,9 +18,9 @@ import { Home, LayoutGrid, User, Settings, LogOut } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 export default function DashboardLayout({
   children,
@@ -32,6 +32,9 @@ export default function DashboardLayout({
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+  
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isRoleLoading, setIsRoleLoading] = useState(true);
 
   useEffect(() => {
     if (!isUserLoading && !user) {
@@ -46,12 +49,35 @@ export default function DashboardLayout({
 
   const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
-  const userRole = userProfile?.role || 'customer';
+  // Correctly check for admin role
+  useEffect(() => {
+    if (user && firestore) {
+      setIsRoleLoading(true);
+      const adminDocRef = doc(firestore, 'roles_admin', user.uid);
+      getDoc(adminDocRef).then((docSnap) => {
+        setIsAdmin(docSnap.exists());
+        setIsRoleLoading(false);
+      }).catch(() => {
+        setIsAdmin(false);
+        setIsRoleLoading(false);
+      });
+    } else {
+      setIsAdmin(false);
+      setIsRoleLoading(false);
+    }
+  }, [user, firestore]);
+  
 
   const navItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
     { href: '/admin', label: 'Fulfillment', icon: LayoutGrid, roles: ['admin'] },
   ];
+  
+  const accessibleNavItems = navItems.filter(item => {
+    if (item.roles.includes('admin') && isAdmin) return true;
+    if (item.roles.includes('customer')) return true; // All users see customer links
+    return false;
+  });
 
   const handleLogout = async () => {
     if (auth) {
@@ -62,7 +88,7 @@ export default function DashboardLayout({
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
-  if (isUserLoading || !user) {
+  if (isUserLoading || isProfileLoading || isRoleLoading || !user) {
     return (
         <div className="flex items-center justify-center h-screen">
             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -87,7 +113,7 @@ export default function DashboardLayout({
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>
               </div>
             ) : (
-              navItems.filter(item => item.roles.includes(userRole)).map((item) => (
+              accessibleNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} passHref>
                   <SidebarMenuButton
@@ -136,6 +162,14 @@ export default function DashboardLayout({
                     {userProfile?.firstName ? `Welcome, ${userProfile.firstName}` : pageTitle}
                 </h1>
             </div>
+            {isAdmin && (
+              <Button variant="outline" size="icon" asChild>
+                <Link href="/admin">
+                  <LayoutGrid className="h-5 w-5" />
+                  <span className="sr-only">Fulfillment</span>
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" size="icon" asChild>
                 <Link href="/dashboard">
                     <User className="h-5 w-5" />
