@@ -4,12 +4,24 @@ export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
   return (
     <svg
       xmlns="http://www.w3.org/2000/svg"
-      viewBox="0 0 148 56"
-      fill="currentColor"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       {...props}
     >
       <title>PXL8 Logo</title>
-      <path d="M136.273 0H11.727C5.249 0 0 5.249 0 11.727v32.545C0 50.751 5.249 56 11.727 56h124.545C142.751 56 148 50.751 148 44.272V11.727C148 5.249 142.751 0 136.273 0zM35.918 39.818h-4.727v-4.727h4.727v4.727zm0-7.091h-4.727v-4.727h4.727v4.727zm0-7.091h-4.727v-4.727h4.727v4.727zm0-7.091h-4.727v-4.727h4.727v4.727zm-7.091 21.273h-4.727V35h4.727v4.818zm0-7.091h-4.727v-4.727h4.727v4.727zm0-7.091h-4.727v-4.727h4.727v4.727zm-7.091 14.182h-4.727v-4.727h4.727v4.727zm0-7.091h-4.727v-4.727h4.727v4.727zm44.5-5.909H52.054L69.145 28 52.054 13.818h14.182L83.327 28l-16.99 12.091zM91.873 39.818h-4.727V13.818h4.727v26zM120.355 28c0 6.673-5.418 12.091-12.091 12.091s-12.091-5.418-12.091-12.091S101.59 15.91 108.264 15.91s12.091 5.418 12.091 12.09zM42.218 39.818h-19.5v-26h12.409c3.9 0 7.091 3.19 7.091 7.091v11.818c0 3.9-3.19 7.091-7.091 7.091zM108.264 35c3.8 0 6.818-3.019 6.818-6.818s-3.019-6.818-6.818-6.818-6.818 3.019-6.818 6.818S104.464 35 108.264 35z" />
+      <path d="M4 4h4v4H4z" fill="hsl(var(--primary))" stroke="none" />
+      <path d="M10 4h4v4h-4z" />
+      <path d="M16 4h4v4h-4z" fill="hsl(var(--accent))" stroke="none" />
+      <path d="M4 10h4v4H4z" />
+      <path d="M10 10h4v4h-4z" fill="currentColor" />
+      <path d="M16 10h4v4h-4z" />
+      <path d="M4 16h4v4H4z" />
+      <path d="M10 16h4v4h-4z" />
+      <path d="M16 16h4v4h-4z" />
     </svg>
   );
 }
