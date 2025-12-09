@@ -177,14 +177,19 @@ export default function CartPage() {
             if (!isTestMode) {
                 await createCheckoutSession(cartItems, total);
             } else {
+                // Simulate a successful order placement in test mode
                 await new Promise(resolve => setTimeout(resolve, 1000));
+                console.log('--- TEST MODE ORDER ---');
+                console.log('Customer:', formData);
+                console.log('Items:', cartItems);
+                console.log('Total: $0.00');
             }
             
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
             clearCart();
         } catch (error) {
             console.error("Checkout failed", error);
-            toast({ variant: 'destructive', title: 'Checkout Failed', description: 'Please try again.' });
+            toast({ variant: 'destructive', title: 'Checkout Failed', description: 'There was an issue processing your order.' });
         } finally {
             setIsCheckingOut(false);
         }
@@ -513,5 +518,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    
