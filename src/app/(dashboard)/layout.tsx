@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { doc } from 'firebase/firestore';
 import { signOut } from 'firebase/auth';
+import { useEffect } from 'react';
 
 export default function DashboardLayout({
   children,
@@ -27,9 +28,16 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
   const firestore = useFirestore();
+
+  useEffect(() => {
+    if (!isUserLoading && !user) {
+      router.push('/auth/login');
+    }
+  }, [isUserLoading, user, router]);
 
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -48,10 +56,19 @@ export default function DashboardLayout({
   const handleLogout = async () => {
     if (auth) {
         await signOut(auth);
+        router.push('/auth/login');
     }
   };
 
   const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
+
+  if (isUserLoading || !user) {
+    return (
+        <div className="flex items-center justify-center h-screen">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+        </div>
+    );
+  }
 
   return (
     <SidebarProvider>
