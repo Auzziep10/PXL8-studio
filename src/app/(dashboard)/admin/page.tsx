@@ -1,6 +1,7 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Order, OrderStatus, GangSheetItem, User } from '@/lib/types';
+import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
 import {
   Printer,
   Search,
@@ -14,11 +15,8 @@ import {
   History,
   ArrowLeft,
   ArrowUpRight,
-  ArrowUp,
-  ArrowDown,
   ZoomIn,
   FileText,
-  Filter,
   Database,
   Cloud,
 } from 'lucide-react';
@@ -169,7 +167,7 @@ export default function AdminPage() {
     return doc(firestore, 'users', user.uid);
   }, [user, firestore]);
   
-  const { data: userProfile } = useDoc<User>(userProfileRef);
+  const { data: userProfile } = useDoc<AppUser>(userProfileRef);
   const isAdmin = userProfile?.role === 'admin';
 
   const ordersQuery = useMemoFirebase(
@@ -1017,3 +1015,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
