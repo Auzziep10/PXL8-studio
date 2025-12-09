@@ -27,8 +27,8 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, query, updateDoc, doc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { collection, query, updateDoc, doc, collectionGroup } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -162,20 +162,14 @@ const AssetCard: React.FC<{
 
 export default function AdminPage() {
   const firestore = useFirestore();
+  const { user } = useUser();
 
-  // Fetch all orders from all users
   const ordersQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'orders')) : null),
-    [firestore]
+    () => (firestore && user ? query(collectionGroup(firestore, 'orders')) : null),
+    [firestore, user]
   );
+  
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
-
-  // Fetch all users
-  const usersQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'users')) : null),
-    [firestore]
-  );
-  const { data: allUsers, isLoading: isLoadingUsers } = useCollection<User>(usersQuery);
 
   const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
   const [searchTerm, setSearchTerm] = useState('');
@@ -187,7 +181,6 @@ export default function AdminPage() {
   const [isZipping, setIsZipping] = useState(false);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  // Health Check State
   const [
     healthStatus,
     setHealthStatus,
@@ -196,7 +189,6 @@ export default function AdminPage() {
   );
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
-  // Sorting & Filtering State
   const [
     sortConfig,
     setSortConfig,
@@ -206,7 +198,6 @@ export default function AdminPage() {
   });
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
 
-  // Derive the selected order from the orders prop to ensure it stays in sync
   const selectedOrder = useMemo(
     () => allOrders?.find((o) => o.id === selectedOrderId) || null,
     [allOrders, selectedOrderId]
@@ -221,36 +212,23 @@ export default function AdminPage() {
 
   // Group customers logic
   const customers = useMemo(() => {
+    if (!Array.isArray(allOrders)) return [];
+
     const customerMap = new Map<string, any>();
-    
-    if (Array.isArray(allUsers)) {
-      allUsers.forEach((u) => {
-        customerMap.set(u.id, {
-          id: u.id,
-          name: `${u.firstName || ''} ${u.lastName || ''}`.trim() || 'Unknown',
-          email: u.email,
-          orders: [],
-          totalSpend: 0,
-          lastOrderDate: 'N/A',
-          orderCount: 0,
-        });
-      });
-    }
 
-    if (Array.isArray(allOrders)) {
-      allOrders.forEach((order) => {
+    allOrders.forEach((order) => {
         const customerId = order.customerId;
-
+        
         if (!customerMap.has(customerId)) {
-          customerMap.set(customerId, {
-            id: customerId,
-            name: order.customerName || 'Guest User',
-            email: 'guest@example.com',
-            orders: [],
-            totalSpend: 0,
-            lastOrderDate: order.orderDate,
-            orderCount: 0,
-          });
+            customerMap.set(customerId, {
+                id: customerId,
+                name: order.customerName || `User ${customerId.substring(0,6)}`,
+                email: 'N/A', // We can't get email without a user profile lookup
+                orders: [],
+                totalSpend: 0,
+                lastOrderDate: order.orderDate,
+                orderCount: 0,
+            });
         }
 
         const customer = customerMap.get(customerId)!;
@@ -258,31 +236,24 @@ export default function AdminPage() {
         customer.totalSpend += order.total || 0;
         customer.orderCount += 1;
 
-        if (
-          customer.lastOrderDate === 'N/A' ||
-          new Date(order.orderDate) > new Date(customer.lastOrderDate)
-        ) {
-          customer.lastOrderDate = order.orderDate;
+        if (new Date(order.orderDate) > new Date(customer.lastOrderDate)) {
+            customer.lastOrderDate = order.orderDate;
         }
-      });
-    }
+    });
 
     customerMap.forEach((customer) => {
-      customer.orders.sort(
-        (a: Order, b: Order) =>
-          new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
-      );
+        customer.orders.sort(
+            (a: Order, b: Order) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
+        );
     });
 
     return Array.from(customerMap.values()).filter(
-      (c) =>
-        c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        c.email.toLowerCase().includes(searchTerm.toLowerCase())
+        (c) =>
+            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            c.id.toLowerCase().includes(searchTerm.toLowerCase())
     );
-  }, [allOrders, allUsers, searchTerm]);
+  }, [allOrders, searchTerm]);
 
-  // Deep linking simulation for QR codes
   useEffect(() => {
     if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
       const found = allOrders?.find(
@@ -299,7 +270,7 @@ export default function AdminPage() {
       );
       if (found) {
         setSelectedOrderId(found.id);
-        setViewMode('orders'); // Switch back to orders view if scanning
+        setViewMode('orders');
       }
     }
   }, [searchTerm, allOrders]);
@@ -316,11 +287,9 @@ export default function AdminPage() {
     }
   };
 
-  // Filter and Sort Orders
   const processedOrders = useMemo(() => {
     if (!Array.isArray(allOrders)) return [];
 
-    // 1. Filter by Search
     let result = allOrders.filter((order) => {
       const term = searchTerm.toLowerCase();
       const id = (order.orderId || '').toLowerCase();
@@ -337,12 +306,10 @@ export default function AdminPage() {
       return id.includes(term) || name.includes(term) || hasTracking;
     });
 
-    // 2. Filter by Status
     if (statusFilter !== 'ALL') {
       result = result.filter((order) => order.status === statusFilter);
     }
 
-    // 3. Sort
     result.sort((a, b) => {
       let aValue: any;
       let bValue: any;
@@ -1041,3 +1008,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    

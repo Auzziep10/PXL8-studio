@@ -105,33 +105,39 @@ service cloud.firestore {
       allow create: if isOwner(userId) && isNewUserDocumentValid(userId);
       allow update: if isExistingOwner(userId) && isUserDocumentUpdateValid();
       allow delete: if isExistingOwner(userId);
-    }
 
-    /**
-     * @description Stores user-specific order information.
-     * @path /users/{userId}/orders/{orderId}
-     * @allow (create, get, list, update, delete) A user managing their own orders.
-     * @deny  (get) A user trying to read another user's orders.
-     * @principle Enforces document ownership via path hierarchy for all operations.
-     */
-    match /users/{userId}/orders/{orderId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId);
-      allow update: if isExistingOwner(userId);
-      allow delete: if isExistingOwner(userId);
+      /**
+       * @description Stores user-specific order information.
+       * @path /users/{userId}/orders/{orderId}
+       * @allow (create, get, list, update, delete) A user managing their own orders.
+       * @deny  (get) A user trying to read another user's orders.
+       * @principle Enforces document ownership via path hierarchy for all operations.
+       */
+      match /orders/{orderId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+        allow create: if isOwner(userId);
+        allow update: if isExistingOwner(userId);
+        allow delete: if isExistingOwner(userId);
+      }
+      
+      /**
+       * @description Stores user-specific draft documents, like gang sheets.
+       * @path /users/{userId}/drafts/{draftId}
+       * @allow (create, get, list, update, delete) A user managing their own drafts.
+       * @deny  (get) A user trying to read another user's drafts.
+       * @principle Enforces document ownership via path hierarchy for all draft operations.
+       */
+      match /drafts/{draftId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
-    /**
-     * @description Stores user-specific draft documents, like gang sheets.
-     * @path /users/{userId}/drafts/{draftId}
-     * @allow (create, get, list, update, delete) A user managing their own drafts.
-     * @deny  (get) A user trying to read another user's drafts.
-     * @principle Enforces document ownership via path hierarchy for all draft operations.
-     */
-    match /users/{userId}/drafts/{draftId} {
-      allow read, write: if isOwner(userId);
+    // Allow admins to list all orders via a collection group query
+    match /{path=**}/orders/{orderId} {
+      allow list: if isAdmin();
     }
+
 
     /**
      * @description A private collection to check for administrative roles.
@@ -149,3 +155,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
