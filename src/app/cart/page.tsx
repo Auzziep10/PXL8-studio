@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -194,12 +194,25 @@ export default function CartPage() {
             customerName: `${formData.firstName} ${formData.lastName}`,
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
-            items: cartItems.map(item => ({
-              ...item,
-              // Strip large data URLs before saving to DB
-              artworks: item.artworks.map(({ imageUrl, ...art }) => art), 
-              compositeImageUrl: '' // This will be generated and stored on the backend
-            })),
+            items: cartItems.map((item: CartItem) => {
+                const artworksForDb = item.artworks.map(art => {
+                    const { imageUrl, analysis, ...restOfArt } = art;
+                    const finalArt: any = { ...restOfArt };
+                    if (analysis) {
+                        finalArt.analysis = {
+                            ...analysis,
+                            imageDataUri: '', // Clear large field
+                        };
+                    }
+                    return finalArt;
+                });
+
+                return {
+                    ...item,
+                    artworks: artworksForDb,
+                    compositeImageUrl: '', // This will be generated and stored on the backend
+                };
+            }),
             total: total,
             shippingAddress: {
                 street: formData.street,
@@ -239,7 +252,12 @@ export default function CartPage() {
 
                 // Also save to local storage for the admin panel demo
                 const existingOrders: Order[] = JSON.parse(localStorage.getItem('pxl8-orders') || '[]');
-                existingOrders.push({ ...newOrderData, id: orderId });
+                const storableOrder = {
+                    ...newOrderData,
+                    items: newOrderData.items.map(({ compositeImageUrl, ...item }) => item), // Remove data url
+                    id: orderId,
+                }
+                existingOrders.push(storableOrder as unknown as Order);
                 localStorage.setItem('pxl8-orders', JSON.stringify(existingOrders));
             }
             
