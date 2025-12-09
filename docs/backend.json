@@ -8,8 +8,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the user.",
-          "format": "uuid"
+          "description": "Unique identifier for the User entity."
         },
         "email": {
           "type": "string",
@@ -26,18 +25,13 @@
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the user account was created.",
+          "description": "Date and time the user account was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the user account was last updated.",
+          "description": "Date and time the user account was last updated.",
           "format": "date-time"
-        },
-        "role": {
-          "type": "string",
-          "description": "Role of the user, e.g., 'admin', 'customer'.",
-          "format": "string"
         }
       },
       "required": [
@@ -46,8 +40,125 @@
         "firstName",
         "lastName",
         "createdAt",
-        "updatedAt",
-        "role"
+        "updatedAt"
+      ]
+    },
+    "GangSheet": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "GangSheet",
+      "type": "object",
+      "description": "Represents a gang sheet created by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the GangSheet entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who created the gang sheet. (Relationship: User 1:N GangSheet)"
+        },
+        "name": {
+          "type": "string",
+          "description": "Name of the gang sheet (user-defined)."
+        },
+        "imageUrl": {
+          "type": "string",
+          "description": "URL of the gang sheet image stored in Firebase Storage."
+        },
+        "width": {
+          "type": "number",
+          "description": "Width of the gang sheet in inches."
+        },
+        "height": {
+          "type": "number",
+          "description": "Height of the gang sheet in inches."
+        },
+        "dpi": {
+          "type": "number",
+          "description": "DPI (dots per inch) of the gang sheet."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time the gang sheet was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time the gang sheet was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "name",
+        "imageUrl",
+        "width",
+        "height",
+        "dpi",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Order": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Order",
+      "type": "object",
+      "description": "Represents an order placed by a user.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the Order entity."
+        },
+        "userId": {
+          "type": "string",
+          "description": "Reference to the User who placed the order. (Relationship: User 1:N Order)"
+        },
+        "gangSheetIds": {
+          "type": "array",
+          "description": "References to the GangSheets included in the order. (Relationship: Order 1:N GangSheet)",
+          "items": {
+            "type": "string"
+          }
+        },
+        "orderDate": {
+          "type": "string",
+          "description": "Date the order was placed.",
+          "format": "date-time"
+        },
+        "status": {
+          "type": "string",
+          "description": "Current status of the order (e.g., Pending, Processing, Shipped, Delivered)."
+        },
+        "shippingAddress": {
+          "type": "string",
+          "description": "Shipping address for the order."
+        },
+        "trackingId": {
+          "type": "string",
+          "description": "Tracking ID for the order."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Date and time the order was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Date and time the order was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "userId",
+        "gangSheetIds",
+        "orderDate",
+        "status",
+        "shippingAddress",
+        "trackingId",
+        "createdAt",
+        "updatedAt"
       ]
     }
   },
@@ -66,27 +177,31 @@
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profiles.  User ID matches Firebase Auth UID.",
+          "description": "Stores user profile information.  Path-based ownership for private user data.",
           "params": [
             {
               "name": "userId",
-              "description": "The Firebase Auth UID of the user."
+              "description": "The unique identifier for the user."
             }
           ]
         }
       },
       {
-        "path": "/roles_admin/{userId}",
+        "path": "/users/{userId}/gangSheets/{gangSheetId}",
         "definition": {
-          "entityName": "user",
+          "entityName": "GangSheet",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/backend/entities/GangSheet"
           },
-          "description": "Indicates admin status. Presence of a document grants admin role.",
+          "description": "Stores gang sheets created by users. Path-based ownership ensures only the user can access their gang sheets.",
           "params": [
             {
               "name": "userId",
-              "description": "The Firebase Auth UID of the admin user."
+              "description": "The unique identifier for the user who created the gang sheet."
+            },
+            {
+              "name": "gangSheetId",
+              "description": "The unique identifier for the gang sheet."
             }
           ]
         }
@@ -94,15 +209,15 @@
       {
         "path": "/users/{userId}/orders/{orderId}",
         "definition": {
-          "entityName": "User",
+          "entityName": "Order",
           "schema": {
-            "$ref": "#/backend/entities/User"
+            "$ref": "#/backend/entities/Order"
           },
-          "description": "Stores order data for each user.",
+          "description": "Stores orders placed by users. Path-based ownership ensures only the user can access their orders.",
           "params": [
             {
               "name": "userId",
-              "description": "The Firebase Auth UID of the user who owns the order."
+              "description": "The unique identifier for the user who placed the order."
             },
             {
               "name": "orderId",
@@ -110,28 +225,8 @@
             }
           ]
         }
-      },
-      {
-        "path": "/users/{userId}/drafts/{draftId}",
-        "definition": {
-          "entityName": "GangSheet",
-          "schema": {
-            "$ref": "#/backend/entities/GangSheet"
-          },
-          "description": "Stores user-specific draft documents, like gang sheets.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Auth UID of the user who owns the draft."
-            },
-            {
-              "name": "draftId",
-              "description": "The unique identifier for the draft."
-            }
-          ]
-        }
       }
     ],
-    "reasoning": "This Firestore structure is designed to support the PXL8 DTF Platform, focusing on secure and scalable data management for users, orders, and related entities. The design prioritizes authorization independence by denormalizing authorization data where necessary, enabling atomic operations and simplifying security rules. It incorporates structural segregation to ensure collections contain documents with uniform security requirements, and utilizes consistent access modeling for predictable authorization. The structure explicitly models state and employs semantic naming for clarity and debuggability.\n\nKey structural decisions and justifications:\n\n*   **/users/{userId}:** Stores user profiles. Follows path-based ownership for private user data. The `userId` parameter corresponds to the Firebase Auth UID.\n*   **/roles_admin/{userId}:**  Indicates admin status. The existence of a document with the user's UID in this collection grants admin privileges.  This existence-based check simplifies admin role verification in security rules.\n*   **/users/{userId}/orders/{orderId}:** Stores order data for each user. This path-based ownership ensures only the user can access their own orders. Includes denormalized `userId` for authorization independence.\n*   **/users/{userId}/drafts/{draftId}:** Stores user-specific draft documents. This path-based ownership ensures only the user can access their own drafts.\n\nThis design achieves Authorization Independence by avoiding hierarchical authorization dependencies.  For example, access to an order does not require reading the user document; it is solely based on the path and, optionally, data within the order document itself, which could include denormalized user data if needed. This enables atomic operations and makes security rules more robust and easier to debug.  The admin role is handled through the `/roles_admin/{userId}` collection, allowing straightforward role checks without complex data lookups.\n\nTo support the required QAPs (rules are not filters), the structure uses segregation to isolate data with different access requirements. Private user data is stored under `/users/{userId}`, ensuring only the user has access. Admin-related data is stored separately, preventing unauthorized access. This segregation simplifies list operations by ensuring that rules do not need to filter based on authorization criteria.\n"
+    "reasoning": "The Firestore structure is designed to store user data, gang sheets, and orders in a way that prioritizes security, scalability, and ease of debugging. Authorization Independence is achieved by leveraging path-based ownership for gang sheets and orders, eliminating the need for complex `get()` calls in security rules. All `list` operations are secured by the path-based ownership, ensuring that users can only access their own data. This also adheres to the principle that \"Rules are not Filters\" (QAPs). The structure uses explicit state modeling via the 'status' field in the Order entity. Furthermore, the data model enforces radical consistency by utilizing semantic naming conventions for collections, documents, and fields (e.g., always `userId` for user references). The use of hierarchical paths for User-owned entities like GangSheets (`/users/{userId}/gangSheets/{gangSheetId}`) and Orders (`/users/{userId}/orders/{orderId}`) ensures that ownership-based security rules are simple and efficient. This structure facilitates secure `list` operations since rules can simply check `request.auth.uid == userId`."
   }
 }

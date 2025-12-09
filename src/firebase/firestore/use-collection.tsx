@@ -8,7 +8,6 @@ import {
   FirestoreError,
   QuerySnapshot,
   CollectionReference,
-  DocumentSnapshot,
 } from 'firebase/firestore';
 import { errorEmitter } from '@/firebase/error-emitter';
 import { FirestorePermissionError } from '@/firebase/errors';
@@ -76,19 +75,11 @@ export function useCollection<T = any>(
     // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
-      (snapshot: QuerySnapshot<DocumentData> | DocumentSnapshot<DocumentData>) => {
+      (snapshot: QuerySnapshot<DocumentData>) => {
         const results: ResultItemType[] = [];
-        
-        // Check if snapshot is a QuerySnapshot (for collections) or DocumentSnapshot (for docs)
-        if ('docs' in snapshot) { // It's a QuerySnapshot
-          for (const doc of snapshot.docs) {
-            results.push({ ...(doc.data() as T), id: doc.id });
-          }
-        } else if (snapshot.exists()) { // It's a DocumentSnapshot that exists
-          results.push({ ...(snapshot.data() as T), id: snapshot.id });
+        for (const doc of snapshot.docs) {
+          results.push({ ...(doc.data() as T), id: doc.id });
         }
-        // If it's a non-existent DocumentSnapshot, results will be empty, which is correct.
-
         setData(results);
         setError(null);
         setIsLoading(false);
