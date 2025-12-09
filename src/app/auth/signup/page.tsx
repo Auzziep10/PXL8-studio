@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
@@ -40,6 +40,12 @@ export default function SignUpPage() {
     }
     setIsLoading(true);
     try {
+      // Check if any users already exist to determine role
+      const usersCollectionRef = collection(firestore, 'users');
+      const usersSnapshot = await getDocs(usersCollectionRef);
+      const isFirstUser = usersSnapshot.empty;
+      const role = isFirstUser ? 'admin' : 'customer';
+
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -53,14 +59,22 @@ export default function SignUpPage() {
         email: user.email,
         firstName: fullName.split(' ')[0] || '',
         lastName: fullName.split(' ').slice(1).join(' ') || '',
-        role: 'customer', // Explicitly set role to customer
+        role: role,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
+      
+      // If the user is an admin, also create a document in the roles_admin collection
+      if (role === 'admin') {
+        await setDoc(doc(firestore, 'roles_admin', user.uid), {
+            isAdmin: true
+        });
+      }
+
 
       toast({
         title: 'Account Created!',
-        description: "You've been successfully signed up.",
+        description: `You've been successfully signed up as a ${role}.`,
       });
       router.push('/dashboard');
     } catch (error: any) {
