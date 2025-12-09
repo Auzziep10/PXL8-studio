@@ -1,5 +1,3 @@
-
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
@@ -26,7 +24,7 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc, setDocumentNonBlocking } from '@/firebase';
 import { collection, query, updateDoc, doc, setDoc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -165,17 +163,14 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
   
   // ONE-TIME SCRIPT TO GRANT ADMIN: This will attempt to run once when the component mounts.
   useEffect(() => {
-    const grantAdmin = async () => {
+    const grantAdmin = () => {
       // This is the user ID from the error logs.
       const userIdToMakeAdmin = 'dYHzPjU2AyVH98OowMi2SSft4LU2'; 
       if (firestore && user && user.uid === userIdToMakeAdmin) {
-        try {
           const adminRoleRef = doc(firestore, 'roles_admin', userIdToMakeAdmin);
-          await setDoc(adminRoleRef, { isAdmin: true });
-          console.log(`Successfully granted admin role to ${userIdToMakeAdmin}`);
-        } catch (error) {
-          console.error("Failed to grant admin role:", error);
-        }
+          // Using the non-blocking update with our centralized error handling
+          setDocumentNonBlocking(adminRoleRef, { isAdmin: true }, { merge: false });
+          console.log(`Attempted to grant admin role to ${userIdToMakeAdmin}`);
       }
     };
     
