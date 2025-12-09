@@ -240,13 +240,15 @@ export default function GangSheetBuilder() {
       for (let i = 0; i < count; i++) {
           const pos = findOpenPosition(itemToClone.width, itemToClone.height, currentItemsForCheck);
           
-          const newItem: ArtworkOnCanvas = {
+          const newItem: Omit<ArtworkOnCanvas, 'analysis' | 'analysisLoading'> & { analysis?: any } = {
               ...itemToClone,
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`,
               x: pos.x,
               y: pos.y,
-              analysis: undefined, // Clear analysis for duplicates
           };
+          delete newItem.analysis;
+          delete newItem.analysisLoading;
+
           newItems.push(newItem);
           currentItemsForCheck.push(newItem);
       }
