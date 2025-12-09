@@ -1,4 +1,5 @@
 
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
@@ -26,7 +27,7 @@ import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, updateDoc, doc, collectionGroup } from 'firebase/firestore';
+import { collection, query, updateDoc, doc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -162,7 +163,7 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
   const firestore = useFirestore();
   
   const ordersQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collectionGroup(firestore, 'orders')) : null),
+    () => (firestore && isAdmin ? query(collection(firestore, 'orders')) : null),
     [firestore, isAdmin]
   );
   
@@ -203,7 +204,7 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
 
   const updateStatus = async (id: string, status: OrderStatus) => {
     if (!firestore || !selectedOrder) return;
-    const orderDocRef = doc(firestore, 'users', selectedOrder.customerId, 'orders', id);
+    const orderDocRef = doc(firestore, 'orders', id);
     await updateDoc(orderDocRef, { status });
     setSelectedOrderId(null);
   };

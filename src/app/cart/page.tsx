@@ -227,38 +227,26 @@ export default function CartPage() {
         };
 
         try {
-            if (!isTestMode) {
-                // For a real order, we save to Firestore and then go to Stripe
-                if (firestore && currentUser) {
+            if (firestore) {
+                // Save to the centralized orders collection for admin access
+                await addDoc(collection(firestore, 'orders'), {
+                    ...newOrderData,
+                    createdAt: serverTimestamp()
+                });
+
+                // If user is logged in, also save a reference in their own subcollection
+                if (currentUser) {
                     const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
                     await addDoc(userOrdersRef, {
                         ...newOrderData,
                         createdAt: serverTimestamp()
                     });
                 }
-                // Then proceed to Stripe
+            }
+
+            if (!isTestMode) {
+                // For a real order, proceed to Stripe
                 await createCheckoutSession(cartItems, total);
-
-            } else {
-                 // In test mode, we just save the order to local storage (for admin demo)
-                 // and Firestore if the user is logged in
-                if (firestore && currentUser) {
-                     const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
-                     await addDoc(userOrdersRef, {
-                        ...newOrderData,
-                        createdAt: serverTimestamp()
-                    });
-                }
-
-                // Also save to local storage for the admin panel demo
-                const existingOrders: Order[] = JSON.parse(localStorage.getItem('pxl8-orders') || '[]');
-                const storableOrder = {
-                    ...newOrderData,
-                    items: newOrderData.items.map(({ compositeImageUrl, ...item }) => item), // Remove data url
-                    id: orderId,
-                }
-                existingOrders.push(storableOrder as unknown as Order);
-                localStorage.setItem('pxl8-orders', JSON.stringify(existingOrders));
             }
             
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });

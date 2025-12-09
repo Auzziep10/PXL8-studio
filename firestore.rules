@@ -15,6 +15,7 @@
  *   inheriting ownership from the parent user document.
  * - /users/{userId}/drafts/{draftId}: A subcollection for user-specific draft
  *   documents, like in-progress gang sheets.
+ * - /orders/{orderId}: A centralized collection of all orders for admin access.
  * - /roles_admin/{userId}: A separate, client-inaccessible collection used as a
  *   lookup table. The existence of a document here grants a user admin privileges
  *   across the database.
@@ -114,11 +115,7 @@ service cloud.firestore {
        * @principle Enforces document ownership via path hierarchy for all operations.
        */
       match /orders/{orderId} {
-        allow get: if isOwner(userId) || isAdmin();
-        allow list: if isOwner(userId) || isAdmin();
-        allow create: if isOwner(userId);
-        allow update: if isExistingOwner(userId);
-        allow delete: if isExistingOwner(userId);
+        allow read, write: if isOwner(userId) || isAdmin();
       }
       
       /**
@@ -133,9 +130,17 @@ service cloud.firestore {
       }
     }
     
-    // Allow admins to list all orders via a collection group query
-    match /{path=**}/orders/{orderId} {
-      allow list: if isAdmin();
+    /**
+     * @description Centralized collection for all orders, for admin access.
+     * @path /orders/{orderId}
+     * @allow (read, list, update) An admin can manage all orders.
+     * @allow (create) Any authenticated user can create an order.
+     * @deny (delete) No one can delete from the central order log.
+     */
+    match /orders/{orderId} {
+        allow read, list, update: if isAdmin();
+        allow create: if isSignedIn();
+        allow delete: if false; // Prevent accidental deletion of order log
     }
 
 
@@ -155,5 +160,3 @@ service cloud.firestore {
     }
   }
 }
-
-    
