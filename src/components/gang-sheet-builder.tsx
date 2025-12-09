@@ -52,7 +52,14 @@ export default function GangSheetBuilder() {
   // Effect to load data from Firestore ONCE
   useEffect(() => {
     if (savedSheet && !isLoaded) {
-      setItems(savedSheet.items || []);
+      // Since we don't save image URLs, the loaded items will be missing them.
+      // The user will need to re-upload images if they want to see the visuals.
+      // The layout (x, y, width, height) will be preserved.
+      const itemsWithoutImages = (savedSheet.items || []).map((item: any) => ({
+        ...item,
+        imageUrl: '', // Ensure imageUrl is not undefined
+      }));
+      setItems(itemsWithoutImages);
       setSelectedSize(savedSheet.selectedSize || SheetSize.MEDIUM);
       setIsLoaded(true); // Mark as loaded to prevent re-loading
     } else if (!isSheetLoading && !savedSheet) {
@@ -66,16 +73,37 @@ export default function GangSheetBuilder() {
   const debouncedSaveToFirestore = useCallback(
     debounce((sheetData: { items: ArtworkOnCanvas[], selectedSize: SheetSize }) => {
       if (gangSheetDocRef) {
-        setDoc(gangSheetDocRef, { 
-          ...sheetData,
-          updatedAt: serverTimestamp()
-        }, { merge: true }).catch((err) => {
+        
+        // Create a version of the items that does NOT include the large imageUrl data
+        const storableItems = sheetData.items.map(item => {
+            const { imageUrl, analysis, ...rest } = item;
+            // We can keep the analysis results, but clear the large image data from it too
+            const storableAnalysis = analysis ? { ...analysis, imageDataUri: '' } : undefined;
+            return { ...rest, analysis: storableAnalysis };
+        });
+
+        const storableSheetData = {
+            ...sheetData,
+            items: storableItems,
+            updatedAt: serverTimestamp()
+        };
+        
+        setDoc(gangSheetDocRef, storableSheetData, { merge: true }).catch((err) => {
             console.error("Failed to save sheet:", err);
-            toast({
-                variant: 'destructive',
-                title: 'Save Failed',
-                description: 'Could not save your sheet to the cloud.'
-            });
+            // Check if the error is due to size limit and provide a specific message
+            if (err.code === 'resource-exhausted' || (err.message && err.message.includes('exceeds the maximum allowed size'))) {
+                 toast({
+                    variant: 'destructive',
+                    title: 'Save Failed',
+                    description: 'Your sheet layout is too complex to auto-save. Please simplify to continue.'
+                });
+            } else {
+                toast({
+                    variant: 'destructive',
+                    title: 'Save Failed',
+                    description: 'Could not save your sheet to the cloud.'
+                });
+            }
         });
       }
     }, 1500), // Save 1.5 seconds after the last change
@@ -379,6 +407,10 @@ export default function GangSheetBuilder() {
     const uniqueUrls: string[] = Array.from(new Set(items.map(i => i.imageUrl)));
     
     await Promise.all(uniqueUrls.map(url => new Promise<void>((resolve, reject) => {
+        if (!url) { // Skip if url is empty
+          resolve();
+          return;
+        }
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[url] = img; resolve(); };
@@ -629,7 +661,11 @@ export default function GangSheetBuilder() {
                           <div className="flex items-start justify-between">
                               <div className="flex items-center space-x-3">
                                   <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
-                                      <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
+                                      {item.imageUrl ? (
+                                        <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
+                                      ): (
+                                        <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs">No img</div>
+                                      )}
                                   </div>
                                   <div className="min-w-0">
                                       <p className="text-sm font-medium text-white truncate w-24" title={item.name}>{item.name}</p>
@@ -714,11 +750,15 @@ export default function GangSheetBuilder() {
                                     isSelected ? 'border-2 border-primary bg-primary/5' : 
                                     'border border-blue-400/30 hover:border-blue-400'
                                 }`}>
-                                    <img 
-                                        src={item.imageUrl} 
-                                        className="w-full h-full object-contain pointer-events-none" 
-                                        alt=""
-                                    />
+                                    {item.imageUrl ? (
+                                      <img 
+                                          src={item.imageUrl} 
+                                          className="w-full h-full object-contain pointer-events-none" 
+                                          alt=""
+                                      />
+                                    ) : (
+                                      <div className="w-full h-full bg-zinc-800/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
+                                    )}
                                     
                                     {/* Warnings */}
                                     {(isColliding || isOutOfBounds) && (
@@ -759,5 +799,7 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
+
+    
 
     
