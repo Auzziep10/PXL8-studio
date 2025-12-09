@@ -564,7 +564,7 @@ export default function AdminPage() {
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider">Customer</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider">Sheet Info</th>
                                 <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('totalPrice')}>Total</th>
-                                <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('status')}>Status</th>
+                                <th className="px-6 py-4 text-left text-xs font-bold text-zinc-400 uppercase tracking-wider cursor-pointer" onClick={()={() => handleSort('status')}}>Status</th>
                                 <th className="px-6 py-4 text-right text-xs font-bold text-zinc-400 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -602,54 +602,6 @@ export default function AdminPage() {
                         </tbody>
                         </table>
                     </div>
-                    
-                    {/* Detail Modal */}
-                    {selectedOrder && viewMode === 'orders' && (
-                        <div className="fixed inset-0 z-50 flex justify-end">
-                            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in-0" onClick={() => setSelectedOrderId(null)}></div>
-                            <div className="relative w-full max-w-2xl bg-[#09090b] h-full shadow-2xl border-l border-white/10 flex flex-col animate-in slide-in-from-right-full duration-500">
-                                <div className="p-6 border-b border-white/10 flex justify-between items-center bg-zinc-900/50">
-                                    <div>
-                                        <h2 className="text-2xl font-bold text-white">Order #{selectedOrder.orderId}</h2>
-                                        <span className={`px-2 py-0.5 text-xs font-bold rounded border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
-                                    </div>
-                                    <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white"><X className="w-6 h-6" /></button>
-                                </div>
-                                {getNextStatus(selectedOrder.status) && (
-                                    <div className="px-6 py-4 bg-zinc-800/30 border-b border-white/5 flex items-center justify-between">
-                                        <span className="text-sm font-medium text-zinc-300">Quick Action:</span>
-                                        <button onClick={() => updateStatus(selectedOrder.orderId, getNextStatus(selectedOrder.status)!)} className="flex items-center px-4 py-2 bg-accent text-black font-bold text-sm rounded-lg hover:bg-white shadow-lg">Mark as {getNextStatus(selectedOrder.status)} <ArrowUpRight className="w-4 h-4 ml-2" /></button>
-                                    </div>
-                                )}
-                                <div className="flex-grow overflow-y-auto p-6 space-y-8 builder-scroll">
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
-                                            <div className="flex items-center mb-3 text-zinc-400 text-xs font-bold uppercase"><UserIcon className="w-4 h-4 mr-2" /> Customer</div>
-                                            <p className="text-white font-medium">{selectedOrder.customerName}</p>
-                                        </div>
-                                        <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
-                                            <div className="flex items-center mb-3 text-zinc-400 text-xs font-bold uppercase"><DollarSign className="w-4 h-4 mr-2" /> Payment</div>
-                                            <p className="text-white font-medium">${(selectedOrder.total || 0).toFixed(2)}</p>
-                                        </div>
-                                    </div>
-                                    <div>
-                                         <div className="flex items-center justify-between mb-4">
-                                            <h3 className="text-white font-bold flex items-center"><Printer className="w-5 h-5 mr-2 text-primary" /> Production Assets</h3>
-                                            <div className='flex gap-2'>
-                                              <button onClick={() => handlePrintPackingSlip(selectedOrder)} className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg border border-white/10 hover:bg-zinc-700">Packing Slip</button>
-                                              <button onClick={() => handleDownloadAllZip(selectedOrder)} disabled={isZipping} className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg border border-white/10 hover:bg-zinc-700">{isZipping ? 'Zipping...' : 'Download All (ZIP)'}</button>
-                                            </div>
-                                         </div>
-                                         <div className="space-y-6">
-                                            {Array.isArray(selectedOrder.items) && selectedOrder.items.map((item, idx) => (
-                                                <AssetCard key={idx} item={{...(item.artworks[0] as any), file: null, printReadyUrl: selectedOrder.printReadyUrl, originalUrl: selectedOrder.previewUrl, originalFileName: 'user-upload.png' }} index={idx} onPreview={setPreviewImage} />
-                                            ))}
-                                         </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    )}
                   </div>
             )}
             {viewMode === 'customers' && selectedCustomerForArchive && (
@@ -710,6 +662,55 @@ export default function AdminPage() {
                 </div>
             )}
         </div>
+        {/* Detail Modal */}
+        {selectedOrder && viewMode === 'orders' && (
+            <div className="fixed inset-0 z-50 flex justify-end">
+                <div className="absolute inset-0 bg-black/60 backdrop-blur-sm animate-in fade-in-0" onClick={() => setSelectedOrderId(null)}></div>
+                <div className="relative w-full max-w-2xl bg-[#09090b] h-full shadow-2xl border-l border-white/10 flex flex-col animate-in slide-in-from-right-full duration-500">
+                    <div className="p-6 border-b border-white/10 flex justify-between items-center bg-zinc-900/50">
+                        <div>
+                            <h2 className="text-2xl font-bold text-white">Order #{selectedOrder.orderId}</h2>
+                            <span className={`px-2 py-0.5 text-xs font-bold rounded border ${getStatusColor(selectedOrder.status)}`}>{selectedOrder.status}</span>
+                        </div>
+                        <button onClick={() => setSelectedOrderId(null)} className="p-2 hover:bg-white/10 rounded-full text-zinc-400 hover:text-white"><X className="w-6 h-6" /></button>
+                    </div>
+                    {getNextStatus(selectedOrder.status) && (
+                        <div className="px-6 py-4 bg-zinc-800/30 border-b border-white/5 flex items-center justify-between">
+                            <span className="text-sm font-medium text-zinc-300">Quick Action:</span>
+                            <button onClick={() => updateStatus(selectedOrder.orderId, getNextStatus(selectedOrder.status)!)} className="flex items-center px-4 py-2 bg-accent text-black font-bold text-sm rounded-lg hover:bg-white shadow-lg">Mark as {getNextStatus(selectedOrder.status)} <ArrowUpRight className="w-4 h-4 ml-2" /></button>
+                        </div>
+                    )}
+                    <div className="flex-grow overflow-y-auto p-6 space-y-8 builder-scroll">
+                         <div className="grid grid-cols-2 gap-4">
+                            <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
+                                <div className="flex items-center mb-3 text-zinc-400 text-xs font-bold uppercase"><UserIcon className="w-4 h-4 mr-2" /> Customer</div>
+                                <p className="text-white font-medium">{selectedOrder.customerName}</p>
+                            </div>
+                            <div className="p-4 bg-zinc-900/50 rounded-xl border border-white/5">
+                                <div className="flex items-center mb-3 text-zinc-400 text-xs font-bold uppercase"><DollarSign className="w-4 h-4 mr-2" /> Payment</div>
+                                <p className="text-white font-medium">${(selectedOrder.total || 0).toFixed(2)}</p>
+                            </div>
+                        </div>
+                        <div>
+                             <div className="flex items-center justify-between mb-4">
+                                <h3 className="text-white font-bold flex items-center"><Printer className="w-5 h-5 mr-2 text-primary" /> Production Assets</h3>
+                                <div className='flex gap-2'>
+                                  <button onClick={() => handlePrintPackingSlip(selectedOrder)} className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg border border-white/10 hover:bg-zinc-700">Packing Slip</button>
+                                  <button onClick={() => handleDownloadAllZip(selectedOrder)} disabled={isZipping} className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg border border-white/10 hover:bg-zinc-700">{isZipping ? 'Zipping...' : 'Download All (ZIP)'}</button>
+                                </div>
+                             </div>
+                             <div className="space-y-6">
+                                {Array.isArray(selectedOrder.items) && selectedOrder.items.map((item, idx) => (
+                                    <AssetCard key={idx} item={{...(item.artworks[0] as any), file: null, printReadyUrl: selectedOrder.printReadyUrl, originalUrl: selectedOrder.previewUrl, originalFileName: 'user-upload.png' }} index={idx} onPreview={setPreviewImage} />
+                                ))}
+                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        )}
     </div>
   );
 }
+
+    
