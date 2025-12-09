@@ -63,13 +63,6 @@ service cloud.firestore {
       return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
     }
     
-    /**
-     * Allows a user to create their own admin role document, but not edit it.
-     * This is useful for a one-time admin setup script.
-     */
-    function isClaimingAdminRole(userId) {
-        return isOwner(userId) && !exists(/databases/$(database)/documents/roles_admin/$(userId));
-    }
 
     /**
      * A robust check for update/delete operations, ensuring the user is the
@@ -160,9 +153,9 @@ service cloud.firestore {
      * @principle Secures role-based access control by making the role data inaccessible from the client-side.
      */
     match /roles_admin/{userId} {
-      allow get: if false;
-      allow list: if false;
-      allow create: if isClaimingAdminRole(userId);
+      allow get: if isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId);
       allow update: if false;
       allow delete: if false;
     }
