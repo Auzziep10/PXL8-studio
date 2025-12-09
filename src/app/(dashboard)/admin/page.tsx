@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
@@ -24,7 +25,7 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, updateDoc, doc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -163,28 +164,36 @@ export default function AdminPage() {
 
   // Self-contained authorization
   const [isAdmin, setIsAdmin] = useState(false);
+
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useCollection<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (userProfile && userProfile.role === 'admin') {
+    if (userProfile && (userProfile as any).role === 'admin') {
       setIsAdmin(true);
     } else {
       setIsAdmin(false);
     }
   }, [userProfile]);
 
+  // Firestore Queries
   const ordersQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'orders')) : null),
     [firestore]
   );
-  
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
+  const usersQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'users')) : null),
+    [firestore]
+  );
+  const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
 
+  // Component State
   const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
@@ -224,49 +233,29 @@ export default function AdminPage() {
     setSelectedOrderId(null);
   };
 
-  // Group customers logic
+  // Group customers logic (now from allUsers)
   const customers = useMemo(() => {
-    if (!Array.isArray(allOrders)) return [];
+    if (!Array.isArray(allUsers)) return [];
 
-    const customerMap = new Map<string, any>();
-
-    allOrders.forEach((order) => {
-        const customerId = order.customerId;
-        
-        if (!customerMap.has(customerId)) {
-            customerMap.set(customerId, {
-                id: customerId,
-                name: order.customerName || `User ${customerId.substring(0,6)}`,
-                email: 'N/A', // We can't get email without a user profile lookup
-                orders: [],
-                totalSpend: 0,
-                lastOrderDate: order.orderDate,
-                orderCount: 0,
-            });
-        }
-
-        const customer = customerMap.get(customerId)!;
-        customer.orders.push(order);
-        customer.totalSpend += order.total || 0;
-        customer.orderCount += 1;
-
-        if (new Date(order.orderDate) > new Date(customer.lastOrderDate)) {
-            customer.lastOrderDate = order.orderDate;
-        }
+    return allUsers.filter(user => {
+      const term = searchTerm.toLowerCase();
+      const name = `${user.firstName} ${user.lastName}`.toLowerCase();
+      const email = user.email.toLowerCase();
+      return name.includes(term) || email.includes(term);
     });
+  }, [allUsers, searchTerm]);
 
-    customerMap.forEach((customer) => {
-        customer.orders.sort(
-            (a: Order, b: Order) => new Date(b.orderDate).getTime() - new Date(a.orderDate).getTime()
-        );
-    });
-
-    return Array.from(customerMap.values()).filter(
-        (c) =>
-            c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            c.id.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [allOrders, searchTerm]);
+  const customerOrderData = useMemo(() => {
+      if (!allOrders) return new Map();
+      const map = new Map<string, { orderCount: number, totalSpend: number }>();
+      allOrders.forEach(order => {
+          const stats = map.get(order.customerId) || { orderCount: 0, totalSpend: 0 };
+          stats.orderCount += 1;
+          stats.totalSpend += order.total || 0;
+          map.set(order.customerId, stats);
+      });
+      return map;
+  }, [allOrders]);
 
   useEffect(() => {
     if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
@@ -658,48 +647,51 @@ export default function AdminPage() {
         {viewMode === 'customers' && (
           <div className="flex-grow overflow-y-auto builder-scroll">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-              {customers.map((customer) => (
-                <div
-                  key={customer.id}
-                  onClick={() => setSelectedCustomerForArchive(customer.id)}
-                  className="glass-panel p-6 rounded-2xl border border-white/10 hover:border-primary/30 transition-all cursor-pointer group"
-                >
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-colors">
-                      <UserIcon className="w-6 h-6 text-zinc-400 group-hover:text-white" />
+              {customers.map((customer) => {
+                const stats = customerOrderData.get(customer.id) || { orderCount: 0, totalSpend: 0 };
+                return (
+                    <div
+                    key={customer.id}
+                    onClick={() => setSelectedCustomerForArchive(customer.id)}
+                    className="glass-panel p-6 rounded-2xl border border-white/10 hover:border-primary/30 transition-all cursor-pointer group"
+                    >
+                    <div className="flex items-start justify-between mb-4">
+                        <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center border border-white/10 group-hover:border-primary/50 transition-colors">
+                        <UserIcon className="w-6 h-6 text-zinc-400 group-hover:text-white" />
+                        </div>
+                        <div className="text-right">
+                        <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">
+                            LTV
+                        </p>
+                        <p className="text-lg font-bold text-white">
+                            ${stats.totalSpend.toFixed(2)}
+                        </p>
+                        </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs text-zinc-500 uppercase tracking-wider font-bold">
-                        LTV
-                      </p>
-                      <p className="text-lg font-bold text-white">
-                        ${customer.totalSpend.toFixed(2)}
-                      </p>
+                    <h3 className="text-lg font-bold text-white mb-1 truncate">
+                        {customer.firstName} {customer.lastName}
+                    </h3>
+                    <p className="text-zinc-500 text-sm mb-4 truncate">
+                        {customer.email}
+                    </p>
+                    <div className="flex items-center justify-between pt-4 border-t border-white/5 text-sm">
+                        <span className="text-zinc-400 flex items-center">
+                        <History className="w-4 h-4 mr-2" /> {stats.orderCount}{' '}
+                        Orders
+                        </span>
+                        <span className="text-primary text-xs font-bold flex items-center group-hover:translate-x-1 transition-transform">
+                        View Archive <ChevronRight className="w-4 h-4 ml-1" />
+                        </span>
                     </div>
-                  </div>
-                  <h3 className="text-lg font-bold text-white mb-1 truncate">
-                    {customer.name}
-                  </h3>
-                  <p className="text-zinc-500 text-sm mb-4 truncate">
-                    {customer.email}
-                  </p>
-                  <div className="flex items-center justify-between pt-4 border-t border-white/5 text-sm">
-                    <span className="text-zinc-400 flex items-center">
-                      <History className="w-4 h-4 mr-2" /> {customer.orderCount}{' '}
-                      Orders
-                    </span>
-                    <span className="text-primary text-xs font-bold flex items-center group-hover:translate-x-1 transition-transform">
-                      View Archive <ChevronRight className="w-4 h-4 ml-1" />
-                    </span>
-                  </div>
-                </div>
-              ))}
-              {customers.length === 0 && !isLoadingOrders && (
+                    </div>
+                )
+              })}
+              {customers.length === 0 && !isLoadingUsers && (
                 <div className="col-span-full py-12 text-center text-zinc-500">
                   No customers found.
                 </div>
               )}
-               {isLoadingOrders && (
+               {(isLoadingUsers || isLoadingOrders) && (
                  <div className="col-span-full py-12 text-center text-zinc-500">
                     <Database className="w-12 h-12 mx-auto mb-3 opacity-20 animate-pulse" />
                     <p>Loading customer data...</p>
@@ -823,7 +815,7 @@ export default function AdminPage() {
                         className="px-6 py-12 text-center text-zinc-500"
                       >
                         <Search className="w-12 h-12 mx-auto mb-3 opacity-20" />
-                        <p>No orders found.</p>
+                        <p>No orders found. Please place a new order for it to appear here.</p>
                       </td>
                     </tr>
                   )}
@@ -844,7 +836,7 @@ export default function AdminPage() {
               <div>
                 <h2 className="text-2xl font-bold text-white">
                   {customers.find((c) => c.id === selectedCustomerForArchive)
-                    ?.name}
+                    ?.firstName}
                 </h2>
                 <div className="flex items-center text-sm text-zinc-500 space-x-4 mt-1">
                   <span>ID: {selectedCustomerForArchive}</span>
@@ -1045,3 +1037,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
