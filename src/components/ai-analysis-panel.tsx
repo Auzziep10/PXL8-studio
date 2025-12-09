@@ -11,10 +11,30 @@ import { Label } from './ui/label';
 interface AiAnalysisPanelProps {
   artwork: ArtworkOnCanvas;
   onAnalyze: () => void;
+  isLoggedIn: boolean;
 }
 
-export default function AiAnalysisPanel({ artwork, onAnalyze }: AiAnalysisPanelProps) {
+export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAnalysisPanelProps) {
   const analysis = artwork.analysis;
+
+  if (!isLoggedIn) {
+      return (
+          <Card className="bg-secondary">
+              <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Wand2 className="text-primary" />
+                    AI Artwork Analysis
+                  </CardTitle>
+              </CardHeader>
+              <CardContent className="text-center">
+                  <p className="text-sm text-muted-foreground mb-4">
+                      Please log in to use AI-powered artwork analysis.
+                  </p>
+                  <Button disabled>Log in to Analyze</Button>
+              </CardContent>
+          </Card>
+      )
+  }
 
   if (!analysis) {
     return (

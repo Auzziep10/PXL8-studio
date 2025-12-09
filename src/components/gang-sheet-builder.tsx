@@ -1,5 +1,6 @@
 
 
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
@@ -13,6 +14,7 @@ import AiAnalysisPanel from './ai-analysis-panel';
 import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from './ui/button';
+import { uploadFileAndGetURL } from '@/firebase/storage';
 
 // Debounce function to limit how often we save to Firestore
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -52,14 +54,7 @@ export default function GangSheetBuilder() {
   // Effect to load data from Firestore ONCE
   useEffect(() => {
     if (savedSheet && !isLoaded) {
-      // Since we don't save image URLs, the loaded items will be missing them.
-      // The user will need to re-upload images if they want to see the visuals.
-      // The layout (x, y, width, height) will be preserved.
-      const itemsWithoutImages = (savedSheet.items || []).map((item: any) => ({
-        ...item,
-        imageUrl: '', // Ensure imageUrl is not undefined
-      }));
-      setItems(itemsWithoutImages);
+      setItems(savedSheet.items || []);
       setSelectedSize(savedSheet.selectedSize || SheetSize.MEDIUM);
       setIsLoaded(true); // Mark as loaded to prevent re-loading
     } else if (!isSheetLoading && !savedSheet) {
@@ -74,17 +69,14 @@ export default function GangSheetBuilder() {
     debounce((sheetData: { items: ArtworkOnCanvas[], selectedSize: SheetSize }) => {
       if (gangSheetDocRef) {
         
-        // Create a version of the items that does NOT include the large imageUrl data
+        // Create a version of the items that does NOT include the large analysis data
         const storableItems = sheetData.items.map(item => {
-            const { imageUrl, analysis, ...rest } = item;
-            
+            const { analysis, ...rest } = item;
             const storableAnalysis = analysis ? { ...analysis, imageDataUri: '' } : undefined;
-            
             const itemToStore: any = { ...rest };
             if (storableAnalysis) {
               itemToStore.analysis = storableAnalysis;
             }
-
             return itemToStore;
         });
 
@@ -203,40 +195,51 @@ export default function GangSheetBuilder() {
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file) return;
+    if (!file || !user) return;
     event.target.value = '';
 
-    const reader = new FileReader();
-    reader.onload = async (e) => {
-      const img = new Image();
-      img.onload = async () => {
-        const PRINT_DPI = 300;
-        const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
-        const h = parseFloat((img.height / PRINT_DPI).toFixed(2));
+    toast({ title: 'Uploading...', description: 'Your image is being uploaded to secure storage.' });
 
-        const pos = findOpenPosition(w, h, items);
-
-        const newItem: ArtworkOnCanvas = {
-          id: Date.now().toString(),
-          name: file.name,
-          imageUrl: e.target?.result as string,
-          width: w,
-          height: h,
-          quantity: 1,
-          dpi: PRINT_DPI,
-          x: pos.x,
-          y: pos.y,
-          canvasWidth: w * PPI,
-          canvasHeight: h * PPI
+    try {
+        const imageUrl = await uploadFileAndGetURL(file, user.uid);
+    
+        const reader = new FileReader();
+        reader.onload = async (e) => {
+          const img = new Image();
+          img.onload = async () => {
+            const PRINT_DPI = 300;
+            const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
+            const h = parseFloat((img.height / PRINT_DPI).toFixed(2));
+    
+            const pos = findOpenPosition(w, h, items);
+    
+            const newItem: ArtworkOnCanvas = {
+              id: Date.now().toString(),
+              name: file.name,
+              imageUrl: imageUrl, // Use the permanent URL from Firebase Storage
+              width: w,
+              height: h,
+              quantity: 1,
+              dpi: PRINT_DPI,
+              x: pos.x,
+              y: pos.y,
+              canvasWidth: w * PPI,
+              canvasHeight: h * PPI
+            };
+    
+            setItems(prev => [...prev, newItem]);
+            setSelectedItemId(newItem.id);
+            setDuplicateCount(1); // Reset duplicate count on new upload
+            toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+          };
+          img.src = e.target?.result as string;
         };
+        reader.readAsDataURL(file);
 
-        setItems(prev => [...prev, newItem]);
-        setSelectedItemId(newItem.id);
-        setDuplicateCount(1); // Reset duplicate count on new upload
-      };
-      img.src = e.target?.result as string;
-    };
-    reader.readAsDataURL(file);
+    } catch (error) {
+        console.error("File upload failed:", error);
+        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload your image. Please try again.' });
+    }
   };
 
   const handleRunAnalysis = async () => {
@@ -244,18 +247,34 @@ export default function GangSheetBuilder() {
 
     updateItem(selectedItem.id, { analysisLoading: true });
     
-    const result = await analyzeArtwork({ 
-        artworkDataUri: selectedItem.imageUrl,
-        artworkDescription: selectedItem.name,
-    });
+    // We need to read the image data from the URL for analysis.
+    // This is a temporary client-side data fetch for the AI function.
+    // It doesn't get saved to Firestore.
+    try {
+        const response = await fetch(selectedItem.imageUrl);
+        const blob = await response.blob();
+        const reader = new FileReader();
+        reader.readAsDataURL(blob);
+        reader.onloadend = async () => {
+            const base64data = reader.result as string;
 
-    if (result.success && result.data) {
-        updateItem(selectedItem.id, { analysis: result.data, analysisLoading: false });
-    } else {
+            const result = await analyzeArtwork({ 
+                artworkDataUri: base64data,
+                artworkDescription: selectedItem.name,
+            });
+
+            if (result.success && result.data) {
+                updateItem(selectedItem.id, { analysis: result.data, analysisLoading: false });
+            } else {
+                throw new Error(result.error || "Unknown analysis error");
+            }
+        };
+    } catch (error) {
+        console.error("Analysis failed:", error);
         toast({
             variant: "destructive",
             title: "Analysis Failed",
-            description: result.error || "Could not analyze the artwork."
+            description: (error as Error).message || "Could not analyze the artwork."
         });
         updateItem(selectedItem.id, { analysisLoading: false });
     }
@@ -427,8 +446,10 @@ export default function GangSheetBuilder() {
         const img = new Image();
         img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[url] = img; resolve(); };
-        img.onerror = () => {
+        img.onerror = (e) => {
             console.warn(`Failed to load image for composition: ${url.substring(0, 50)}...`);
+            // To debug CORS issues, log the error event
+            console.error('Image load error:', e);
             resolve(); // Resolve anyway to continue generating what we can
         };
         img.src = url;
@@ -643,7 +664,7 @@ export default function GangSheetBuilder() {
                      Designs
                   </h3>
                   <button 
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={() => user ? fileInputRef.current?.click() : toast({ variant: 'destructive', title: 'Please log in', description: 'You must be logged in to upload files.' })}
                     className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
                   >
                       <Plus className="w-3 h-3 mr-1" /> Add New
@@ -654,7 +675,7 @@ export default function GangSheetBuilder() {
 
               {items.length === 0 ? (
                 <div 
-                  onClick={() => fileInputRef.current?.click()}
+                  onClick={() => user ? fileInputRef.current?.click() : toast({ variant: 'destructive', title: 'Please log in', description: 'You must be logged in to upload files.' })}
                   className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
                 >
                   <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
@@ -816,3 +837,4 @@ export default function GangSheetBuilder() {
     
 
     
+
