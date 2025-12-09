@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
@@ -25,7 +24,7 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, updateDoc, doc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -170,10 +169,10 @@ export default function AdminPage() {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useCollection<AppUser>(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (userProfile && (userProfile as any).role === 'admin') {
+    if (userProfile && userProfile.role === 'admin') {
       setIsAdmin(true);
     } else {
       setIsAdmin(false);
@@ -1037,5 +1036,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
