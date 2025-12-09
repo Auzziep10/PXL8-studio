@@ -86,7 +86,7 @@ export default function GangSheetBuilder() {
         const storableItems = sheetData.items.map(item => {
             const { analysis, imageUrl, ...rest } = item;
              // Ensure imageUrl is a permanent URL, not a temp data URL
-            if (imageUrl.startsWith('data:')) {
+            if (!imageUrl || imageUrl.startsWith('data:')) {
                 // This shouldn't happen for logged-in users, but as a safeguard
                 console.warn(`Item ${item.id} has a temporary URL and won't be saved to Firestore.`);
                 return null;
@@ -861,3 +861,5 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
+
+    
