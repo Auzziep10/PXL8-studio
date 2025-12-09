@@ -35,7 +35,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar>
+      <Sidebar className="pt-14">
         <SidebarHeader>
           <div className="flex items-center gap-2">
             <PXL8Logo className="size-6 text-primary" />
