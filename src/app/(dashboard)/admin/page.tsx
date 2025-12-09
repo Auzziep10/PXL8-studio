@@ -27,7 +27,7 @@ import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
 import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, updateDoc, doc, setDoc } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -161,7 +161,28 @@ const AssetCard: React.FC<{
 
 export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
   const firestore = useFirestore();
+  const { user } = useUser();
   
+  // ONE-TIME SCRIPT TO GRANT ADMIN: This will attempt to run once when the component mounts.
+  useEffect(() => {
+    const grantAdmin = async () => {
+      // This is the user ID from the error logs.
+      const userIdToMakeAdmin = 'dYHzPjU2AyVH98OowMi2SSft4LU2'; 
+      if (firestore && user && user.uid === userIdToMakeAdmin) {
+        try {
+          const adminRoleRef = doc(firestore, 'roles_admin', userIdToMakeAdmin);
+          await setDoc(adminRoleRef, { isAdmin: true });
+          console.log(`Successfully granted admin role to ${userIdToMakeAdmin}`);
+        } catch (error) {
+          console.error("Failed to grant admin role:", error);
+        }
+      }
+    };
+    
+    grantAdmin();
+  }, [firestore, user]);
+
+
   const ordersQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'orders')) : null),
     [firestore]
