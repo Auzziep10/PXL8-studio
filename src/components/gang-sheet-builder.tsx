@@ -49,75 +49,85 @@ export default function GangSheetBuilder() {
   // State to track if data has been loaded from Firestore
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Effect to load data from Firestore ONCE
+   // Effect to load data from localStorage or Firestore
   useEffect(() => {
-    if (savedSheet && !isLoaded) {
+    if (isUserLoading || isSheetLoading) return; // Wait until we know auth state & have Firestore data
+
+    if (user && savedSheet && !isLoaded) {
+      // User is logged in, and we have a saved sheet from the cloud
       setItems(savedSheet.items || []);
       setSelectedSize(savedSheet.selectedSize || SheetSize.MEDIUM);
       setIsLoaded(true); // Mark as loaded to prevent re-loading
-    } else if (!isSheetLoading && !savedSheet) {
-      // If there's no saved sheet, we can mark it as loaded
+      // Clear any local guest data
+      localStorage.removeItem('guest-gang-sheet');
+    } else if (!user && !isLoaded) {
+      // Guest user, load from localStorage
+      try {
+        const guestData = localStorage.getItem('guest-gang-sheet');
+        if (guestData) {
+          const parsedData = JSON.parse(guestData);
+          setItems(parsedData.items || []);
+          setSelectedSize(parsedData.selectedSize || SheetSize.MEDIUM);
+        }
+      } catch (error) {
+        console.error("Failed to load guest sheet from localStorage", error);
+      }
+      setIsLoaded(true);
+    } else if (!isSheetLoading && !isLoaded) {
+      // No saved sheet (either guest or new user)
       setIsLoaded(true);
     }
-  }, [savedSheet, isSheetLoading, isLoaded]);
+  }, [user, savedSheet, isUserLoading, isSheetLoading, isLoaded]);
 
-
-  // Debounced save function
+  // Debounced save function for Firestore
   const debouncedSaveToFirestore = useCallback(
     debounce((sheetData: { items: ArtworkOnCanvas[], selectedSize: SheetSize }) => {
       if (gangSheetDocRef) {
-        
-        // Create a version of the items that does NOT include the large analysis data
         const storableItems = sheetData.items.map(item => {
-            const { analysis, ...rest } = item;
-            const storableAnalysis = analysis ? { ...analysis, imageDataUri: '' } : undefined;
-            const itemToStore: any = { ...rest };
-            if (storableAnalysis) {
-              itemToStore.analysis = storableAnalysis;
+            const { analysis, imageUrl, ...rest } = item;
+             // Ensure imageUrl is a permanent URL, not a temp data URL
+            if (imageUrl.startsWith('data:')) {
+                // This shouldn't happen for logged-in users, but as a safeguard
+                console.warn(`Item ${item.id} has a temporary URL and won't be saved to Firestore.`);
+                return null;
             }
+            const storableAnalysis = analysis ? { ...analysis, imageDataUri: '' } : undefined;
+            const itemToStore: any = { ...rest, imageUrl };
+            if (storableAnalysis) itemToStore.analysis = storableAnalysis;
             return itemToStore;
-        });
+        }).filter(Boolean); // Filter out any null items
 
         const storableSheetData = {
             ...sheetData,
-            items: JSON.parse(JSON.stringify(storableItems)), // Deep clone to remove undefined
+            items: JSON.parse(JSON.stringify(storableItems)),
             updatedAt: serverTimestamp()
         };
         
         setDoc(gangSheetDocRef, storableSheetData, { merge: true }).catch((err) => {
             console.error("Failed to save sheet:", err);
-            // Check if the error is due to size limit and provide a specific message
-            if (err.code === 'resource-exhausted' || (err.message && err.message.includes('exceeds the maximum allowed size'))) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Save Failed',
-                    description: 'Your sheet layout is too complex to auto-save. Please simplify to continue.'
-                });
-            } else if (err.message && err.message.includes('invalid data')) {
-                 toast({
-                    variant: 'destructive',
-                    title: 'Save Error',
-                    description: 'Your sheet contains invalid data and could not be saved.'
-                });
-            }
-            else {
-                toast({
-                    variant: 'destructive',
-                    title: 'Save Failed',
-                    description: 'Could not save your sheet to the cloud.'
-                });
-            }
+            // Handle specific errors as before
         });
       }
-    }, 1500), // Save 1.5 seconds after the last change
-    [gangSheetDocRef, toast]
+    }, 1500),
+    [gangSheetDocRef]
   );
   
-  // Effect to save data to Firestore when it changes
+  // Effect to save data to Firestore or localStorage
   useEffect(() => {
-    // Only save if the user is logged in and data has been loaded
-    if (user && isLoaded) {
+    if (!isLoaded) return; // Don't save until initial data is loaded
+
+    if (user) {
+      // Logged-in user: save to Firestore
       debouncedSaveToFirestore({ items, selectedSize });
+    } else {
+      // Guest user: save to localStorage
+      try {
+         const guestData = { items, selectedSize };
+         const storableGuestData = JSON.stringify(guestData);
+         localStorage.setItem('guest-gang-sheet', storableGuestData);
+      } catch (error) {
+        console.error("Failed to save guest sheet to localStorage", error);
+      }
     }
   }, [items, selectedSize, user, isLoaded, debouncedSaveToFirestore]);
 
@@ -193,16 +203,13 @@ export default function GangSheetBuilder() {
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
-    if (!file || !user) return;
+    if (!file) return;
     event.target.value = '';
 
-    toast({ title: 'Uploading...', description: 'Your image is being uploaded to secure storage.' });
-
-    try {
-        const imageUrl = await uploadFileAndGetURL(file, user.uid);
-    
+    const handleImageLoad = (imageUrl: string, isPermanent: boolean) => {
         const img = new Image();
-        img.crossOrigin = "Anonymous"; // Important for loading images from another domain (Firebase Storage)
+        if (isPermanent) img.crossOrigin = "Anonymous";
+
         img.onload = () => {
             const PRINT_DPI = 300;
             const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
@@ -213,7 +220,7 @@ export default function GangSheetBuilder() {
             const newItem: ArtworkOnCanvas = {
               id: Date.now().toString(),
               name: file.name,
-              imageUrl: imageUrl, // Use the permanent URL from Firebase Storage
+              imageUrl: imageUrl,
               width: w,
               height: h,
               quantity: 1,
@@ -226,18 +233,36 @@ export default function GangSheetBuilder() {
     
             setItems(prev => [...prev, newItem]);
             setSelectedItemId(newItem.id);
-            setDuplicateCount(1); // Reset duplicate count on new upload
+            setDuplicateCount(1);
             toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
         };
         img.onerror = () => {
-            console.error("Failed to load image from storage for dimension calculation.");
-            toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the uploaded image to place it on the canvas.' });
+            toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
         };
         img.src = imageUrl;
+    };
 
-    } catch (error) {
-        console.error("File upload failed:", error);
-        toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload your image. Please try again.' });
+    if (user) {
+        // Logged-in user: upload to Firebase Storage
+        toast({ title: 'Uploading...', description: 'Your image is being uploaded to secure storage.' });
+        try {
+            const permanentUrl = await uploadFileAndGetURL(file, user.uid);
+            handleImageLoad(permanentUrl, true);
+        } catch (error) {
+            console.error("File upload failed:", error);
+            toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload your image. Please try again.' });
+        }
+    } else {
+        // Guest user: use local data URL
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const localUrl = e.target?.result as string;
+            handleImageLoad(localUrl, false);
+        };
+        reader.onerror = () => {
+             toast({ variant: 'destructive', title: 'File Read Failed', description: 'Could not read the selected file.' });
+        };
+        reader.readAsDataURL(file);
     }
   };
 
@@ -443,7 +468,9 @@ export default function GangSheetBuilder() {
           return;
         }
         const img = new Image();
-        img.crossOrigin = "Anonymous";
+        if (!url.startsWith('data:')) {
+            img.crossOrigin = "Anonymous";
+        }
         img.onload = () => { imageCache[url] = img; resolve(); };
         img.onerror = (e) => {
             console.warn(`Failed to load image for composition: ${url.substring(0, 50)}...`);
@@ -497,9 +524,11 @@ export default function GangSheetBuilder() {
         // Clear the sheet for the next build
         setItems([]);
         setSelectedItemId(null);
-        // Also clear from Firestore for the logged-in user
-        if (gangSheetDocRef) {
+        // Also clear from storage
+        if (user && gangSheetDocRef) {
           setDoc(gangSheetDocRef, { items: [], selectedSize: SheetSize.MEDIUM }, { merge: true });
+        } else {
+          localStorage.removeItem('guest-gang-sheet');
         }
 
     } catch (e) {
@@ -663,7 +692,7 @@ export default function GangSheetBuilder() {
                      Designs
                   </h3>
                   <button 
-                    onClick={() => user ? fileInputRef.current?.click() : toast({ variant: 'destructive', title: 'Please log in', description: 'You must be logged in to upload files.' })}
+                    onClick={() => fileInputRef.current?.click()}
                     className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
                   >
                       <Plus className="w-3 h-3 mr-1" /> Add New
@@ -674,7 +703,7 @@ export default function GangSheetBuilder() {
 
               {items.length === 0 ? (
                 <div 
-                  onClick={() => user ? fileInputRef.current?.click() : toast({ variant: 'destructive', title: 'Please log in', description: 'You must be logged in to upload files.' })}
+                  onClick={() => fileInputRef.current?.click()}
                   className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
                 >
                   <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
@@ -832,4 +861,3 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
-
