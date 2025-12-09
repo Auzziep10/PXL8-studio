@@ -27,7 +27,7 @@ import FileSaver from 'file-saver';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
-import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
 import { collection, query, updateDoc, doc, collectionGroup } from 'firebase/firestore';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
@@ -163,13 +163,27 @@ const AssetCard: React.FC<{
 export default function AdminPage() {
   const firestore = useFirestore();
   const { user } = useUser();
+  const [isAdmin, setIsAdmin] = useState(false);
 
+  // Check for admin role
+  const adminRoleRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, `roles_admin/${user.uid}`);
+  }, [firestore, user]);
+  const { data: adminRoleDoc } = useDoc(adminRoleRef);
+
+  useEffect(() => {
+    setIsAdmin(!!adminRoleDoc);
+  }, [adminRoleDoc]);
+
+  // Securely query orders only if the user is an admin
   const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collectionGroup(firestore, 'orders')) : null),
-    [firestore, user]
+    () => (firestore && isAdmin ? query(collectionGroup(firestore, 'orders')) : null),
+    [firestore, isAdmin]
   );
   
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
+
 
   const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
   const [searchTerm, setSearchTerm] = useState('');
