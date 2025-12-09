@@ -15,7 +15,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
-import { doc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 
 interface CheckoutFormData {
     firstName: string;
@@ -184,42 +184,63 @@ export default function CartPage() {
         }
 
         setIsCheckingOut(true);
+
+        const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
+        const orderId = `ORD-${Date.now()}`;
+        
+        const newOrderData = {
+            orderId: orderId,
+            customerId: customerId,
+            customerName: `${formData.firstName} ${formData.lastName}`,
+            orderDate: new Date().toISOString(),
+            status: OrderStatus.PENDING,
+            items: cartItems.map(item => ({
+              ...item,
+              // Strip large data URLs before saving to DB
+              artworks: item.artworks.map(({ imageUrl, ...art }) => art), 
+              compositeImageUrl: '' // This will be generated and stored on the backend
+            })),
+            total: total,
+            shippingAddress: {
+                street: formData.street,
+                city: formData.city,
+                state: formData.state,
+                zip: formData.zip,
+                country: 'US',
+            },
+            trackingId: '',
+            printReadyUrl: '',
+            previewUrl: '',
+        };
+
         try {
             if (!isTestMode) {
+                // For a real order, we save to Firestore and then go to Stripe
+                if (firestore && currentUser) {
+                    const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
+                    await addDoc(userOrdersRef, {
+                        ...newOrderData,
+                        createdAt: serverTimestamp()
+                    });
+                }
+                // Then proceed to Stripe
                 await createCheckoutSession(cartItems, total);
+
             } else {
-                // Simulate a successful order placement in test mode
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                const newOrder: Order = {
-                    id: `ORD-${Date.now()}`,
-                    orderId: `ORD-${Date.now()}`,
-                    customerId: currentUser?.uid || `GUEST-${Date.now()}`,
-                    customerName: `${formData.firstName} ${formData.lastName}`,
-                    orderDate: new Date().toISOString(),
-                    status: OrderStatus.PENDING,
-                    items: cartItems,
-                    total: total,
-                    shippingAddress: {
-                        street: formData.street,
-                        city: formData.city,
-                        state: formData.state,
-                        zip: formData.zip,
-                        country: 'US',
-                    },
-                    trackingId: '',
-                    printReadyUrl: '',
-                    previewUrl: '',
-                };
+                 // In test mode, we just save the order to local storage (for admin demo)
+                 // and Firestore if the user is logged in
+                if (firestore && currentUser) {
+                     const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
+                     await addDoc(userOrdersRef, {
+                        ...newOrderData,
+                        createdAt: serverTimestamp()
+                    });
+                }
 
+                // Also save to local storage for the admin panel demo
                 const existingOrders: Order[] = JSON.parse(localStorage.getItem('pxl8-orders') || '[]');
-                existingOrders.push(newOrder);
+                existingOrders.push({ ...newOrderData, id: orderId });
                 localStorage.setItem('pxl8-orders', JSON.stringify(existingOrders));
-
-                console.log('--- TEST MODE ORDER ---');
-                console.log('Customer:', formData);
-                console.log('Items:', cartItems);
-                console.log('Total: $0.00');
             }
             
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
