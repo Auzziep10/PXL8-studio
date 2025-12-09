@@ -163,8 +163,8 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
   const firestore = useFirestore();
   
   const ordersQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collection(firestore, 'orders')) : null),
-    [firestore, isAdmin]
+    () => (firestore ? query(collection(firestore, 'orders')) : null),
+    [firestore]
   );
   
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
@@ -497,6 +497,15 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
     printWindow.document.close();
   };
 
+  if (!isAdmin) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+            <p className="text-zinc-400">You do not have permission to view this page.</p>
+        </div>
+    );
+  }
+
   // Main render
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto w-full px-4 py-8">
@@ -662,11 +671,17 @@ export default function AdminPage({ isAdmin }: { isAdmin?: boolean }) {
                   </div>
                 </div>
               ))}
-              {customers.length === 0 && (
+              {customers.length === 0 && !isLoadingOrders && (
                 <div className="col-span-full py-12 text-center text-zinc-500">
                   No customers found.
                 </div>
               )}
+               {isLoadingOrders && (
+                 <div className="col-span-full py-12 text-center text-zinc-500">
+                    <Database className="w-12 h-12 mx-auto mb-3 opacity-20 animate-pulse" />
+                    <p>Loading customer data...</p>
+                 </div>
+               )}
             </div>
           </div>
         )}
