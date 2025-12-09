@@ -10,6 +10,8 @@ import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import AiAnalysisPanel from './ai-analysis-panel';
 
+const LOCAL_STORAGE_KEY = 'pxl8-gang-sheet';
+
 export default function GangSheetBuilder() {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
@@ -31,6 +33,34 @@ export default function GangSheetBuilder() {
 
   const sheetConfig = SHEET_DIMENSIONS[selectedSize];
   const selectedItem = items.find(item => item.id === selectedItemId);
+
+  // --- State Persistence ---
+  useEffect(() => {
+    try {
+      const savedItems = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedItems) {
+        setItems(JSON.parse(savedItems));
+      }
+    } catch (error) {
+        console.error("Failed to load items from localStorage", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
+    } catch (error) {
+        console.error("Failed to save items to localStorage", error);
+        if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+             toast({
+                variant: 'destructive',
+                title: 'Storage Full',
+                description: 'Could not save your sheet. Browser storage is full.'
+             });
+        }
+    }
+  }, [items, toast]);
+
 
   // --- Auto-Scaling for Preview ---
   useEffect(() => {
@@ -661,5 +691,7 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
+
+    
 
     
