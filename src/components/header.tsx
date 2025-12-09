@@ -17,7 +17,6 @@ import type { User as AppUser } from '@/lib/types';
 const navLinks = [
   { href: '/build', label: 'Builder' },
   { href: '/upload', label: 'Upload' },
-  { href: '/dashboard', label: 'Dashboard' },
   { href: '/track', label: 'Track Order' },
 ];
 
@@ -76,6 +75,17 @@ export default function Header() {
               {link.label}
             </Link>
           ))}
+          {isAuthenticated && (
+            <Link
+                href="/dashboard"
+                className={cn(
+                    'transition-colors hover:text-foreground/80',
+                    pathname.startsWith('/dashboard') || pathname.startsWith('/admin') ? 'text-foreground' : 'text-foreground/60'
+                )}
+            >
+                Dashboard
+            </Link>
+          )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
           {isAuthenticated && isAdmin && (

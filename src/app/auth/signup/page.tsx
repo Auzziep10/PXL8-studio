@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
@@ -51,11 +51,11 @@ export default function SignUpPage() {
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: user.email,
-        firstName: fullName.split(' ')[0],
-        lastName: fullName.split(' ').slice(1).join(' '),
-        role: 'customer',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
+        firstName: fullName.split(' ')[0] || '',
+        lastName: fullName.split(' ').slice(1).join(' ') || '',
+        role: 'customer', // Explicitly set role to customer
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       });
 
       toast({

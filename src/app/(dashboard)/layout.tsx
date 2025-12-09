@@ -65,7 +65,8 @@ export default function DashboardLayout({
   
   const accessibleNavItems = navItems.filter(item => {
     if (item.roles.includes('admin') && isAdmin) return true;
-    if (item.roles.includes('customer')) return true;
+    if (item.roles.includes('customer') && !isAdmin) return true; // Only show overview for customers
+    if (item.href === '/dashboard' && isAdmin) return true; // Admins should see overview too
     return false;
   });
 
