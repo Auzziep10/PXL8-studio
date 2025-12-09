@@ -46,8 +46,12 @@ export default function DashboardLayout({
   ];
 
   const handleLogout = async () => {
-    await signOut(auth);
+    if (auth) {
+        await signOut(auth);
+    }
   };
+
+  const pageTitle = pathname.split('/').pop()?.replace('-', ' ');
 
   return (
     <SidebarProvider>
@@ -112,7 +116,7 @@ export default function DashboardLayout({
             <SidebarTrigger className="sm:hidden" />
             <div className='flex-1'>
                 <h1 className="text-xl font-semibold capitalize">
-                    {pathname.split('/').pop()?.replace('-', ' ')}
+                    {userProfile?.firstName ? `Welcome, ${userProfile.firstName}` : pageTitle}
                 </h1>
             </div>
             <Button variant="outline" size="icon" asChild>
