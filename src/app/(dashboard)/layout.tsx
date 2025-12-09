@@ -44,7 +44,7 @@ export default function DashboardLayout({
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile } = useDoc(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
 
   const userRole = userProfile?.role || 'customer';
 
@@ -81,7 +81,7 @@ export default function DashboardLayout({
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
-            {isUserLoading ? (
+            {isUserLoading || isProfileLoading ? (
               <div className="p-2 space-y-2">
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>

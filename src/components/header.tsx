@@ -30,7 +30,7 @@ export default function Header() {
     return doc(firestore, 'users', user.uid);
   }, [firestore, user]);
 
-  const { data: userProfile } = useDoc(userDocRef);
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc(userDocRef);
   const userRole = userProfile?.role || 'customer';
 
   const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
@@ -87,7 +87,7 @@ export default function Header() {
             </Link>
           </Button>
 
-          {isUserLoading ? (
+          {isUserLoading || isProfileLoading ? (
             <div className='w-8 h-8 bg-muted rounded-full animate-pulse' />
           ) : isAuthenticated ? (
             <>
