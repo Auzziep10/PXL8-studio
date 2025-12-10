@@ -195,18 +195,28 @@ export default function CartPage() {
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
             items: cartItems.map((item: CartItem) => {
-                // Sanitize artworks to remove complex objects before saving to Firestore
-                const artworksForDb = item.artworks.map((art: ArtworkOnCanvas) => {
-                    const { analysis, analysisLoading, ...rest } = art;
-                    return rest;
-                });
+                // Rigorous sanitation of artworks to ensure only plain data is saved.
+                const artworksForDb = item.artworks.map((art: ArtworkOnCanvas) => ({
+                    id: art.id,
+                    name: art.name,
+                    imageUrl: art.imageUrl,
+                    width: art.width,
+                    height: art.height,
+                    dpi: art.dpi,
+                    x: art.x,
+                    y: art.y,
+                    canvasWidth: art.canvasWidth,
+                    canvasHeight: art.canvasHeight,
+                    quantity: art.quantity,
+                    // Explicitly exclude analysis and analysisLoading
+                }));
     
-                // Rebuild the entire item to ensure no extra properties are included and nested objects are flattened.
+                // Rebuild the entire item to ensure no extra properties are included
                 const sanitizedItem = {
                     id: item.id,
                     quantity: item.quantity,
                     compositeImageUrl: item.compositeImageUrl,
-                    sheetSize: { // Flatten the sheetSize object
+                    sheetSize: {
                         name: item.sheetSize.name,
                         width: item.sheetSize.width,
                         height: item.sheetSize.height,
