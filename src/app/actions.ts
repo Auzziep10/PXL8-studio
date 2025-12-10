@@ -2,9 +2,8 @@
 
 import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from '@/ai/flows/improve-artwork-printability';
 import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
-import { fetchShippingRates as fetchEasyPostShippingRates } from '@/services/easyPostService';
-import type { ShippingAddress } from '@/lib/types';
-
+import type { ShippingAddress, ShippingRate } from '@/lib/types';
+import EasyPostClient from '@easypost/api';
 
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
   try {
@@ -23,6 +22,63 @@ export async function generateDesign(input: GenerateDesignFromPromptInput) {
     } catch (error) {
         console.error('Error generating design:', error);
         return { success: false, error: 'Failed to generate design.' };
+    }
+}
+
+// --- EasyPost Logic Moved Here ---
+
+const client = new EasyPostClient(process.env.EASYPOST_API_KEY as string);
+
+const fromAddress = {
+    street1: '417 MONTGOMERY ST',
+    city: 'SAN FRANCISCO',
+    state: 'CA',
+    zip: '94104',
+    country: 'US',
+    company: 'PXL8',
+    phone: '415-123-4567',
+};
+
+async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunces: number): Promise<ShippingRate[]> {
+    if (!process.env.EASYPOST_API_KEY || process.env.EASYPOST_API_KEY === 'YOUR_API_KEY_HERE') {
+        console.error("EasyPost API key is not configured.");
+        return [];
+    }
+    
+    try {
+        const shipment = await client.Shipment.create({
+            to_address: {
+                name: 'Recipient', // EasyPost requires a name
+                street1: toAddress.street,
+                city: toAddress.city,
+                state: toAddress.state,
+                zip: toAddress.zip,
+                country: toAddress.country
+            },
+            from_address: fromAddress,
+            parcel: {
+                weight: weightOunces,
+            },
+        });
+
+        if (!shipment.rates || shipment.rates.length === 0) {
+            console.warn("No rates returned from EasyPost for this shipment.");
+            return [];
+        }
+
+        const formattedRates: ShippingRate[] = shipment.rates.map(rate => ({
+            id: rate.id,
+            carrier: rate.carrier,
+            service: rate.service,
+            rate: parseFloat(rate.rate),
+            deliveryDays: rate.delivery_days ? `${rate.delivery_days} business days` : 'Not available'
+        }));
+        
+        return formattedRates.sort((a,b) => a.rate - b.rate);
+
+    } catch (error) {
+        console.error("EasyPost API Error:", error);
+        return [];
     }
 }
 
