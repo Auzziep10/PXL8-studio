@@ -434,19 +434,17 @@ export default function GangSheetBuilder() {
   const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
 
   // --- Generation ---
-  const generateCompositeSheet = async (trackingId: string): Promise<string> => {
+  const generateCompositeSheet = async (trackingId: string, includeHeader: boolean): Promise<string> => {
     const BASE_DPI = 300;
-    const HEADER_HEIGHT_INCHES = 2;
+    const HEADER_HEIGHT_INCHES = includeHeader ? 2 : 0;
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
-    // Create a canvas for the main artwork content
     const sheetCanvas = document.createElement('canvas');
     const sheetCtx = sheetCanvas.getContext('2d');
     if (!sheetCtx) throw new Error('No sheet context');
     sheetCanvas.width = sheetConfig.width * BASE_DPI;
     sheetCanvas.height = sheetConfig.height * BASE_DPI;
 
-    // Load all unique images
     const imageCache: Record<string, HTMLImageElement> = {};
     await Promise.all(items.map(item => new Promise<void>((resolve, reject) => {
         if (imageCache[item.imageUrl]) return resolve();
@@ -457,7 +455,6 @@ export default function GangSheetBuilder() {
         img.src = item.imageUrl;
     })));
 
-    // Draw images onto the sheet canvas
     items.forEach(item => {
         const img = imageCache[item.imageUrl];
         if (img && (item.y + item.height <= sheetConfig.height)) {
@@ -470,19 +467,20 @@ export default function GangSheetBuilder() {
             );
         }
     });
+
+    if (!includeHeader) {
+        return sheetCanvas.toDataURL('image/png');
+    }
     
-    // Create the final canvas with header
     const finalCanvas = document.createElement('canvas');
     const finalCtx = finalCanvas.getContext('2d');
     if (!finalCtx) throw new Error('No final context');
     finalCanvas.width = sheetConfig.width * BASE_DPI;
     finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
 
-    // Fill header with white
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
 
-    // Generate and draw QR code
     const qrCodeDataUrl = await QRCode.toDataURL(trackingId, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
     const qrImg = new Image();
     await new Promise<void>(resolve => {
@@ -491,7 +489,6 @@ export default function GangSheetBuilder() {
     });
     finalCtx.drawImage(qrImg, 10, 10);
     
-    // Draw header text
     finalCtx.fillStyle = 'black';
     finalCtx.font = `bold ${BASE_DPI / 2}px Arial`;
     finalCtx.textAlign = 'left';
@@ -500,7 +497,6 @@ export default function GangSheetBuilder() {
     finalCtx.font = `${BASE_DPI / 3}px Arial`;
     finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 30 + (BASE_DPI / 2) + 10);
 
-    // Draw the main sheet content below the header
     finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
 
     return finalCanvas.toDataURL('image/png');
@@ -510,19 +506,22 @@ export default function GangSheetBuilder() {
     setIsGenerating(true);
     try {
         const trackingId = `TRK-${Date.now()}`;
-        const compositeUrl = await generateCompositeSheet(trackingId);
+        // Generate two versions: one for the customer (preview) and one for production (print-ready)
+        const previewUrl = await generateCompositeSheet(trackingId, false);
+        const printReadyUrl = await generateCompositeSheet(trackingId, true);
         
         const config = SHEET_DIMENSIONS[selectedSize];
         const cartItem: CartItem = {
-          id: trackingId, // Use the tracking ID as the unique cart item ID
+          id: trackingId,
           sheetSize: {
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
             height: config.height,
             price: config.price
           },
-          compositeImageUrl: compositeUrl,
-          artworks: [], // We no longer save the array of artworks
+          previewUrl: previewUrl,
+          printReadyUrl: printReadyUrl,
+          artworks: [],
           quantity: 1,
         };
 
@@ -531,10 +530,8 @@ export default function GangSheetBuilder() {
           title: "Added to Cart",
           description: `${cartItem.sheetSize.name} gang sheet.`
         });
-        // Clear the sheet for the next build
         setItems([]);
         setSelectedItemId(null);
-        // Also clear from storage
         if (user && gangSheetDocRef) {
           setDoc(gangSheetDocRef, { items: [], selectedSize: SheetSize.MEDIUM }, { merge: true });
         } else {
@@ -871,5 +868,3 @@ export default function GangSheetBuilder() {
     </div>
   );
 }
-
-    

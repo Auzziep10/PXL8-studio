@@ -33,7 +33,8 @@ export interface ShippingAddress {
 export interface OrderItem {
   id: string;
   quantity: number;
-  compositeImageUrl: string;
+  previewUrl: string; // Customer-facing image
+  printReadyUrl: string; // Production image with QR code
   sheetSizeName: string;
   sheetWidth: number;
   sheetHeight: number;
@@ -52,8 +53,8 @@ export interface Order {
   total: number;
   shippingAddress: ShippingAddress;
   trackingId: string;
-  printReadyUrl: string;
-  previewUrl: string;
+  printReadyUrl: string; // This might be deprecated on the Order level
+  previewUrl: string; // This might be deprecated on the Order level
 }
 
 export interface Artwork {
@@ -87,7 +88,8 @@ export interface SheetSize {
 export interface CartItem {
   id: string;
   sheetSize: SheetSize;
-  compositeImageUrl: string;
+  previewUrl: string; // Customer-facing image (no QR)
+  printReadyUrl: string; // Production image (with QR)
   artworks: ArtworkOnCanvas[]; // This is now for client-side state only
   quantity: number;
 }

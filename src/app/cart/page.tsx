@@ -193,15 +193,25 @@ export default function CartPage() {
 
             const finalOrderItems: OrderItem[] = [];
             for (const item of cartItems) {
-                // Upload the base64 composite image to Firebase Storage
-                const storageRef = ref(storage, `production-sheets/${orderId}/${item.id}.png`);
-                const snapshot = await uploadString(storageRef, item.compositeImageUrl, 'data_url');
-                const downloadURL = await getDownloadURL(snapshot.ref);
+                // Upload both preview and print-ready images to Firebase Storage
+                const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
+                const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
+                
+                const [previewSnapshot, printReadySnapshot] = await Promise.all([
+                    uploadString(previewStorageRef, item.previewUrl, 'data_url'),
+                    uploadString(printReadyStorageRef, item.printReadyUrl, 'data_url'),
+                ]);
+                
+                const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
+                    getDownloadURL(previewSnapshot.ref),
+                    getDownloadURL(printReadySnapshot.ref)
+                ]);
 
                 const plainItem: OrderItem = {
                     id: item.id,
                     quantity: item.quantity,
-                    compositeImageUrl: downloadURL, // Use the permanent URL
+                    previewUrl: previewDownloadURL,
+                    printReadyUrl: printReadyDownloadURL,
                     sheetSizeName: item.sheetSize.name,
                     sheetWidth: item.sheetSize.width,
                     sheetHeight: item.sheetSize.height,
@@ -226,7 +236,7 @@ export default function CartPage() {
                     country: 'US',
                 },
                 trackingId: '',
-                printReadyUrl: '', // This field might be deprecated or used for something else now
+                printReadyUrl: '',
                 previewUrl: '',
             };
 
@@ -308,9 +318,9 @@ export default function CartPage() {
                                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
                                     <div 
                                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
-                                        onClick={() => handlePreview(item.compositeImageUrl, item.sheetSize)}
+                                        onClick={() => handlePreview(item.previewUrl, item.sheetSize)}
                                     >
-                                        <Image src={item.compositeImageUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
+                                        <Image src={item.previewUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <ZoomIn className="w-5 h-5 text-white" />
                                         </div>
@@ -591,5 +601,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    

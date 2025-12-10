@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Order, OrderStatus, GangSheetItem, User as AppUser } from '@/lib/types';
+import { Order, OrderStatus, GangSheetItem, User as AppUser, OrderItem } from '@/lib/types';
 import {
   Printer,
   Search,
@@ -32,13 +32,12 @@ type SortDirection = 'asc' | 'desc';
 
 // --- AssetCard Component ---
 const AssetCard: React.FC<{
-  item: GangSheetItem;
+  item: OrderItem; // Use the simpler OrderItem type
   index: number;
   onPreview: (url: string) => void;
 }> = ({ item, index, onPreview }) => {
-  const [showOriginal, setShowOriginal] = useState(false);
-
-  // Since we now only store the final print-ready URL, we simplify this.
+  
+  // The production-ready URL is now item.printReadyUrl
   const displayUrl = item.printReadyUrl;
 
   return (
@@ -50,28 +49,19 @@ const AssetCard: React.FC<{
             <span className="text-white font-bold text-sm">
               Sheet #{index + 1}
             </span>
-            {(item.originalFileName || (item as any).file?.name) && (
-              <span
-                className="px-2 py-0.5 rounded bg-zinc-800 border border-white/5 text-zinc-400 text-xs truncate max-w-[200px] flex items-center"
-                title={item.originalFileName || (item as any).file?.name}
-              >
-                <FileText className="w-3 h-3 mr-1 opacity-50" />
-                {item.originalFileName || (item as any).file?.name}
-              </span>
-            )}
           </div>
           <div className="flex items-center space-x-3 text-xs text-zinc-500">
             <span>
-              {item.width}" x {item.height}"
+              {item.sheetWidth}" x {item.sheetHeight}"
             </span>
             <span>•</span>
             <span>Qty: {item.quantity}</span>
-            {item.trackingId && (
+            {item.id && ( // Use item.id which is the tracking ID
               <>
                 <span>•</span>
                 <span className="flex items-center text-accent font-mono bg-accent/5 px-1 rounded">
                   <QrCode className="w-3 h-3 mr-1" />
-                  {item.trackingId}
+                  {item.id}
                 </span>
               </>
             )}
@@ -82,7 +72,7 @@ const AssetCard: React.FC<{
           {/* Download button now directly links to the print-ready URL */}
           <a
             href={displayUrl}
-            download={`sheet-${index + 1}-${item.trackingId}.png`}
+            download={`sheet-${index + 1}-${item.id}.png`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
@@ -355,9 +345,9 @@ export default function AdminPage() {
       const folder = zip.folder(`Order-${targetOrder.orderId}`);
 
       for (let i = 0; i < targetOrder.items.length; i++) {
-        const item = targetOrder.items[i] as any; // Cast to any to access flattened props
+        const item = targetOrder.items[i];
 
-        const urlToUse = item.compositeImageUrl;
+        const urlToUse = item.printReadyUrl;
 
         if (urlToUse) {
             try {
@@ -439,7 +429,7 @@ export default function AdminPage() {
                     <thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead>
                     <tbody>${targetOrder.items
                       .map(
-                        (item: any, idx) => // Cast to any
+                        (item: OrderItem, idx) =>
                           `<tr><td>${idx + 1}</td><td>Gang Sheet ${
                             item.sheetSizeName
                           }</td><td>${item.quantity}</td></tr>`
@@ -849,16 +839,16 @@ export default function AdminPage() {
                       <div className="p-4 bg-black/20">
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                           {Array.isArray(order.items) &&
-                            order.items.map((item: any, idx: number) => (
+                            order.items.map((item: OrderItem, idx: number) => (
                               <div
                                 key={idx}
                                 className="relative aspect-square bg-checkerboard-dark rounded-lg border border-white/5 overflow-hidden group cursor-zoom-in"
                                 onClick={() =>
-                                  setPreviewImage(item.compositeImageUrl)
+                                  setPreviewImage(item.printReadyUrl)
                                 }
                               >
                                 <img
-                                  src={item.compositeImageUrl}
+                                  src={item.printReadyUrl}
                                   className="w-full h-full object-contain"
                                   alt=""
                                 />
@@ -968,27 +958,11 @@ export default function AdminPage() {
                 </div>
                 <div className="space-y-6">
                   {Array.isArray(selectedOrder.items) &&
-                    selectedOrder.items.map((item: any, idx) => {
-                      const gangSheetItem: GangSheetItem = {
-                        id: item.id,
-                        file: null,
-                        printReadyUrl: item.compositeImageUrl,
-                        originalUrl: '', // This model doesn't have a separate original URL
-                        previewUrl: item.compositeImageUrl,
-                        originalFileName: `sheet-${idx + 1}.png`,
-                        width: item.sheetWidth,
-                        height: item.sheetHeight,
-                        quantity: item.quantity,
-                        trackingId: item.id,
-                        originalHeightPx: 0,
-                        originalWidthPx: 0,
-                        x: 0,
-                        y: 0,
-                      };
+                    selectedOrder.items.map((item: OrderItem, idx) => {
                       return (
                         <AssetCard
                           key={idx}
-                          item={gangSheetItem}
+                          item={item}
                           index={idx}
                           onPreview={setPreviewImage}
                         />
@@ -1003,5 +977,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    

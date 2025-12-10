@@ -17,9 +17,13 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 // and removing large data URLs before storage.
 function safeStringifyForStorage(items: CartItem[]): string {
   const storableItems = items.map(item => {
-    const { compositeImageUrl, artworks, ...rest } = item;
-    const storableArtworks = artworks.map(({ imageUrl, ...art }) => art);
-    return { ...rest, artworks: storableArtworks, compositeImageUrl: '' };
+    // Only store URLs for persistence, not the full data URLs if they are long
+    const { previewUrl, printReadyUrl, ...rest } = item;
+    return { 
+        ...rest, 
+        previewUrl: previewUrl.startsWith('data:') ? '' : previewUrl,
+        printReadyUrl: printReadyUrl.startsWith('data:') ? '' : printReadyUrl
+    };
   });
   return JSON.stringify(storableItems);
 }
@@ -33,9 +37,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const storedItems = localStorage.getItem('pxl8-cart');
       if (storedItems) {
-        // We only store metadata, so we can parse it back directly.
-        // The actual image data URLs will be missing, which is expected.
-        // The application should be robust enough to handle this.
+        // Since we don't store the image data, this is safe to parse.
+        // The app must handle cases where image URLs are empty.
         setItems(JSON.parse(storedItems));
       }
     } catch (error) {
@@ -47,47 +50,20 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save to localStorage whenever items change
   useEffect(() => {
     try {
-      const storableString = safeStringifyForStorage(items);
-      localStorage.setItem('pxl8-cart', storableString);
+      // Don't save image data to local storage. It can exceed limits.
+      const storableItems = items.map(({ previewUrl, printReadyUrl, ...rest }) => rest);
+      localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
     } catch (error) {
       console.error('Failed to save cart to localStorage', error);
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
-         // This is a critical error, inform the user.
-        alert('Could not save cart changes. Your browser storage is full. Please clear some space or try a different browser.');
+        alert('Could not save cart changes. Your browser storage is full.');
       }
     }
   }, [items]);
 
   const addItem = (item: CartItem) => {
     setItems((prevItems) => {
-      // Find item based on sheet size and whether it's a custom build or pre-built upload
-      // A simple way is to check if it has artworks or not.
-      const isCustomBuild = item.artworks && item.artworks.length > 0;
-      
-      const existingItemIndex = prevItems.findIndex(i => 
-        i.sheetSize.name === item.sheetSize.name &&
-        (i.artworks && i.artworks.length > 0) === isCustomBuild
-      );
-
-      if (existingItemIndex > -1) {
-        // If it's a custom build, replace it. If it's a pre-built, add quantity.
-        const updatedItems = [...prevItems];
-        const existingItem = updatedItems[existingItemIndex];
-        
-        if (isCustomBuild) {
-            // For custom builds, we typically want to replace the old one if a new one is added.
-            // Or, if your business logic allows multiple custom sheets of the same size,
-            // you would treat it like a new item. For now, let's replace.
-            updatedItems[existingItemIndex] = item;
-        } else {
-            // For pre-built uploads, just increase the quantity
-            updatedItems[existingItemIndex] = {
-              ...existingItem,
-              quantity: existingItem.quantity + item.quantity,
-            };
-        }
-        return updatedItems;
-      }
+      // For this simplified logic, all new gang sheets are unique items
       return [...prevItems, item];
     });
   };
