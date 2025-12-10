@@ -45,6 +45,19 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     [firestore, usage]
   );
   const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
+
+  const sqInchPriceQuery = useMemoFirebase(
+    () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
+    [firestore]
+  );
+  const { data: sqInchPriceData, isLoading: isLoadingPrice } = useCollection<ServiceAddOn & {id: string}>(sqInchPriceQuery);
+  
+  const pricePerSqInch = useMemo(() => {
+    if (sqInchPriceData && sqInchPriceData.length > 0) {
+        return sqInchPriceData[0].price;
+    }
+    return null;
+  }, [sqInchPriceData]);
   
   const sortedSheetSizes = useMemo(() => {
     if (!sheetSizes) return [];
@@ -194,13 +207,29 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const [scale, setScale] = useState(0.25);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const sheetConfig = sortedSheetSizes?.find(s => s.id === selectedSizeId) || { width: 0, height: 0, price: 0, discount: 0 };
+  const sheetConfig = sortedSheetSizes?.find(s => s.id === selectedSizeId);
+  
+  const calculateFinalPrice = useCallback((config: SheetType): number => {
+    if (pricePerSqInch === null) return 0;
+    const basePrice = config.width * config.height * pricePerSqInch;
+    const discountAmount = basePrice * (config.discount / 100);
+    return basePrice - discountAmount;
+  }, [pricePerSqInch]);
+
+  const selectedSheetPrice = useMemo(() => {
+    if (sheetConfig) {
+      return calculateFinalPrice(sheetConfig);
+    }
+    return 0;
+  }, [sheetConfig, calculateFinalPrice]);
+
+
   const selectedItem = items.find(item => item.id === selectedItemId);
 
   // --- Auto-Scaling for Preview ---
   useEffect(() => {
     const handleResize = () => {
-        if (!containerRef.current) return;
+        if (!containerRef.current || !sheetConfig) return;
         const containerW = containerRef.current.clientWidth;
         const availableW = Math.max(0, containerW - 90); 
         const sheetPxW = sheetConfig.width * PPI;
@@ -217,13 +246,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         resizeObserver.observe(containerRef.current);
     }
     return () => resizeObserver.disconnect();
-  }, [selectedSizeId, sheetConfig.width]); 
+  }, [selectedSizeId, sheetConfig]); 
 
-  const displayWidth = sheetConfig.width * PPI * scale;
-  const displayHeight = sheetConfig.height * PPI * scale;
+  const displayWidth = (sheetConfig?.width || 0) * PPI * scale;
+  const displayHeight = (sheetConfig?.height || 0) * PPI * scale;
 
   // --- Auto-Positioning Algorithm ---
   const findOpenPosition = (width: number, height: number, existingItems: ArtworkOnCanvas[]): {x: number, y: number} => {
+    if (!sheetConfig) return { x: 0, y: 0 };
     const margin = 0.25; // inch margin
     const step = 0.5; // check every half inch
 
@@ -545,6 +575,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+      if (!sheetConfig) return;
       if (rotatingState && draggingId && containerRef.current) {
           const sheetRect = containerRef.current.querySelector('.sheet-canvas')?.getBoundingClientRect();
           if (!sheetRect) return;
@@ -611,7 +642,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
       setItems(prev => prev.map(i => i.id === draggingId ? { ...i, x: newX, y: newY } : i));
 
-  }, [draggingId, dragOffset, scale, sheetConfig.width, sheetConfig.height, items, resizingState, rotatingState]);
+  }, [draggingId, dragOffset, scale, sheetConfig, items, resizingState, rotatingState]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
@@ -695,11 +726,13 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
   const isSheetOverflowing = items.some(i => {
+    if (!sheetConfig) return false;
     const bbox = getRotatedBoundingBox(i);
     return bbox.maxY > sheetConfig.height;
   });
 
   const generatePreviewSheet = async (): Promise<string> => {
+    if (!sheetConfig) throw new Error("Sheet size not configured");
     const BASE_DPI = 300;
     const sheetCanvas = document.createElement('canvas');
     const sheetCtx = sheetCanvas.getContext('2d');
@@ -749,6 +782,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
   const handleProcessAndAddToCart = async () => {
+    if (!sheetConfig) {
+      toast({
+        variant: "destructive",
+        title: "No Sheet Size Selected",
+        description: "Please select a sheet size before adding to cart."
+      });
+      return;
+    }
     setIsGenerating(true);
     try {
         const previewUrl = await generatePreviewSheet();
@@ -761,7 +802,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
             height: config.height,
-            price: config.price,
+            price: selectedSheetPrice,
             discount: config.discount,
           },
           previewUrl: previewUrl,
@@ -797,7 +838,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
 
-  if (isUserLoading || !isLoaded || isLoadingSizes) {
+  if (isUserLoading || !isLoaded || isLoadingSizes || isLoadingPrice) {
     return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center space-y-4">
@@ -837,9 +878,12 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                   )}
               </div>
               <div className="space-y-3">
-                {sortedSheetSizes?.length === 0 ? (
+                {(isLoadingSizes || isLoadingPrice) ? (
+                    <p className="text-zinc-400 text-sm">Loading pricing...</p>
+                ) : sortedSheetSizes?.length === 0 ? (
                     <p className="text-zinc-400 text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
                 ) : sortedSheetSizes?.map((config) => {
+                    const finalPrice = calculateFinalPrice(config);
                     return (
                         <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
                             <div className="flex items-center relative z-10">
@@ -854,7 +898,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                             <span className="ml-3 font-medium text-gray-200">{config.name} - {config.width}" x {config.height}"</span>
                             </div>
                             <div className="flex flex-col items-end relative z-10">
-                                <span className="font-bold text-accent">{formatCurrency(config.price)}</span>
+                                <span className="font-bold text-accent">{formatCurrency(finalPrice)}</span>
                                 {config.discount > 0 && 
                                     <span className="text-xs text-red-400 flex items-center gap-1">
                                         <Percent className="w-3 h-3" /> {config.discount}% Off
@@ -1027,7 +1071,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 onClick={handleProcessAndAddToCart}
                 className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
             >
-                {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(sheetConfig.price)}`}
+                {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(selectedSheetPrice)}`}
                 {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
             </button>
           </div>
@@ -1066,7 +1110,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                         const isSelected = selectedItemId === item.id;
                         
                         const itemBBox = getRotatedBoundingBox(item);
-                        const isOutOfBounds = itemBBox.minX < 0 || itemBBox.maxX > sheetConfig.width || itemBBox.minY < 0 || itemBBox.maxY > sheetConfig.height;
+                        const isOutOfBounds = sheetConfig ? (itemBBox.minX < 0 || itemBBox.maxX > sheetConfig.width || itemBBox.minY < 0 || itemBBox.maxY > sheetConfig.height) : false;
 
                         const isColliding = items.some(other => {
                             if (other.id === item.id) return false;
@@ -1139,7 +1183,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
             </div>
             <div className="w-full flex justify-between text-zinc-500 text-xs mt-2 font-mono">
                 <span>0"</span>
-                <span>{sheetConfig.width}"</span>
+                <span>{sheetConfig?.width || 0}"</span>
             </div>
             
             <div className="mt-4 text-xs text-zinc-500 flex items-center">
