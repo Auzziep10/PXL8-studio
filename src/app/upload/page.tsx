@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useRef, useEffect } from 'react';
-import { CartItem, ArtworkOnCanvas, SheetSize as SheetType } from '@/lib/types';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { CartItem, ArtworkOnCanvas, SheetSize as SheetType, SheetCartItem } from '@/lib/types';
 import { Upload, FileText, CheckCircle, ArrowRight, Trash2, ShieldCheck, Ruler } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -21,6 +21,11 @@ export default function PrebuiltUploadPage() {
     );
     const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
 
+    const sortedSheetSizes = useMemo(() => {
+        if (!sheetSizes) return [];
+        return [...sheetSizes].sort((a, b) => a.price - b.price);
+    }, [sheetSizes]);
+
     const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -30,10 +35,10 @@ export default function PrebuiltUploadPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
-        if (!selectedSizeId && sheetSizes && sheetSizes.length > 0) {
-            setSelectedSizeId(sheetSizes[1]?.id || sheetSizes[0].id); // Default to medium or first
+        if (!selectedSizeId && sortedSheetSizes && sortedSheetSizes.length > 0) {
+            setSelectedSizeId(sortedSheetSizes[0].id); // Default to cheapest
         }
-    }, [sheetSizes, selectedSizeId]);
+    }, [sortedSheetSizes, selectedSizeId]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -67,12 +72,12 @@ export default function PrebuiltUploadPage() {
     };
 
     const autoSelectSize = (width: number, height: number) => {
-        if (!sheetSizes) return;
+        if (!sortedSheetSizes) return;
 
         let bestFitId: string | null = null;
         let smallestArea = Infinity;
 
-        sheetSizes.forEach((config) => {
+        sortedSheetSizes.forEach((config) => {
             const fitStandard = width <= config.width && height <= config.height;
             if (fitStandard) {
                 const area = config.width * config.height;
@@ -98,7 +103,7 @@ export default function PrebuiltUploadPage() {
             return;
         }
         
-        if (!selectedSizeId || !sheetSizes) {
+        if (!selectedSizeId || !sortedSheetSizes) {
             toast({
                 variant: 'destructive',
                 title: 'Size not selected',
@@ -109,7 +114,7 @@ export default function PrebuiltUploadPage() {
 
         setIsProcessing(true);
         try {
-            const sheetConfig = sheetSizes.find(s => s.id === selectedSizeId);
+            const sheetConfig = sortedSheetSizes.find(s => s.id === selectedSizeId);
             if (!sheetConfig) throw new Error("Selected size not found");
 
             // Create a single artwork item representing the entire uploaded sheet
@@ -127,8 +132,9 @@ export default function PrebuiltUploadPage() {
                 quantity: 1, // Quantity is handled at the cart item level
             };
 
-            const item: CartItem = {
+            const item: SheetCartItem = {
                 id: `prebuilt-${Date.now()}`,
+                type: 'sheet',
                 sheetSize: sheetConfig,
                 previewUrl: previewUrl, // The uploaded image serves as its own preview
                 artworks: [uploadedArtwork], // Embed the single artwork
@@ -189,9 +195,9 @@ export default function PrebuiltUploadPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2 builder-scroll">
                              {isLoadingSizes ? (
                                 <p>Loading sizes...</p>
-                             ) : sheetSizes?.length === 0 ? (
+                             ) : sortedSheetSizes?.length === 0 ? (
                                 <p className="text-zinc-400 col-span-2">No pricing tiers available for "Upload". Please configure them in the admin pricing manager.</p>
-                             ) : sheetSizes?.map((config) => (
+                             ) : sortedSheetSizes?.map((config) => (
                                 <label 
                                     key={config.id} 
                                     className={`relative group cursor-pointer rounded-2xl border p-6 transition-all duration-300 ${

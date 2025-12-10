@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType } from '@/lib/types';
 import { PPI } from '@/lib/constants';
 import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode } from 'lucide-react';
@@ -42,6 +42,12 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     [firestore, usage]
   );
   const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
+  
+  const sortedSheetSizes = useMemo(() => {
+    if (!sheetSizes) return [];
+    return [...sheetSizes].sort((a, b) => a.price - b.price);
+  }, [sheetSizes]);
+
 
   const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
 
@@ -58,10 +64,10 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    if (!selectedSizeId && sheetSizes && sheetSizes.length > 0) {
-      setSelectedSizeId(sheetSizes[1]?.id || sheetSizes[0].id); // Default to medium or first
+    if (!selectedSizeId && sortedSheetSizes && sortedSheetSizes.length > 0) {
+      setSelectedSizeId(sortedSheetSizes[0].id); 
     }
-  }, [sheetSizes, selectedSizeId]);
+  }, [sortedSheetSizes, selectedSizeId]);
 
 
   useEffect(() => {
@@ -166,7 +172,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const [scale, setScale] = useState(0.25);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const sheetConfig = sheetSizes?.find(s => s.id === selectedSizeId) || { width: 0, height: 0, price: 0};
+  const sheetConfig = sortedSheetSizes?.find(s => s.id === selectedSizeId) || { width: 0, height: 0, price: 0};
   const selectedItem = items.find(item => item.id === selectedItemId);
 
   // --- Auto-Scaling for Preview ---
@@ -508,11 +514,13 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         const config = sheetConfig;
         const cartItem: CartItem = {
           id: `GNG-${Date.now()}`,
+          type: 'sheet',
           sheetSize: {
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
             height: config.height,
-            price: config.price
+            price: config.price,
+            usage: usage
           },
           previewUrl: previewUrl,
           artworks: items, 
@@ -587,9 +595,9 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                   )}
               </div>
               <div className="space-y-3">
-                {sheetSizes?.length === 0 ? (
+                {sortedSheetSizes?.length === 0 ? (
                     <p className="text-zinc-400 text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
-                ) : sheetSizes?.map((config) => (
+                ) : sortedSheetSizes?.map((config) => (
                   <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
                     <div className="flex items-center relative z-10">
                       <input
