@@ -1,63 +1,62 @@
+
 'use server';
 
 import { ShippingAddress, ShippingRate } from "@/lib/types";
+import EasyPostClient from '@easypost/api';
 
-// This is a mock function that simulates fetching shipping rates from EasyPost.
-// In a real application, you would use the EasyPost Node.js client library.
+const client = new EasyPostClient(process.env.EASYPOST_API_KEY as string);
+
+// IMPORTANT: Update this with your actual business address
+const fromAddress = {
+    street1: '417 MONTGOMERY ST',
+    city: 'SAN FRANCISCO',
+    state: 'CA',
+    zip: '94104',
+    country: 'US',
+    company: 'PXL8',
+    phone: '415-123-4567',
+};
+
 export async function fetchShippingRates(toAddress: ShippingAddress, weightOunces: number): Promise<ShippingRate[]> {
-    console.log(`Fetching mock shipping rates for ${weightOunces}oz to ${toAddress.zip}...`);
-    
-    // Simulate network delay
-    await new Promise(resolve => setTimeout(resolve, 1200));
-
-    // Simulate different rates based on destination zip code for variety
-    const zipPrefix = parseInt(toAddress.zip.substring(0, 2), 10);
-    let baseRate = 5.00;
-
-    if (zipPrefix >= 90) { // West Coast
-        baseRate = 7.50;
-    } else if (zipPrefix >= 60) { // Midwest
-        baseRate = 9.00;
-    } else if (zipPrefix >= 30) { // Southeast
-        baseRate = 6.50;
-    } else { // Northeast
-        baseRate = 8.50;
+    if (!process.env.EASYPOST_API_KEY || process.env.EASYPOST_API_KEY === 'YOUR_API_KEY_HERE') {
+        console.error("EasyPost API key is not configured.");
+        return [];
     }
     
-    // Add weight cost
-    baseRate += (weightOunces / 16) * 1.50; // $1.50 per pound
+    try {
+        const shipment = await client.Shipment.create({
+            to_address: {
+                name: 'Recipient', // EasyPost requires a name
+                street1: toAddress.street,
+                city: toAddress.city,
+                state: toAddress.state,
+                zip: toAddress.zip,
+                country: toAddress.country
+            },
+            from_address: fromAddress,
+            parcel: {
+                weight: weightOunces,
+            },
+        });
 
-    // Return a set of mock rates
-    const mockRates: ShippingRate[] = [
-        {
-            id: 'rate_mock_usps_ground',
-            carrier: 'USPS',
-            service: 'Ground Advantage',
-            rate: baseRate,
-            deliveryDays: '3-5 business days'
-        },
-        {
-            id: 'rate_mock_usps_priority',
-            carrier: 'USPS',
-            service: 'Priority Mail',
-            rate: baseRate + 4.50,
-            deliveryDays: '2-3 business days'
-        },
-        {
-            id: 'rate_mock_ups_ground',
-            carrier: 'UPS',
-            service: 'Ground',
-            rate: baseRate + 1.25,
-            deliveryDays: '4 business days'
-        },
-        {
-            id: 'rate_mock_ups_2day',
-            carrier: 'UPS',
-            service: '2nd Day Air',
-            rate: baseRate + 15.75,
-            deliveryDays: '2 business days'
+        if (!shipment.rates || shipment.rates.length === 0) {
+            console.warn("No rates returned from EasyPost for this shipment.");
+            return [];
         }
-    ];
-    
-    return mockRates.sort((a,b) => a.rate - b.rate);
+
+        const formattedRates: ShippingRate[] = shipment.rates.map(rate => ({
+            id: rate.id,
+            carrier: rate.carrier,
+            service: rate.service,
+            rate: parseFloat(rate.rate),
+            deliveryDays: rate.delivery_days ? `${rate.delivery_days} business days` : 'Not available'
+        }));
+        
+        return formattedRates.sort((a,b) => a.rate - b.rate);
+
+    } catch (error) {
+        console.error("EasyPost API Error:", error);
+        // In a real app, you might want to return a user-friendly error or a default rate
+        return [];
+    }
 }
