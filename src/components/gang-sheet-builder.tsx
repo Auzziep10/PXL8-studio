@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { SheetSize, GangSheetItem, CartItem, ArtworkOnCanvas } from '@/lib/types';
 import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -13,6 +13,8 @@ import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
+import QRCode from 'qrcode';
+
 
 // Debounce function to limit how often we save to Firestore
 function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
@@ -432,79 +434,87 @@ export default function GangSheetBuilder() {
   const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
 
   // --- Generation ---
-  const generateCompositeSheet = async (): Promise<string> => {
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    if (!ctx) throw new Error('No canvas context');
-
+  const generateCompositeSheet = async (trackingId: string): Promise<string> => {
     const BASE_DPI = 300;
-    const MAX_DIMENSION = 4096 * 2; // Increased for better quality
+    const HEADER_HEIGHT_INCHES = 2;
+    const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
-    const wPixels = sheetConfig.width * BASE_DPI;
-    const hPixels = sheetConfig.height * BASE_DPI;
+    // Create a canvas for the main artwork content
+    const sheetCanvas = document.createElement('canvas');
+    const sheetCtx = sheetCanvas.getContext('2d');
+    if (!sheetCtx) throw new Error('No sheet context');
+    sheetCanvas.width = sheetConfig.width * BASE_DPI;
+    sheetCanvas.height = sheetConfig.height * BASE_DPI;
 
-    // Determine target size while maintaining aspect ratio
-    let targetW = wPixels;
-    let targetH = hPixels;
-
-    if (wPixels > MAX_DIMENSION || hPixels > MAX_DIMENSION) {
-        const ratio = Math.min(MAX_DIMENSION / wPixels, MAX_DIMENSION / hPixels);
-        targetW = Math.floor(wPixels * ratio);
-        targetH = Math.floor(hPixels * ratio);
-    }
-
-    canvas.width = targetW;
-    canvas.height = targetH;
-    
-    // Calculate scale factor relative to standard 300 DPI
-    const renderScale = targetW / wPixels;
-
+    // Load all unique images
     const imageCache: Record<string, HTMLImageElement> = {};
-    const uniqueUrls: string[] = Array.from(new Set(items.map(i => i.imageUrl)));
-    
-    await Promise.all(uniqueUrls.map(url => new Promise<void>((resolve, reject) => {
-        if (!url) { // Skip if url is empty
-          resolve();
-          return;
-        }
+    await Promise.all(items.map(item => new Promise<void>((resolve, reject) => {
+        if (imageCache[item.imageUrl]) return resolve();
         const img = new Image();
-        if (!url.startsWith('data:')) {
-            img.crossOrigin = "Anonymous";
-        }
-        img.onload = () => { imageCache[url] = img; resolve(); };
-        img.onerror = (e) => {
-            console.warn(`Failed to load image for composition: ${url.substring(0, 50)}...`);
-            // To debug CORS issues, log the error event
-            console.error('Image load error:', e);
-            resolve(); // Resolve anyway to continue generating what we can
-        };
-        img.src = url;
+        if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
+        img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
+        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
+        img.src = item.imageUrl;
     })));
 
+    // Draw images onto the sheet canvas
     items.forEach(item => {
         const img = imageCache[item.imageUrl];
         if (img && (item.y + item.height <= sheetConfig.height)) {
-            ctx.drawImage(
-                img, 
-                item.x * BASE_DPI * renderScale, 
-                item.y * BASE_DPI * renderScale, 
-                item.width * BASE_DPI * renderScale, 
-                item.height * BASE_DPI * renderScale
+            sheetCtx.drawImage(
+                img,
+                item.x * BASE_DPI,
+                item.y * BASE_DPI,
+                item.width * BASE_DPI,
+                item.height * BASE_DPI
             );
         }
     });
+    
+    // Create the final canvas with header
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    if (!finalCtx) throw new Error('No final context');
+    finalCanvas.width = sheetConfig.width * BASE_DPI;
+    finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
 
-    return canvas.toDataURL('image/png');
+    // Fill header with white
+    finalCtx.fillStyle = 'white';
+    finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
+
+    // Generate and draw QR code
+    const qrCodeDataUrl = await QRCode.toDataURL(trackingId, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
+    const qrImg = new Image();
+    await new Promise<void>(resolve => {
+        qrImg.onload = () => resolve();
+        qrImg.src = qrCodeDataUrl;
+    });
+    finalCtx.drawImage(qrImg, 10, 10);
+    
+    // Draw header text
+    finalCtx.fillStyle = 'black';
+    finalCtx.font = `bold ${BASE_DPI / 2}px Arial`;
+    finalCtx.textAlign = 'left';
+    finalCtx.textBaseline = 'top';
+    finalCtx.fillText(`ID: ${trackingId}`, HEADER_HEIGHT_PX, 30);
+    finalCtx.font = `${BASE_DPI / 3}px Arial`;
+    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 30 + (BASE_DPI / 2) + 10);
+
+    // Draw the main sheet content below the header
+    finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
+
+    return finalCanvas.toDataURL('image/png');
   };
 
   const handleProcessAndAddToCart = async () => {
     setIsGenerating(true);
     try {
-        const compositeUrl = await generateCompositeSheet();
+        const trackingId = `TRK-${Date.now()}`;
+        const compositeUrl = await generateCompositeSheet(trackingId);
         
         const config = SHEET_DIMENSIONS[selectedSize];
         const cartItem: CartItem = {
-          id: `sheet-${Date.now()}`,
+          id: trackingId, // Use the tracking ID as the unique cart item ID
           sheetSize: {
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
@@ -512,7 +522,7 @@ export default function GangSheetBuilder() {
             price: config.price
           },
           compositeImageUrl: compositeUrl,
-          artworks: items,
+          artworks: [], // We no longer save the array of artworks
           quantity: 1,
         };
 

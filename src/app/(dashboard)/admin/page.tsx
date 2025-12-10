@@ -262,11 +262,7 @@ export default function AdminPage() {
           o.orderId === searchTerm ||
           (Array.isArray(o.items) &&
             o.items.some(
-              (i) =>
-                i.artworks &&
-                i.artworks.length > 0 &&
-                i.artworks[0] &&
-                (i.artworks[0] as any).id.includes(searchTerm)
+              (i) => i.id.includes(searchTerm)
             ))
       );
       if (found) {
@@ -297,11 +293,7 @@ export default function AdminPage() {
       const name = (order.customerName || '').toLowerCase();
       const items = Array.isArray(order.items) ? order.items : [];
       const hasTracking = items.some(
-        (i) =>
-          i.artworks &&
-          i.artworks.length > 0 &&
-          i.artworks[0] &&
-          (i.artworks[0] as any).id.includes(term)
+        (i) => i.id.toLowerCase().includes(term)
       );
 
       return id.includes(term) || name.includes(term) || hasTracking;
@@ -1017,12 +1009,13 @@ export default function AdminPage() {
                         id: item.id,
                         file: null,
                         printReadyUrl: item.compositeImageUrl,
-                        originalUrl: item.compositeImageUrl, // Use composite for original as well if no other source
+                        originalUrl: '', // Original URL is not stored with this new model
                         previewUrl: item.compositeImageUrl,
                         originalFileName: `sheet-${idx + 1}.png`,
                         width: item.sheetSize.width,
                         height: item.sheetSize.height,
                         quantity: item.quantity,
+                        trackingId: item.id,
                         originalHeightPx: 0,
                         originalWidthPx: 0,
                         x: 0,

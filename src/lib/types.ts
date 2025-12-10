@@ -70,10 +70,10 @@ export interface SheetSize {
 }
 
 export interface CartItem {
-  id: string;
+  id: string; // This will now be the tracking ID (e.g., TRK-1678886400000)
   sheetSize: SheetSize;
   compositeImageUrl: string;
-  artworks: ArtworkOnCanvas[];
+  artworks: ArtworkOnCanvas[]; // This will now be empty when saved to the order
   quantity: number;
 }
 
