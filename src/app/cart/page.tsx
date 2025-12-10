@@ -43,7 +43,9 @@ interface PreviewState {
 const generateFinalSheetForPrint = async (
     artworks: ArtworkOnCanvas[],
     sheetConfig: { width: number; height: number },
-    qrData: string
+    orderId: string,
+    customerName: string,
+    shippingAddress: ShippingAddress,
 ): Promise<string> => {
     const BASE_DPI = 300;
     const HEADER_HEIGHT_INCHES = 1;
@@ -87,7 +89,11 @@ const generateFinalSheetForPrint = async (
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
 
-    const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
+    // Generate a URL for the QR code to link to
+    const origin = typeof window !== 'undefined' ? window.location.origin : '';
+    const qrUrl = `${origin}/admin?orderId=${orderId}`;
+
+    const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
     const qrImg = new window.Image();
     await new Promise<void>(resolve => {
         qrImg.onload = () => resolve();
@@ -96,14 +102,28 @@ const generateFinalSheetForPrint = async (
     finalCtx.drawImage(qrImg, 10, 10);
 
     finalCtx.fillStyle = 'black';
-    finalCtx.font = `bold ${BASE_DPI / 3}px Arial`;
     finalCtx.textAlign = 'left';
     finalCtx.textBaseline = 'top';
-    const qrInfo = JSON.parse(qrData);
-    finalCtx.fillText(`ID: ${qrInfo.orderId}`, HEADER_HEIGHT_PX, 15);
-    finalCtx.font = `${BASE_DPI / 4}px Arial`;
-    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10);
-    finalCtx.fillText(`To: ${qrInfo.customerName}`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10 + (BASE_DPI / 4) + 10);
+    const FONT_SIZE_LARGE = BASE_DPI / 4; // approx 75pt
+    const FONT_SIZE_MEDIUM = BASE_DPI / 6; // approx 50pt
+    const FONT_SIZE_SMALL = BASE_DPI / 8; // approx 37.5pt
+
+    let currentY = 15;
+    finalCtx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
+    finalCtx.fillText(`Order: ${orderId}`, HEADER_HEIGHT_PX, currentY);
+    currentY += FONT_SIZE_LARGE + 15;
+    
+    finalCtx.font = `bold ${FONT_SIZE_MEDIUM}px Arial`;
+    finalCtx.fillText(`To: ${customerName}`, HEADER_HEIGHT_PX, currentY);
+    currentY += FONT_SIZE_MEDIUM + 10;
+    
+    finalCtx.font = `${FONT_SIZE_SMALL}px Arial`;
+    const fullAddress = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}`;
+    finalCtx.fillText(`Ship To: ${fullAddress}`, HEADER_HEIGHT_PX, currentY);
+    currentY += FONT_SIZE_SMALL + 15;
+    
+    finalCtx.fillText(`Sheet Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, currentY);
+
 
     finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
 
@@ -276,15 +296,14 @@ export default function CartPage() {
 
             const finalOrderItems: OrderItem[] = [];
             for (const item of cartItems) {
-                 // Define the data to be embedded in the QR code
-                const qrData = JSON.stringify({
-                    orderId: orderId,
-                    customerName: customerName,
-                    shippingAddress: shippingAddress
-                });
-
                 // Generate the final print-ready image with the QR code and all info
-                const finalPrintReadyUrl = await generateFinalSheetForPrint(item.artworks, item.sheetSize, qrData);
+                const finalPrintReadyUrl = await generateFinalSheetForPrint(
+                    item.artworks, 
+                    item.sheetSize, 
+                    orderId,
+                    customerName,
+                    shippingAddress
+                );
 
                 // Upload preview and the NEW print-ready images to Firebase Storage
                 const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);

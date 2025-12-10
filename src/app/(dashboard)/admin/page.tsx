@@ -1,3 +1,4 @@
+
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { Order, OrderStatus, GangSheetItem, User as AppUser, OrderItem } from '@/lib/types';
@@ -26,6 +27,7 @@ import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
 import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, updateDoc, doc } from 'firebase/firestore';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -122,6 +124,8 @@ const AssetCard: React.FC<{
 export default function AdminPage() {
   const firestore = useFirestore();
   const { user, isUserLoading } = useUser();
+  const router = useRouter();
+  const searchParams = useSearchParams();
 
   // Self-contained authorization
   const [isAdmin, setIsAdmin] = useState(false);
@@ -181,6 +185,20 @@ export default function AdminPage() {
     direction: 'desc',
   });
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
+  
+  // Effect to handle URL query param for orderId
+  useEffect(() => {
+    const orderIdFromUrl = searchParams.get('orderId');
+    if (orderIdFromUrl && allOrders) {
+      const foundOrder = allOrders.find(o => o.orderId === orderIdFromUrl);
+      if (foundOrder) {
+        setSelectedOrderId(foundOrder.id);
+        // Clean the URL
+        router.replace('/admin', { scroll: false });
+      }
+    }
+  }, [searchParams, allOrders, router]);
+
 
   const selectedOrder = useMemo(
     () => allOrders?.find((o) => o.id === selectedOrderId) || null,
