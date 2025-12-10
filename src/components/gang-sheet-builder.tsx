@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { SheetSize, GangSheetItem, CartItem, ArtworkOnCanvas } from '@/lib/types';
+import { SheetSize, GangSheetItem, CartItem, ArtworkOnCanvas, Artwork } from '@/lib/types';
 import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
 import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
@@ -29,7 +29,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder() {
+export default function GangSheetBuilder({ newArtworks }: { newArtworks?: Artwork[] }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [selectedSize, setSelectedSize] = useState<SheetSize>(SheetSize.MEDIUM);
@@ -50,6 +50,13 @@ export default function GangSheetBuilder() {
 
   // State to track if data has been loaded from Firestore
   const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    if (newArtworks && newArtworks.length > 0) {
+        newArtworks.forEach(artwork => handleImageLoad(artwork.imageUrl, true, artwork.name, artwork));
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newArtworks]);
 
    // Effect to load data from localStorage or Firestore
   useEffect(() => {
@@ -202,54 +209,62 @@ export default function GangSheetBuilder() {
     return { x: 0, y: 0 };
   };
 
+  const handleImageLoad = (imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Artwork) => {
+    const img = new window.Image();
+    if (isPermanent) img.crossOrigin = "Anonymous";
+
+    img.onload = () => {
+        let w, h, dpi;
+        if (existingArtwork) {
+            w = existingArtwork.width;
+            h = existingArtwork.height;
+            dpi = existingArtwork.dpi;
+        } else {
+            dpi = 300; // Assume 300 DPI for new uploads
+            w = parseFloat((img.width / dpi).toFixed(2));
+            h = parseFloat((img.height / dpi).toFixed(2));
+        }
+
+        const pos = findOpenPosition(w, h, items);
+
+        const newItem: ArtworkOnCanvas = {
+          id: Date.now().toString(),
+          name: fileName,
+          imageUrl: imageUrl,
+          width: w,
+          height: h,
+          quantity: 1,
+          dpi: dpi,
+          x: pos.x,
+          y: pos.y,
+          canvasWidth: w * PPI,
+          canvasHeight: h * PPI
+        };
+
+        setItems(prev => [...prev, newItem]);
+        setSelectedItemId(newItem.id);
+        setDuplicateCount(1);
+        toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+    };
+    img.onerror = () => {
+        toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
+    };
+    img.src = imageUrl;
+  };
+
+
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
     event.target.value = '';
 
-    const handleImageLoad = (imageUrl: string, isPermanent: boolean) => {
-        const img = new window.Image();
-        if (isPermanent) img.crossOrigin = "Anonymous";
-
-        img.onload = () => {
-            const PRINT_DPI = 300;
-            const w = parseFloat((img.width / PRINT_DPI).toFixed(2));
-            const h = parseFloat((img.height / PRINT_DPI).toFixed(2));
-    
-            const pos = findOpenPosition(w, h, items);
-    
-            const newItem: ArtworkOnCanvas = {
-              id: Date.now().toString(),
-              name: file.name,
-              imageUrl: imageUrl,
-              width: w,
-              height: h,
-              quantity: 1,
-              dpi: PRINT_DPI,
-              x: pos.x,
-              y: pos.y,
-              canvasWidth: w * PPI,
-              canvasHeight: h * PPI
-            };
-    
-            setItems(prev => [...prev, newItem]);
-            setSelectedItemId(newItem.id);
-            setDuplicateCount(1);
-            toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
-        };
-        img.onerror = () => {
-            toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
-        };
-        img.src = imageUrl;
-    };
-
     if (user) {
         // Logged-in user: upload to Firebase Storage
         toast({ title: 'Uploading...', description: 'Your image is being uploaded to secure storage.' });
         try {
             const permanentUrl = await uploadFileAndGetURL(file, user.uid);
-            handleImageLoad(permanentUrl, true);
+            handleImageLoad(permanentUrl, true, file.name);
         } catch (error) {
             console.error("File upload failed:", error);
             toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload your image. Please try again.' });
@@ -259,7 +274,7 @@ export default function GangSheetBuilder() {
         const reader = new FileReader();
         reader.onload = (e) => {
             const localUrl = e.target?.result as string;
-            handleImageLoad(localUrl, false);
+            handleImageLoad(localUrl, false, file.name);
         };
         reader.onerror = () => {
              toast({ variant: 'destructive', title: 'File Read Failed', description: 'Could not read the selected file.' });
