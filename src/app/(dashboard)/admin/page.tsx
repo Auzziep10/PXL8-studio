@@ -139,7 +139,7 @@ export default function AdminPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (!isProfileLoading) {
+    if (!isUserLoading && !isProfileLoading) {
       if (userProfile && userProfile.role === 'admin') {
         setIsAdmin(true);
       } else {
@@ -147,20 +147,31 @@ export default function AdminPage() {
       }
       setIsAuthCheckComplete(true);
     }
-  }, [userProfile, isProfileLoading]);
+  }, [user, userProfile, isUserLoading, isProfileLoading]);
 
   // Firestore Queries - Gated by isAdmin check
   const ordersQuery = useMemoFirebase(
-    () => (firestore && isAdmin && isAuthCheckComplete ? query(collection(firestore, 'orders')) : null),
-    [firestore, isAdmin, isAuthCheckComplete]
+    () => {
+      if (firestore && isAuthCheckComplete && isAdmin) {
+        return query(collection(firestore, 'orders'));
+      }
+      return null;
+    },
+    [firestore, isAuthCheckComplete, isAdmin]
   );
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
   const usersQuery = useMemoFirebase(
-    () => (firestore && isAdmin && isAuthCheckComplete ? query(collection(firestore, 'users')) : null),
-    [firestore, isAdmin, isAuthCheckComplete]
+    () => {
+      if (firestore && isAuthCheckComplete && isAdmin) {
+        return query(collection(firestore, 'users'));
+      }
+      return null;
+    },
+    [firestore, isAuthCheckComplete, isAdmin]
   );
   const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
+
 
   // Component State
   const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
@@ -461,7 +472,7 @@ export default function AdminPage() {
     printWindow.document.close();
   };
 
-  if (isProfileLoading || isUserLoading || !isAuthCheckComplete) {
+  if (isUserLoading || !isAuthCheckComplete) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center">
              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
@@ -993,5 +1004,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
-    
