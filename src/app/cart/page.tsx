@@ -195,37 +195,38 @@ export default function CartPage() {
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
             items: cartItems.map((item: CartItem) => {
-                // Rigorous sanitation of artworks to ensure only plain data is saved.
-                const artworksForDb = item.artworks.map((art: ArtworkOnCanvas) => ({
-                    id: art.id,
-                    name: art.name,
-                    imageUrl: art.imageUrl,
-                    width: art.width,
-                    height: art.height,
-                    dpi: art.dpi,
-                    x: art.x,
-                    y: art.y,
-                    canvasWidth: art.canvasWidth,
-                    canvasHeight: art.canvasHeight,
-                    quantity: art.quantity,
-                    // Explicitly exclude analysis and analysisLoading
-                }));
-    
-                // Rebuild the entire item to ensure no extra properties are included
-                const sanitizedItem = {
-                    id: item.id,
-                    quantity: item.quantity,
-                    compositeImageUrl: item.compositeImageUrl,
+                // BRUTE FORCE SANITIZATION: Deep clone via JSON stringify/parse
+                // This strips out any non-serializable data, class instances, or complex objects.
+                const plainItem = JSON.parse(JSON.stringify(item));
+                
+                // Now, ensure required fields that might be stripped are present.
+                // This is a safeguard, but JSON.parse/stringify should keep plain data.
+                const finalItem = {
+                    id: plainItem.id,
+                    quantity: plainItem.quantity,
+                    compositeImageUrl: item.compositeImageUrl, // Restore original data URL
                     sheetSize: {
-                        name: item.sheetSize.name,
-                        width: item.sheetSize.width,
-                        height: item.sheetSize.height,
-                        price: item.sheetSize.price
+                        name: plainItem.sheetSize.name,
+                        width: plainItem.sheetSize.width,
+                        height: plainItem.sheetSize.height,
+                        price: plainItem.sheetSize.price
                     },
-                    artworks: artworksForDb,
+                    artworks: plainItem.artworks.map((art: any) => ({
+                        id: art.id,
+                        name: art.name,
+                        imageUrl: art.imageUrl,
+                        width: art.width,
+                        height: art.height,
+                        dpi: art.dpi,
+                        x: art.x,
+                        y: art.y,
+                        canvasWidth: art.canvasWidth,
+                        canvasHeight: art.canvasHeight,
+                        quantity: art.quantity,
+                    }))
                 };
     
-                return sanitizedItem;
+                return finalItem;
             }),
             total: total,
             shippingAddress: {
