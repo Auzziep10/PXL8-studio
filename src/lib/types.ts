@@ -83,6 +83,7 @@ export interface SheetSize {
     height: number; // inches
     price: number;
     usage: 'Builder' | 'Upload';
+    discount: number; // Percentage discount
 }
 
 export interface ServiceAddOn {

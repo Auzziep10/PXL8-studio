@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem, ServiceAddOn } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -45,19 +45,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     [firestore, usage]
   );
   const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
-
-  const sqInchPriceQuery = useMemoFirebase(
-    () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
-    [firestore]
-  );
-  const { data: sqInchPriceData, isLoading: isLoadingPrice } = useCollection<ServiceAddOn & {id: string}>(sqInchPriceQuery);
-  
-  const pricePerSqInch = useMemo(() => {
-    if (sqInchPriceData && sqInchPriceData.length > 0) {
-        return sqInchPriceData[0].price;
-    }
-    return 0; // Default to 0 if not found
-  }, [sqInchPriceData]);
   
   const sortedSheetSizes = useMemo(() => {
     if (!sheetSizes) return [];
@@ -207,7 +194,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const [scale, setScale] = useState(0.25);
   const [isGenerating, setIsGenerating] = useState(false);
 
-  const sheetConfig = sortedSheetSizes?.find(s => s.id === selectedSizeId) || { width: 0, height: 0, price: 0};
+  const sheetConfig = sortedSheetSizes?.find(s => s.id === selectedSizeId) || { width: 0, height: 0, price: 0, discount: 0 };
   const selectedItem = items.find(item => item.id === selectedItemId);
 
   // --- Auto-Scaling for Preview ---
@@ -765,7 +752,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     setIsGenerating(true);
     try {
         const previewUrl = await generatePreviewSheet();
-        const price = sheetConfig.width * sheetConfig.height * pricePerSqInch;
         
         const config = sheetConfig as SheetType & { id: string };
         const cartItem: SheetCartItem = {
@@ -775,8 +761,8 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
             height: config.height,
-            price: price, // Use the dynamically calculated price
-            usage: usage
+            price: config.price,
+            discount: config.discount,
           },
           previewUrl: previewUrl,
           artworks: items, 
@@ -811,7 +797,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
 
-  if (isUserLoading || !isLoaded || isLoadingSizes || isLoadingPrice) {
+  if (isUserLoading || !isLoaded || isLoadingSizes) {
     return (
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center space-y-4">
@@ -822,8 +808,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     )
   }
   
-  const calculatedPrice = sheetConfig.width * sheetConfig.height * pricePerSqInch;
-
   return (
     <div className="min-h-screen pb-12 select-none">
       <div className="max-w-7xl mx-auto px-4 py-8">
@@ -856,7 +840,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 {sortedSheetSizes?.length === 0 ? (
                     <p className="text-zinc-400 text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
                 ) : sortedSheetSizes?.map((config) => {
-                    const dynamicPrice = config.width * config.height * pricePerSqInch;
                     return (
                         <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
                             <div className="flex items-center relative z-10">
@@ -870,7 +853,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                             />
                             <span className="ml-3 font-medium text-gray-200">{config.name} - {config.width}" x {config.height}"</span>
                             </div>
-                            <span className="font-bold text-accent relative z-10">{formatCurrency(dynamicPrice)}</span>
+                            <div className="flex flex-col items-end relative z-10">
+                                <span className="font-bold text-accent">{formatCurrency(config.price)}</span>
+                                {config.discount > 0 && 
+                                    <span className="text-xs text-red-400 flex items-center gap-1">
+                                        <Percent className="w-3 h-3" /> {config.discount}% Off
+                                    </span>
+                                }
+                            </div>
                             {selectedSizeId === config.id && <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />}
                         </label>
                     )
@@ -1037,7 +1027,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 onClick={handleProcessAndAddToCart}
                 className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
             >
-                {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(calculatedPrice)}`}
+                {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(sheetConfig.price)}`}
                 {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
             </button>
           </div>

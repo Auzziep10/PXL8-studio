@@ -26,7 +26,7 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings, Box, Sparkles, Upload as UploadIcon, Wand2 } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings, Box, Sparkles, Upload as UploadIcon, Wand2, Percent } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -36,11 +36,11 @@ type SheetSizeWithId = SheetSize & { id: string };
 type ServiceAddOnWithId = ServiceAddOn & { id: string };
 
 const defaultSheetSizes: Omit<SheetSize, 'id' | 'price'>[] = [
-    { name: 'Small', width: 22, height: 24, usage: 'Builder' },
-    { name: 'Medium', width: 22, height: 36, usage: 'Builder' },
-    { name: 'Large', width: 22, height: 60, usage: 'Builder' },
-    { name: 'X-Large', width: 22, height: 120, usage: 'Builder' },
-    { name: 'XX-Large', width: 22, height: 240, usage: 'Builder' },
+    { name: 'Small', width: 22, height: 24, usage: 'Builder', discount: 0 },
+    { name: 'Medium', width: 22, height: 36, usage: 'Builder', discount: 5 },
+    { name: 'Large', width: 22, height: 60, usage: 'Builder', discount: 10 },
+    { name: 'X-Large', width: 22, height: 120, usage: 'Builder', discount: 15 },
+    { name: 'XX-Large', width: 22, height: 240, usage: 'Builder', discount: 20 },
 ];
 
 const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
@@ -70,7 +70,7 @@ export default function PricingAdminPage() {
   const [editingSheet, setEditingSheet] = useState<SheetSizeWithId | null>(null);
   const [editingAddOn, setEditingAddOn] = useState<ServiceAddOnWithId | null>(null);
 
-  const [sheetFormData, setSheetFormData] = useState({ name: '', width: '', height: '', usage: 'Builder' });
+  const [sheetFormData, setSheetFormData] = useState({ name: '', width: '', height: '', discount: '' });
   const [addOnFormData, setAddOnFormData] = useState({ name: '', description: '', price: '' });
 
   const [isSeeding, setIsSeeding] = useState(false);
@@ -97,16 +97,17 @@ export default function PricingAdminPage() {
         try {
           const batch = writeBatch(firestore);
           
-          defaultSheetSizes.forEach(sheet => {
-            const docRef = doc(collection(firestore, 'sheetSizes'));
-            const pricePerSqIn = defaultAddOns.find(a => a.type === 'per_sq_inch')?.price || 0.12;
-            const price = sheet.width * sheet.height * pricePerSqIn;
-            batch.set(docRef, { ...sheet, price, createdAt: serverTimestamp() });
-          });
-          
           defaultAddOns.forEach(addOn => {
               const docRef = doc(collection(firestore, 'serviceAddOns'));
               batch.set(docRef, {...addOn, createdAt: serverTimestamp() });
+          });
+          
+          const pricePerSqIn = defaultAddOns.find(a => a.type === 'per_sq_inch')?.price || 0.12;
+          defaultSheetSizes.forEach(sheet => {
+            const docRef = doc(collection(firestore, 'sheetSizes'));
+            const basePrice = sheet.width * sheet.height * pricePerSqIn;
+            const finalPrice = basePrice - (basePrice * (sheet.discount / 100));
+            batch.set(docRef, { ...sheet, price: finalPrice, createdAt: serverTimestamp() });
           });
 
           await batch.commit();
@@ -134,11 +135,11 @@ export default function PricingAdminPage() {
         name: sheet.name,
         width: String(sheet.width),
         height: String(sheet.height),
-        usage: sheet.usage || 'Builder',
+        discount: String(sheet.discount || 0),
       });
     } else {
       setEditingSheet(null);
-      setSheetFormData({ name: '', width: '', height: '', usage: 'Builder' });
+      setSheetFormData({ name: '', width: '', height: '', discount: '0' });
     }
     setIsSheetDialogOpen(true);
   };
@@ -168,24 +169,27 @@ export default function PricingAdminPage() {
   const handleSheetFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore || !perSqInchPrice) {
-        toast({ variant: 'destructive', title: 'Error', description: 'Pricing service not available.' });
+        toast({ variant: 'destructive', title: 'Error', description: 'Dynamic pricing (price per sq. inch) must be set before adding or editing sheets.' });
         return;
     }
 
     const width = parseFloat(sheetFormData.width);
     const height = parseFloat(sheetFormData.height);
-    const price = width * height * perSqInchPrice.price;
+    const discount = parseFloat(sheetFormData.discount);
+    
+    const basePrice = width * height * perSqInchPrice.price;
+    const finalPrice = basePrice - (basePrice * (discount / 100));
 
-    const sheetData: SheetSize = {
-      id: editingSheet?.id || '',
+    const sheetData: Omit<SheetSize, 'id'> = {
       name: sheetFormData.name,
       width: width,
       height: height,
-      price: price,
+      price: finalPrice,
+      discount: discount,
       usage: 'Builder',
     };
 
-    if (!sheetData.name || isNaN(sheetData.width) || isNaN(sheetData.height)) {
+    if (!sheetData.name || isNaN(sheetData.width) || isNaN(sheetData.height) || isNaN(sheetData.discount)) {
       toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please fill out all fields correctly.' });
       return;
     }
@@ -271,22 +275,28 @@ export default function PricingAdminPage() {
             <TableHeader>
                 <TableRow>
                     <TableHead>Name</TableHead>
-                    <TableHead className="flex items-center"><Ruler className="mr-2 h-4 w-4"/>Dimensions</TableHead>
-                    <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Calculated Price</TableHead>
+                    <TableHead><Ruler className="inline mr-2 h-4 w-4"/>Dimensions</TableHead>
+                    <TableHead><Percent className="inline mr-2 h-4 w-4"/>Discount</TableHead>
+                    <TableHead className="text-right"><DollarSign className="inline mr-2 h-4 w-4"/>Final Price</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
                 {isLoading || isSeeding || isLoadingAddOns ? (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8">Loading tiers...</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8">Loading tiers...</TableCell></TableRow>
                 ) : sizes.length > 0 && perSqInchPrice ? (
                     sizes.map((sheet) => {
-                        const calculatedPrice = sheet.width * sheet.height * (perSqInchPrice.price || 0);
+                        const basePrice = sheet.width * sheet.height * (perSqInchPrice.price || 0);
+                        const finalPrice = basePrice - (basePrice * ((sheet.discount || 0) / 100));
                         return (
                             <TableRow key={sheet.id}>
                                 <TableCell className="font-medium text-white">{sheet.name}</TableCell>
                                 <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
-                                <TableCell className="text-right font-mono text-white">{formatCurrency(calculatedPrice)}</TableCell>
+                                <TableCell className="font-mono text-accent">{sheet.discount || 0}%</TableCell>
+                                <TableCell className="text-right font-mono text-white">
+                                    {formatCurrency(finalPrice)}
+                                    {sheet.discount > 0 && <span className="text-xs text-zinc-500 line-through ml-2">{formatCurrency(basePrice)}</span>}
+                                </TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleOpenSheetDialog(sheet)}><Edit className="h-4 w-4" /></Button>
                                     <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(sheet.id, 'sheet')}><Trash2 className="h-4 w-4" /></Button>
@@ -295,7 +305,7 @@ export default function PricingAdminPage() {
                         )
                     })
                 ) : (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8">No pricing tiers found. Please set a 'Price Per Square Inch' in Dynamic Pricing first.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={5} className="text-center py-8">No pricing tiers found. Please set a 'Price Per Square Inch' in Dynamic Pricing first.</TableCell></TableRow>
                 )}
             </TableBody>
         </Table>
@@ -363,7 +373,7 @@ export default function PricingAdminPage() {
                     <CardHeader>
                         <CardTitle>Price Per Square Inch</CardTitle>
                         <CardDescription>
-                            This single value controls the pricing for both uploaded sheets and pre-defined builder sheets.
+                            This single value is the base for calculating prices for all sheet types. Discounts can be applied per sheet size.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -405,6 +415,10 @@ export default function PricingAdminPage() {
               <div className="grid grid-cols-2 gap-4">
                 <Input name="width" type="number" value={sheetFormData.width} onChange={(e) => setSheetFormData({...sheetFormData, width: e.target.value})} placeholder="Width (in)" required />
                 <Input name="height" type="number" value={sheetFormData.height} onChange={(e) => setSheetFormData({...sheetFormData, height: e.target.value})} placeholder="Height (in)" required />
+              </div>
+              <div>
+                <Label>Discount (%)</Label>
+                <Input name="discount" type="number" value={sheetFormData.discount} onChange={(e) => setSheetFormData({...sheetFormData, discount: e.target.value})} placeholder="e.g., 10 for 10%" required />
               </div>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>

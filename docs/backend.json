@@ -202,9 +202,13 @@
           "type": "string",
           "description": "Determines where this pricing tier is available.",
           "enum": ["Builder", "Upload", "AI"]
+        },
+        "discount": {
+          "type": "number",
+          "description": "A percentage discount to apply for this specific sheet size."
         }
       },
-      "required": ["id", "name", "width", "height", "price", "usage"]
+      "required": ["id", "name", "width", "height", "price", "usage", "discount"]
     },
     "ServiceAddOn": {
       "$schema": "http://json-schema.org/draft-07/schema#",
