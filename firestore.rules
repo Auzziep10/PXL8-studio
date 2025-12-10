@@ -155,6 +155,21 @@ service cloud.firestore {
       allow read, list: if isSignedIn();
       allow write: if isAdmin();
     }
+    
+    //-------------------------------------------------------------------------//
+    // Collection: serviceAddOns
+    //-------------------------------------------------------------------------//
+    /**
+     * @description Stores global service add-ons.
+     * @path /serviceAddOns/{addOnId}
+     * @allow Any authenticated user to read service add-ons.
+     * @allow Only admins to create, update, or delete service add-ons.
+     */
+    match /serviceAddOns/{addOnId} {
+        allow read, list: if isSignedIn();
+        allow write: if isAdmin();
+    }
+
 
     //-------------------------------------------------------------------------//
     // Collection: users

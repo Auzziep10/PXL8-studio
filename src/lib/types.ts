@@ -83,6 +83,12 @@ export interface SheetSize {
     usage: 'Builder' | 'Upload' | 'AI';
 }
 
+export interface ServiceAddOn {
+    name: string;
+    description: string;
+    price: number;
+}
+
 // Represents a physical gang sheet in the cart
 export interface SheetCartItem {
   id: string;

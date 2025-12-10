@@ -205,6 +205,31 @@
         }
       },
       "required": ["id", "name", "width", "height", "price", "usage"]
+    },
+    "ServiceAddOn": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ServiceAddOn",
+      "type": "object",
+      "description": "Represents a billable service add-on.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ServiceAddOn entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the service (e.g., Rush Order)."
+        },
+        "description": {
+          "type": "string",
+          "description": "A brief explanation of what the service includes."
+        },
+        "price": {
+          "type": "number",
+          "description": "Price for this service in USD."
+        }
+      },
+      "required": ["id", "name", "description", "price"]
     }
   },
   "auth": {
@@ -283,6 +308,22 @@
             {
               "name": "sheetSizeId",
               "description": "The unique identifier for the sheet size."
+            }
+          ]
+        }
+      },
+      {
+        "path": "/serviceAddOns/{addOnId}",
+        "definition": {
+          "entityName": "ServiceAddOn",
+          "schema": {
+            "$ref": "#/backend/entities/ServiceAddOn"
+          },
+          "description": "Stores global service add-ons like 'Rush Order'. Writable only by admins.",
+          "params": [
+            {
+              "name": "addOnId",
+              "description": "The unique identifier for the service add-on."
             }
           ]
         }

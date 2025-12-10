@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
-import { SheetSize } from '@/lib/types';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch, query, where, Query } from 'firebase/firestore';
+import { SheetSize, ServiceAddOn } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -25,11 +25,14 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings } from 'lucide-react';
+import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings, Box, Sparkles, Upload as UploadIcon, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
 
 type SheetSizeWithId = SheetSize & { id: string };
+type ServiceAddOnWithId = ServiceAddOn & { id: string };
 
 const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
     { name: 'Small', width: 22, height: 24, price: 24.00, usage: 'Builder' },
@@ -42,37 +45,62 @@ const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
     { name: 'AI Default', width: 22, height: 24, price: 15.00, usage: 'AI' },
 ];
 
+const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
+    { name: 'Rush Order', description: 'Priority processing and shipping.', price: 25.00 },
+    { name: 'Pantone Color Match', description: 'Precise color matching for brand consistency.', price: 50.00 }
+];
+
+
 export default function PricingAdminPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const sheetSizesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'sheetSizes') : null),
-    [firestore]
-  );
-  const { data: sheetSizes, isLoading } = useCollection<SheetSizeWithId>(sheetSizesQuery);
+  // Queries for different pricing types
+  const builderSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Builder')) : null, [firestore]);
+  const uploadSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Upload')) : null, [firestore]);
+  const aiSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'AI')) : null, [firestore]);
+  const addOnsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'serviceAddOns')) : null, [firestore]);
 
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const { data: builderSizes, isLoading: isLoadingBuilder } = useCollection<SheetSizeWithId>(builderSizesQuery as Query<SheetSizeWithId> | null);
+  const { data: uploadSizes, isLoading: isLoadingUpload } = useCollection<SheetSizeWithId>(uploadSizesQuery as Query<SheetSizeWithId> | null);
+  const { data: aiSizes, isLoading: isLoadingAI } = useCollection<SheetSizeWithId>(aiSizesQuery as Query<SheetSizeWithId> | null);
+  const { data: serviceAddOns, isLoading: isLoadingAddOns } = useCollection<ServiceAddOnWithId>(addOnsQuery as Query<ServiceAddOnWithId> | null);
+
+  const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
+  const [isAddOnDialogOpen, setIsAddOnDialogOpen] = useState(false);
+  
   const [editingSheet, setEditingSheet] = useState<SheetSizeWithId | null>(null);
-  const [formData, setFormData] = useState({ name: '', width: '', height: '', price: '', usage: 'Builder' });
+  const [editingAddOn, setEditingAddOn] = useState<ServiceAddOnWithId | null>(null);
+
+  const [sheetFormData, setSheetFormData] = useState({ name: '', width: '', height: '', price: '', usage: 'Builder' });
+  const [addOnFormData, setAddOnFormData] = useState({ name: '', description: '', price: '' });
+
   const [isSeeding, setIsSeeding] = useState(false);
+  const [activeTab, setActiveTab] = useState<'Builder' | 'Upload' | 'AI' | 'Add-on'>('Builder');
 
   // Effect to seed database if it's empty
   useEffect(() => {
     const seedDatabase = async () => {
-      if (firestore && !isLoading && sheetSizes && sheetSizes.length === 0 && !isSeeding) {
+      if (firestore && !isLoadingBuilder && builderSizes?.length === 0 && !isSeeding) {
         setIsSeeding(true);
-        toast({ title: 'No tiers found.', description: 'Seeding database with default pricing tiers...' });
+        toast({ title: 'No tiers found.', description: 'Seeding database with default pricing...' });
         try {
           const batch = writeBatch(firestore);
+          // Seed sheet sizes
           defaultSheetSizes.forEach(sheet => {
             const docRef = doc(collection(firestore, 'sheetSizes'));
             batch.set(docRef, { ...sheet, createdAt: serverTimestamp() });
           });
+          // Seed add-ons
+          defaultAddOns.forEach(addOn => {
+              const docRef = doc(collection(firestore, 'serviceAddOns'));
+              batch.set(docRef, {...addOn, createdAt: serverTimestamp() });
+          });
+
           await batch.commit();
-          toast({ title: 'Success', description: 'Default tiers have been added.' });
+          toast({ title: 'Success', description: 'Default pricing has been added.' });
         } catch (error: any) {
-          console.error("Failed to seed pricing tiers:", error);
+          console.error("Failed to seed database:", error);
           toast({ variant: 'destructive', title: 'Seeding Failed', description: error.message });
         } finally {
           setIsSeeding(false);
@@ -80,59 +108,68 @@ export default function PricingAdminPage() {
       }
     };
     seedDatabase();
-  }, [firestore, sheetSizes, isLoading, toast, isSeeding]);
+  }, [firestore, builderSizes, isLoadingBuilder, toast, isSeeding]);
 
 
-  const sortedSheetSizes = useMemo(() => {
-    if (!sheetSizes) return [];
-    return [...sheetSizes].sort((a, b) => a.width * a.height - b.width * b.height);
-  }, [sheetSizes]);
+  const sortedBuilderSizes = useMemo(() => builderSizes ? [...builderSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [builderSizes]);
+  const sortedUploadSizes = useMemo(() => uploadSizes ? [...uploadSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [uploadSizes]);
+  const sortedAISizes = useMemo(() => aiSizes ? [...aiSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [aiSizes]);
+  const sortedAddOns = useMemo(() => serviceAddOns ? [...serviceAddOns].sort((a, b) => a.price - b.price) : [], [serviceAddOns]);
 
-  const handleOpenDialog = (sheet?: SheetSizeWithId) => {
+
+  const handleOpenSheetDialog = (sheet?: SheetSizeWithId) => {
     if (sheet) {
       setEditingSheet(sheet);
-      setFormData({
+      setSheetFormData({
         name: sheet.name,
         width: String(sheet.width),
         height: String(sheet.height),
         price: String(sheet.price),
-        usage: sheet.usage || 'Builder',
+        usage: sheet.usage || activeTab,
       });
     } else {
       setEditingSheet(null);
-      setFormData({ name: '', width: '', height: '', price: '', usage: 'Builder' });
+      setSheetFormData({ name: '', width: '', height: '', price: '', usage: activeTab });
     }
-    setIsDialogOpen(true);
+    setIsSheetDialogOpen(true);
+  };
+  
+  const handleOpenAddOnDialog = (addOn?: ServiceAddOnWithId) => {
+    if (addOn) {
+        setEditingAddOn(addOn);
+        setAddOnFormData({
+            name: addOn.name,
+            description: addOn.description,
+            price: String(addOn.price)
+        });
+    } else {
+        setEditingAddOn(null);
+        setAddOnFormData({ name: '', description: '', price: '' });
+    }
+    setIsAddOnDialogOpen(true);
   };
 
   const handleCloseDialog = () => {
-    setIsDialogOpen(false);
+    setIsSheetDialogOpen(false);
+    setIsAddOnDialogOpen(false);
     setEditingSheet(null);
+    setEditingAddOn(null);
   };
 
-  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
-  
-  const handleUsageChange = (value: string) => {
-    setFormData(prev => ({...prev, usage: value}));
-  }
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSheetFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!firestore) return;
 
     const sheetData: Omit<SheetSize, 'id'> = {
-      name: formData.name,
-      width: parseFloat(formData.width),
-      height: parseFloat(formData.height),
-      price: parseFloat(formData.price),
-      usage: formData.usage as 'Builder' | 'Upload' | 'AI',
+      name: sheetFormData.name,
+      width: parseFloat(sheetFormData.width),
+      height: parseFloat(sheetFormData.height),
+      price: parseFloat(sheetFormData.price),
+      usage: sheetFormData.usage as 'Builder' | 'Upload' | 'AI',
     };
 
-    if (Object.values(sheetData).some(v => (typeof v === 'number' && isNaN(v)) || v === '')) {
-      toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please ensure all fields are filled and numeric fields are valid numbers.' });
+    if (Object.values(sheetData).some(v => v === '' || (typeof v === 'number' && isNaN(v)))) {
+      toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please fill out all fields correctly.' });
       return;
     }
 
@@ -147,142 +184,192 @@ export default function PricingAdminPage() {
       }
       handleCloseDialog();
     } catch (error: any) {
-      console.error('Failed to save sheet size:', error);
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
   };
+  
+  const handleAddOnFormSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (!firestore) return;
 
-  const handleDelete = async (id: string) => {
-    if (!firestore || !window.confirm('Are you sure you want to delete this pricing tier?')) return;
+      const addOnData: Omit<ServiceAddOn, 'id'> = {
+          name: addOnFormData.name,
+          description: addOnFormData.description,
+          price: parseFloat(addOnFormData.price)
+      };
+      
+      if (!addOnData.name || !addOnData.description || isNaN(addOnData.price)) {
+          toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please fill out all fields correctly.' });
+          return;
+      }
+
+      try {
+          if (editingAddOn) {
+              const docRef = doc(firestore, 'serviceAddOns', editingAddOn.id);
+              await updateDoc(docRef, { ...addOnData, updatedAt: serverTimestamp() });
+              toast({ title: 'Success', description: 'Add-on updated.' });
+          } else {
+              await addDoc(collection(firestore, 'serviceAddOns'), { ...addOnData, createdAt: serverTimestamp() });
+              toast({ title: 'Success', description: 'New add-on created.' });
+          }
+          handleCloseDialog();
+      } catch (error: any) {
+          toast({ variant: 'destructive', title: 'Error', description: error.message });
+      }
+  };
+
+
+  const handleDelete = async (id: string, type: 'sheet' | 'addOn') => {
+    if (!firestore || !window.confirm('Are you sure you want to delete this item?')) return;
     try {
-      await deleteDoc(doc(firestore, 'sheetSizes', id));
-      toast({ title: 'Success', description: 'Pricing tier deleted.' });
+      const collectionName = type === 'sheet' ? 'sheetSizes' : 'serviceAddOns';
+      await deleteDoc(doc(firestore, collectionName, id));
+      toast({ title: 'Success', description: 'Item deleted.' });
     } catch (error: any) {
-      console.error('Failed to delete sheet size:', error);
       toast({ variant: 'destructive', title: 'Error', description: error.message });
     }
   };
+  
+  const renderSheetTable = (sizes: SheetSizeWithId[], isLoading: boolean) => (
+    <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead className="flex items-center"><Ruler className="mr-2 h-4 w-4"/>Dimensions</TableHead>
+                    <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Price</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                {isLoading || isSeeding ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8">Loading tiers...</TableCell></TableRow>
+                ) : sizes.length > 0 ? (
+                    sizes.map((sheet) => (
+                        <TableRow key={sheet.id}>
+                            <TableCell className="font-medium text-white">{sheet.name}</TableCell>
+                            <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
+                            <TableCell className="text-right font-mono text-white">{formatCurrency(sheet.price)}</TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenSheetDialog(sheet)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(sheet.id, 'sheet')}><Trash2 className="h-4 w-4" /></Button>
+                            </TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8">No pricing tiers found for this category.</TableCell></TableRow>
+                )}
+            </TableBody>
+        </Table>
+    </div>
+  );
 
-  const getUsageBadgeColor = (usage: string) => {
-    switch (usage) {
-        case 'Builder': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
-        case 'Upload': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
-        case 'AI': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
-        default: return 'bg-zinc-700 text-zinc-300 border-zinc-600';
-    }
-  }
+  const renderAddOnTable = (addOns: ServiceAddOnWithId[], isLoading: boolean) => (
+      <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+        <Table>
+            <TableHeader>
+                <TableRow>
+                    <TableHead>Name</TableHead>
+                    <TableHead>Description</TableHead>
+                    <TableHead className="text-right">Price</TableHead>
+                    <TableHead className="text-right">Actions</TableHead>
+                </TableRow>
+            </TableHeader>
+            <TableBody>
+                 {isLoading || isSeeding ? (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8">Loading add-ons...</TableCell></TableRow>
+                ) : addOns.length > 0 ? (
+                    addOns.map((addOn) => (
+                        <TableRow key={addOn.id}>
+                            <TableCell className="font-medium text-white">{addOn.name}</TableCell>
+                            <TableCell className="text-zinc-400">{addOn.description}</TableCell>
+                            <TableCell className="text-right font-mono text-white">{formatCurrency(addOn.price)}</TableCell>
+                            <TableCell className="text-right">
+                                <Button variant="ghost" size="icon" onClick={() => handleOpenAddOnDialog(addOn)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(addOn.id, 'addOn')}><Trash2 className="h-4 w-4" /></Button>
+                            </TableCell>
+                        </TableRow>
+                    ))
+                ) : (
+                    <TableRow><TableCell colSpan={4} className="text-center py-8">No add-ons found.</TableCell></TableRow>
+                )}
+            </TableBody>
+        </Table>
+      </div>
+  )
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex justify-between items-center mb-8">
-        <div>
-            <h1 className="text-3xl font-bold text-white">Pricing Manager</h1>
-            <p className="text-zinc-400 text-sm mt-1">Add, edit, or remove sheet size pricing tiers.</p>
-        </div>
-        <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-          <DialogTrigger asChild>
-            <Button onClick={() => handleOpenDialog()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New Tier
+    <div className="max-w-6xl mx-auto">
+        <div className="flex justify-between items-center mb-8">
+            <div>
+                <h1 className="text-3xl font-bold text-white">Pricing Manager</h1>
+                <p className="text-zinc-400 text-sm mt-1">Manage pricing for sheets and service add-ons.</p>
+            </div>
+            <Button onClick={() => activeTab === 'Add-on' ? handleOpenAddOnDialog() : handleOpenSheetDialog()}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Add New
             </Button>
-          </DialogTrigger>
+        </div>
+
+        <Tabs defaultValue="Builder" onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="Builder"><Box className="mr-2 h-4 w-4"/>Builder Sheets</TabsTrigger>
+                <TabsTrigger value="Upload"><UploadIcon className="mr-2 h-4 w-4"/>Upload Sheets</TabsTrigger>
+                <TabsTrigger value="AI"><Wand2 className="mr-2 h-4 w-4"/>AI Sheets</TabsTrigger>
+                <TabsTrigger value="Add-on"><Sparkles className="mr-2 h-4 w-4"/>Service Add-ons</TabsTrigger>
+            </TabsList>
+            <TabsContent value="Builder" className="mt-6">{renderSheetTable(sortedBuilderSizes, isLoadingBuilder)}</TabsContent>
+            <TabsContent value="Upload" className="mt-6">{renderSheetTable(sortedUploadSizes, isLoadingUpload)}</TabsContent>
+            <TabsContent value="AI" className="mt-6">{renderSheetTable(sortedAISizes, isLoadingAI)}</TabsContent>
+            <TabsContent value="Add-on" className="mt-6">{renderAddOnTable(sortedAddOns, isLoadingAddOns)}</TabsContent>
+        </Tabs>
+        
+        {/* Dialog for Sheet Sizes */}
+        <Dialog open={isSheetDialogOpen} onOpenChange={setIsSheetDialogOpen}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>{editingSheet ? 'Edit' : 'Add New'} Pricing Tier</DialogTitle>
+              <DialogTitle>{editingSheet ? 'Edit' : 'Add New'} Sheet Tier</DialogTitle>
             </DialogHeader>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
-                <Label htmlFor="name">Tier Name</Label>
-                <Input id="name" name="name" value={formData.name} onChange={handleFormChange} placeholder='e.g., Small, Medium, etc.' required />
-              </div>
+            <form onSubmit={handleSheetFormSubmit} className="space-y-4">
+              <Input name="name" value={sheetFormData.name} onChange={(e) => setSheetFormData({...sheetFormData, name: e.target.value})} placeholder="Tier Name, e.g., Small" required />
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="width">Width (in)</Label>
-                  <Input id="width" name="width" type="number" step="0.1" value={formData.width} onChange={handleFormChange} required />
-                </div>
-                <div>
-                  <Label htmlFor="height">Height (in)</Label>
-                  <Input id="height" name="height" type="number" step="0.1" value={formData.height} onChange={handleFormChange} required />
-                </div>
+                <Input name="width" type="number" value={sheetFormData.width} onChange={(e) => setSheetFormData({...sheetFormData, width: e.target.value})} placeholder="Width (in)" required />
+                <Input name="height" type="number" value={sheetFormData.height} onChange={(e) => setSheetFormData({...sheetFormData, height: e.target.value})} placeholder="Height (in)" required />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="price">Price (USD)</Label>
-                  <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleFormChange} required />
-                </div>
-                <div>
-                    <Label htmlFor="usage">Usage</Label>
-                    <Select value={formData.usage} onValueChange={handleUsageChange}>
-                        <SelectTrigger id="usage">
-                            <SelectValue placeholder="Select where this tier is used" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Builder">Builder</SelectItem>
-                            <SelectItem value="Upload">Upload</SelectItem>
-                            <SelectItem value="AI">AI Creation</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-              </div>
+              <Input name="price" type="number" value={sheetFormData.price} onChange={(e) => setSheetFormData({...sheetFormData, price: e.target.value})} placeholder="Price (USD)" required />
+              <Select value={sheetFormData.usage} onValueChange={(v) => setSheetFormData({...sheetFormData, usage: v})}>
+                  <SelectTrigger><SelectValue/></SelectTrigger>
+                  <SelectContent>
+                      <SelectItem value="Builder">Builder</SelectItem>
+                      <SelectItem value="Upload">Upload</SelectItem>
+                      <SelectItem value="AI">AI</SelectItem>
+                  </SelectContent>
+              </Select>
               <DialogFooter>
-                <DialogClose asChild>
-                  <Button type="button" variant="secondary">Cancel</Button>
-                </DialogClose>
-                <Button type="submit">Save Changes</Button>
+                <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                <Button type="submit">Save</Button>
               </DialogFooter>
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+        
+        {/* Dialog for Add-ons */}
+        <Dialog open={isAddOnDialogOpen} onOpenChange={setIsAddOnDialogOpen}>
+             <DialogContent>
+                 <DialogHeader>
+                     <DialogTitle>{editingAddOn ? 'Edit' : 'Add New'} Service Add-on</DialogTitle>
+                 </DialogHeader>
+                 <form onSubmit={handleAddOnFormSubmit} className="space-y-4">
+                     <Input name="name" value={addOnFormData.name} onChange={(e) => setAddOnFormData({...addOnFormData, name: e.target.value})} placeholder="Add-on Name, e.g., Rush Order" required />
+                     <Textarea name="description" value={addOnFormData.description} onChange={(e) => setAddOnFormData({...addOnFormData, description: e.target.value})} placeholder="Brief description of the service" required />
+                     <Input name="price" type="number" value={addOnFormData.price} onChange={(e) => setAddOnFormData({...addOnFormData, price: e.target.value})} placeholder="Price (USD)" required />
+                     <DialogFooter>
+                        <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
+                        <Button type="submit">Save</Button>
+                     </DialogFooter>
+                 </form>
+             </DialogContent>
+        </Dialog>
 
-      <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Name</TableHead>
-              <TableHead className="flex items-center"><Ruler className="mr-2 h-4 w-4"/>Dimensions</TableHead>
-              <TableHead><Settings className="mr-2 h-4 w-4"/>Usage</TableHead>
-              <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Price</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading || isSeeding ? (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-zinc-500 py-8">
-                  Loading pricing tiers...
-                </TableCell>
-              </TableRow>
-            ) : sortedSheetSizes.length > 0 ? (
-              sortedSheetSizes.map((sheet) => (
-                <TableRow key={sheet.id}>
-                  <TableCell className="font-medium text-white">{sheet.name}</TableCell>
-                  <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
-                  <TableCell>
-                    <span className={`px-2 py-1 text-xs font-bold rounded-full border ${getUsageBadgeColor(sheet.usage)}`}>
-                        {sheet.usage}
-                    </span>
-                  </TableCell>
-                  <TableCell className="text-right font-mono text-white">{formatCurrency(sheet.price)}</TableCell>
-                  <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(sheet)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(sheet.id)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))
-            ) : (
-              <TableRow>
-                <TableCell colSpan={5} className="text-center text-zinc-500 py-8">
-                  No pricing tiers found. Add one to get started.
-                </TableCell>
-              </TableRow>
-            )}
-          </TableBody>
-        </Table>
-      </div>
     </div>
   );
 }
