@@ -14,8 +14,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
-import { useUser, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 interface CheckoutFormData {
     firstName: string;
@@ -44,6 +45,7 @@ export default function CartPage() {
     
     const { user: currentUser, isUserLoading } = useUser();
     const firestore = useFirestore();
+    const storage = useStorage();
 
     const userDocRef = useMemoFirebase(() => {
         if (!firestore || !currentUser) return null;
@@ -185,44 +187,49 @@ export default function CartPage() {
 
         setIsCheckingOut(true);
 
-        const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
-        const orderId = `ORD-${Date.now()}`;
-
-        // Definitive fix: Manually construct a plain array of plain objects.
-        const finalOrderItems: OrderItem[] = cartItems.map(item => {
-            const plainItem: OrderItem = {
-                id: item.id,
-                quantity: item.quantity,
-                compositeImageUrl: item.compositeImageUrl,
-                sheetSizeName: item.sheetSize.name,
-                sheetWidth: item.sheetSize.width,
-                sheetHeight: item.sheetSize.height,
-                sheetPrice: item.sheetSize.price
-            };
-            return plainItem;
-        });
-        
-        const newOrderData: Omit<Order, 'id'> = {
-            orderId: orderId,
-            customerId: customerId,
-            customerName: `${formData.firstName} ${formData.lastName}`,
-            orderDate: new Date().toISOString(),
-            status: OrderStatus.PENDING,
-            items: finalOrderItems, // Use the guaranteed plain array
-            total: total,
-            shippingAddress: {
-                street: formData.street,
-                city: formData.city,
-                state: formData.state,
-                zip: formData.zip,
-                country: 'US',
-            },
-            trackingId: '',
-            printReadyUrl: '',
-            previewUrl: '',
-        };
-
         try {
+            const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
+            const orderId = `ORD-${Date.now()}`;
+
+            const finalOrderItems: OrderItem[] = [];
+            for (const item of cartItems) {
+                // Upload the base64 composite image to Firebase Storage
+                const storageRef = ref(storage, `production-sheets/${orderId}/${item.id}.png`);
+                const snapshot = await uploadString(storageRef, item.compositeImageUrl, 'data_url');
+                const downloadURL = await getDownloadURL(snapshot.ref);
+
+                const plainItem: OrderItem = {
+                    id: item.id,
+                    quantity: item.quantity,
+                    compositeImageUrl: downloadURL, // Use the permanent URL
+                    sheetSizeName: item.sheetSize.name,
+                    sheetWidth: item.sheetSize.width,
+                    sheetHeight: item.sheetSize.height,
+                    sheetPrice: item.sheetSize.price,
+                };
+                finalOrderItems.push(plainItem);
+            }
+            
+            const newOrderData: Omit<Order, 'id'> = {
+                orderId: orderId,
+                customerId: customerId,
+                customerName: `${formData.firstName} ${formData.lastName}`,
+                orderDate: new Date().toISOString(),
+                status: OrderStatus.PENDING,
+                items: finalOrderItems,
+                total: total,
+                shippingAddress: {
+                    street: formData.street,
+                    city: formData.city,
+                    state: formData.state,
+                    zip: formData.zip,
+                    country: 'US',
+                },
+                trackingId: '',
+                printReadyUrl: '', // This field might be deprecated or used for something else now
+                previewUrl: '',
+            };
+
             if (firestore) {
                 const centralOrdersRef = collection(firestore, 'orders');
                 const centralOrderDoc = await addDoc(centralOrdersRef, {
@@ -230,18 +237,16 @@ export default function CartPage() {
                     createdAt: serverTimestamp()
                 });
 
-                // If user is logged in, also save a reference in their own subcollection
                 if (currentUser) {
                     const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
                     await setDoc(doc(userOrdersRef, centralOrderDoc.id), {
                         ...newOrderData,
-                         createdAt: serverTimestamp()
+                        createdAt: serverTimestamp()
                     });
                 }
             }
 
             if (!isTestMode) {
-                // For a real order, proceed to Stripe
                 await createCheckoutSession(cartItems, total);
             }
             
@@ -249,7 +254,7 @@ export default function CartPage() {
             clearCart();
         } catch (error) {
             console.error("Checkout failed", error);
-            toast({ variant: 'destructive', title: 'Checkout Failed', description: 'There was an issue processing your order.' });
+            toast({ variant: 'destructive', title: 'Checkout Failed', description: 'There was an issue processing your order. See console for details.' });
         } finally {
             setIsCheckingOut(false);
         }
@@ -586,3 +591,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    

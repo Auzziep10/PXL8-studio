@@ -38,24 +38,8 @@ const AssetCard: React.FC<{
 }> = ({ item, index, onPreview }) => {
   const [showOriginal, setShowOriginal] = useState(false);
 
-  // Check available assets
-  const hasPrintReady = !!item.printReadyUrl;
-  const hasOriginal = !!item.originalUrl;
-
-  // Determine which URL to show in preview
-  // Priority: Print Ready (Default) -> Preview -> Original (If toggled)
-  const displayUrl =
-    hasPrintReady && !showOriginal
-      ? item.printReadyUrl
-      : showOriginal && item.originalUrl
-      ? item.originalUrl
-      : item.previewUrl;
-
-  // Determine download link
-  const downloadUrl =
-    (showOriginal && item.originalUrl) ||
-    item.printReadyUrl ||
-    item.previewUrl;
+  // Since we now only store the final print-ready URL, we simplify this.
+  const displayUrl = item.printReadyUrl;
 
   return (
     <div className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden shadow-sm hover:border-white/20 transition-colors">
@@ -95,18 +79,10 @@ const AssetCard: React.FC<{
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Toggle Button: Only show if we have both asset types */}
-          {(hasPrintReady || hasOriginal) && (
-            <button
-              onClick={() => setShowOriginal(!showOriginal)}
-              className="px-3 py-1.5 text-xs font-medium text-zinc-300 bg-zinc-800 border border-white/10 rounded-lg hover:bg-zinc-700 transition-colors"
-            >
-              {showOriginal ? 'View Print Ready' : 'View Original'}
-            </button>
-          )}
-
+          {/* Download button now directly links to the print-ready URL */}
           <a
-            href={downloadUrl}
+            href={displayUrl}
+            download={`sheet-${index + 1}-${item.trackingId}.png`}
             target="_blank"
             rel="noopener noreferrer"
             className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
@@ -143,13 +119,9 @@ const AssetCard: React.FC<{
 
         <div className="absolute top-4 left-4 flex gap-2">
           <span
-            className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg ${
-              showOriginal
-                ? 'bg-blue-500/80 text-white'
-                : 'bg-primary/80 text-black'
-            }`}
+            className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black`}
           >
-            {showOriginal ? 'Original File' : 'Print Ready (QR)'}
+            Print Ready (QR)
           </span>
         </div>
       </div>
@@ -388,13 +360,6 @@ export default function AdminPage() {
         const urlToUse = item.compositeImageUrl;
 
         if (urlToUse) {
-          if (urlToUse.startsWith('data:')) {
-            const base64Data = urlToUse.split(',')[1];
-            const fileName = `Sheet-${i + 1}-${
-              targetOrder.orderId || 'NoID'
-            }.png`;
-            folder?.file(fileName, base64Data, { base64: true });
-          } else {
             try {
               const response = await fetch(urlToUse);
               const blob = await response.blob();
@@ -405,7 +370,6 @@ export default function AdminPage() {
             } catch (e) {
               console.warn('Could not fetch asset for zipping', urlToUse);
             }
-          }
         }
       }
 
@@ -580,7 +544,7 @@ export default function AdminPage() {
               Live Orders
             </button>
             <button
-              onClick={() => {
+              onClick={()={() => {
                 setViewMode('customers');
                 setSelectedCustomerForArchive(null);
               }}
@@ -1009,7 +973,7 @@ export default function AdminPage() {
                         id: item.id,
                         file: null,
                         printReadyUrl: item.compositeImageUrl,
-                        originalUrl: '', // Original URL is not stored with this new model
+                        originalUrl: '', // This model doesn't have a separate original URL
                         previewUrl: item.compositeImageUrl,
                         originalFileName: `sheet-${idx + 1}.png`,
                         width: item.sheetWidth,
@@ -1039,3 +1003,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
