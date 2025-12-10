@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -17,6 +17,8 @@ import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
+import QRCode from 'qrcode';
+import { SHEET_DIMENSIONS } from '@/lib/constants';
 
 interface CheckoutFormData {
     firstName: string;
@@ -35,6 +37,78 @@ interface PreviewState {
     url: string | null;
     size: SheetSizeType | null;
 }
+
+// This function is now responsible for generating the FINAL print-ready image with customer data
+const generateFinalSheetForPrint = async (
+    artworks: ArtworkOnCanvas[],
+    sheetConfig: { width: number; height: number },
+    qrData: string
+): Promise<string> => {
+    const BASE_DPI = 300;
+    const HEADER_HEIGHT_INCHES = 1;
+    const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
+
+    const sheetCanvas = document.createElement('canvas');
+    const sheetCtx = sheetCanvas.getContext('2d');
+    if (!sheetCtx) throw new Error('No sheet context');
+    sheetCanvas.width = sheetConfig.width * BASE_DPI;
+    sheetCanvas.height = sheetConfig.height * BASE_DPI;
+
+    const imageCache: Record<string, HTMLImageElement> = {};
+    await Promise.all(artworks.map(item => new Promise<void>((resolve) => {
+        if (imageCache[item.imageUrl]) return resolve();
+        const img = new Image();
+        if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
+        img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
+        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
+        img.src = item.imageUrl;
+    })));
+
+    artworks.forEach(item => {
+        const img = imageCache[item.imageUrl];
+        if (img) {
+            sheetCtx.drawImage(
+                img,
+                item.x * BASE_DPI,
+                item.y * BASE_DPI,
+                item.width * BASE_DPI,
+                item.height * BASE_DPI
+            );
+        }
+    });
+
+    const finalCanvas = document.createElement('canvas');
+    const finalCtx = finalCanvas.getContext('2d');
+    if (!finalCtx) throw new Error('No final context');
+    finalCanvas.width = sheetConfig.width * BASE_DPI;
+    finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
+    
+    finalCtx.fillStyle = 'white';
+    finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
+
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
+    const qrImg = new Image();
+    await new Promise<void>(resolve => {
+        qrImg.onload = () => resolve();
+        qrImg.src = qrCodeDataUrl;
+    });
+    finalCtx.drawImage(qrImg, 10, 10);
+
+    finalCtx.fillStyle = 'black';
+    finalCtx.font = `bold ${BASE_DPI / 3}px Arial`;
+    finalCtx.textAlign = 'left';
+    finalCtx.textBaseline = 'top';
+    const qrInfo = JSON.parse(qrData);
+    finalCtx.fillText(`ID: ${qrInfo.orderId}`, HEADER_HEIGHT_PX, 15);
+    finalCtx.font = `${BASE_DPI / 4}px Arial`;
+    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10);
+    finalCtx.fillText(`To: ${qrInfo.customerName}`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10 + (BASE_DPI / 4) + 10);
+
+    finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
+
+    return finalCanvas.toDataURL('image/png');
+};
+
 
 export default function CartPage() {
     const { items: cartItems, removeItem, updateItemQuantity, clearCart } = useCart();
@@ -190,16 +264,35 @@ export default function CartPage() {
         try {
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
             const orderId = `ORD-${Date.now()}`;
+            const customerName = `${formData.firstName} ${formData.lastName}`;
+            const shippingAddress: ShippingAddress = {
+                street: formData.street,
+                city: formData.city,
+                state: formData.state,
+                zip: formData.zip,
+                country: 'US',
+            };
 
             const finalOrderItems: OrderItem[] = [];
             for (const item of cartItems) {
-                // Upload both preview and print-ready images to Firebase Storage
+                 // Define the data to be embedded in the QR code
+                const qrData = JSON.stringify({
+                    orderId: orderId,
+                    customerName: customerName,
+                    shippingAddress: shippingAddress
+                });
+
+                // Generate the final print-ready image with the QR code and all info
+                const finalPrintReadyUrl = await generateFinalSheetForPrint(item.artworks, item.sheetSize, qrData);
+
+                // Upload preview and the NEW print-ready images to Firebase Storage
                 const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
                 const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
                 
+                // Upload preview from cart, and new print-ready image
                 const [previewSnapshot, printReadySnapshot] = await Promise.all([
                     uploadString(previewStorageRef, item.previewUrl, 'data_url'),
-                    uploadString(printReadyStorageRef, item.printReadyUrl, 'data_url'),
+                    uploadString(printReadyStorageRef, finalPrintReadyUrl, 'data_url'),
                 ]);
                 
                 const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
@@ -207,6 +300,7 @@ export default function CartPage() {
                     getDownloadURL(printReadySnapshot.ref)
                 ]);
 
+                // Create a completely plain object for Firestore
                 const plainItem: OrderItem = {
                     id: item.id,
                     quantity: item.quantity,
@@ -220,24 +314,16 @@ export default function CartPage() {
                 finalOrderItems.push(plainItem);
             }
             
-            const newOrderData: Omit<Order, 'id'> = {
+            const newOrderData = {
                 orderId: orderId,
                 customerId: customerId,
-                customerName: `${formData.firstName} ${formData.lastName}`,
+                customerName: customerName,
                 orderDate: new Date().toISOString(),
                 status: OrderStatus.PENDING,
                 items: finalOrderItems,
                 total: total,
-                shippingAddress: {
-                    street: formData.street,
-                    city: formData.city,
-                    state: formData.state,
-                    zip: formData.zip,
-                    country: 'US',
-                },
+                shippingAddress: shippingAddress,
                 trackingId: '',
-                printReadyUrl: '',
-                previewUrl: '',
             };
 
             if (firestore) {

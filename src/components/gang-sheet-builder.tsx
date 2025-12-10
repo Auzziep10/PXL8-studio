@@ -434,9 +434,9 @@ export default function GangSheetBuilder() {
   const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
 
   // --- Generation ---
-  const generateCompositeSheet = async (trackingId: string, includeHeader: boolean): Promise<string> => {
+  const generateCompositeSheet = async (qrData: string, includeHeader: boolean): Promise<string> => {
     const BASE_DPI = 300;
-    const HEADER_HEIGHT_INCHES = includeHeader ? 2 : 0;
+    const HEADER_HEIGHT_INCHES = includeHeader ? 1 : 0; // Changed to 1 inch
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
     const sheetCanvas = document.createElement('canvas');
@@ -451,8 +451,7 @@ export default function GangSheetBuilder() {
         const img = new Image();
         if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
-        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
-        img.src = item.imageUrl;
+        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); }; // Don't reject, just skip
     })));
 
     items.forEach(item => {
@@ -478,10 +477,15 @@ export default function GangSheetBuilder() {
     finalCanvas.width = sheetConfig.width * BASE_DPI;
     finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
 
+    // Draw white header background
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
 
-    const qrCodeDataUrl = await QRCode.toDataURL(trackingId, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
+    // QR Code
+    const qrCodeDataUrl = await QRCode.toDataURL(qrData, { 
+      width: HEADER_HEIGHT_PX - 20, // Make it slightly smaller than header
+      margin: 1 
+    });
     const qrImg = new Image();
     await new Promise<void>(resolve => {
         qrImg.onload = () => resolve();
@@ -489,14 +493,21 @@ export default function GangSheetBuilder() {
     });
     finalCtx.drawImage(qrImg, 10, 10);
     
+    // Text Info
     finalCtx.fillStyle = 'black';
-    finalCtx.font = `bold ${BASE_DPI / 2}px Arial`;
+    finalCtx.font = `bold ${BASE_DPI / 3}px Arial`; // Smaller font
     finalCtx.textAlign = 'left';
     finalCtx.textBaseline = 'top';
-    finalCtx.fillText(`ID: ${trackingId}`, HEADER_HEIGHT_PX, 30);
-    finalCtx.font = `${BASE_DPI / 3}px Arial`;
-    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 30 + (BASE_DPI / 2) + 10);
 
+    // Extract info from QR data for display
+    const qrInfo = JSON.parse(qrData);
+    finalCtx.fillText(`ID: ${qrInfo.orderId}`, HEADER_HEIGHT_PX, 15);
+    finalCtx.font = `${BASE_DPI / 4}px Arial`;
+    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10);
+    finalCtx.fillText(`To: ${qrInfo.customerName}`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10 + (BASE_DPI / 4) + 10);
+
+
+    // Draw the main gang sheet content below the header
     finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
 
     return finalCanvas.toDataURL('image/png');
@@ -506,9 +517,8 @@ export default function GangSheetBuilder() {
     setIsGenerating(true);
     try {
         const trackingId = `TRK-${Date.now()}`;
-        // Generate two versions: one for the customer (preview) and one for production (print-ready)
+        // We now generate a simple preview for the cart, and the final print file will be generated at checkout
         const previewUrl = await generateCompositeSheet(trackingId, false);
-        const printReadyUrl = await generateCompositeSheet(trackingId, true);
         
         const config = SHEET_DIMENSIONS[selectedSize];
         const cartItem: CartItem = {
@@ -520,8 +530,8 @@ export default function GangSheetBuilder() {
             price: config.price
           },
           previewUrl: previewUrl,
-          printReadyUrl: printReadyUrl,
-          artworks: [],
+          printReadyUrl: '', // This will be generated at checkout
+          artworks: items, // Pass the full artwork data to the cart
           quantity: 1,
         };
 
