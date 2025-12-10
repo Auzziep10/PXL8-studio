@@ -544,7 +544,7 @@ export default function AdminPage() {
               Live Orders
             </button>
             <button
-              onClick={()={() => {
+              onClick={() => {
                 setViewMode('customers');
                 setSelectedCustomerForArchive(null);
               }}
