@@ -209,7 +209,7 @@ export default function GangSheetBuilder() {
     event.target.value = '';
 
     const handleImageLoad = (imageUrl: string, isPermanent: boolean) => {
-        const img = new Image();
+        const img = new window.Image();
         if (isPermanent) img.crossOrigin = "Anonymous";
 
         img.onload = () => {
@@ -447,7 +447,7 @@ export default function GangSheetBuilder() {
         items.map(item =>
             new Promise<void>((resolve) => {
                 if (imageCache[item.imageUrl]) return resolve();
-                const img = new Image();
+                const img = new window.Image();
                 if (!item.imageUrl.startsWith('data:')) img.crossOrigin = 'Anonymous';
                 img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
                 img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };

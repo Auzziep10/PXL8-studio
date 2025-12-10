@@ -1,8 +1,9 @@
+
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { X } from "lucide-react";
-import Image from 'next/image';
+import NextImage from 'next/image';
 
 interface ImagePreviewModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, title, sheetWidth
             }}
           >
             {imageUrl && (
-              <Image 
+              <NextImage 
                   src={imageUrl} 
                   alt={title} 
                   layout="fill"

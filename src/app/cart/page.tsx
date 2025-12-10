@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSi
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
-import Image from 'next/image';
+import NextImage from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
@@ -57,7 +58,7 @@ const generateFinalSheetForPrint = async (
     const imageCache: Record<string, HTMLImageElement> = {};
     await Promise.all(artworks.map(item => new Promise<void>((resolve) => {
         if (imageCache[item.imageUrl]) return resolve();
-        const img = new Image();
+        const img = new window.Image();
         if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
         img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
@@ -87,7 +88,7 @@ const generateFinalSheetForPrint = async (
     finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
 
     const qrCodeDataUrl = await QRCode.toDataURL(qrData, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
-    const qrImg = new Image();
+    const qrImg = new window.Image();
     await new Promise<void>(resolve => {
         qrImg.onload = () => resolve();
         qrImg.src = qrCodeDataUrl;
@@ -406,7 +407,7 @@ export default function CartPage() {
                                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                                         onClick={() => handlePreview(item.previewUrl, item.sheetSize)}
                                     >
-                                        <Image src={item.previewUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
+                                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                             <ZoomIn className="w-5 h-5 text-white" />
                                         </div>
