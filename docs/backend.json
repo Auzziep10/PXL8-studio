@@ -32,6 +32,17 @@
           "type": "string",
           "description": "Date and time the user account was last updated.",
           "format": "date-time"
+        },
+        "address": {
+            "type": "object",
+            "description": "Default shipping address for the user.",
+            "properties": {
+                "street": { "type": "string" },
+                "city": { "type": "string" },
+                "state": { "type": "string" },
+                "zip": { "type": "string" },
+                "country": { "type": "string" }
+            }
         }
       },
       "required": [
