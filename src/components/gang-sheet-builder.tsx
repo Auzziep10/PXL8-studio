@@ -523,6 +523,11 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           const angleDelta = currentAngle - rotatingState.startAngle;
 
           let newRotation = rotatingState.initialRotation + angleDelta;
+          
+          if (e.shiftKey) {
+              newRotation = Math.round(newRotation / 45) * 45;
+          }
+
           updateItem(draggingId, { rotation: newRotation });
           return;
       }
@@ -554,10 +559,9 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
       const item = items.find(i => i.id === draggingId);
       if (item) {
-          // Clamp Left/Right
+          // Clamp to stay within sheet boundaries
           newX = Math.max(0, Math.min(newX, sheetConfig.width - item.width));
-          // Clamp Top
-          newY = Math.max(0, newY); 
+          newY = Math.max(0, Math.min(newY, sheetConfig.height - item.height)); 
       }
 
       setItems(prev => prev.map(i => {
@@ -567,7 +571,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           return i;
       }));
 
-  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, rotatingState]);
+  }, [draggingId, dragOffset, scale, sheetConfig.width, sheetConfig.height, items, resizingState, rotatingState]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
@@ -1017,23 +1021,21 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                             <div
                                 key={item.id}
                                 ref={itemRef}
-                                className={`absolute draggable-item ${isColorPickerActive && isSelected ? 'cursor-eyedropper' : 'cursor-move'} group ${
-                                    isSelected ? 'z-50' : 'z-10'
-                                }`}
+                                className={`absolute draggable-item group ${isColorPickerActive && isSelected ? 'cursor-eyedropper' : 'cursor-move'}`}
                                 style={{
                                     left: `${item.x * PPI * scale}px`,
                                     top: `${item.y * PPI * scale}px`,
                                     width: `${item.width * PPI * scale}px`,
                                     height: `${item.height * PPI * scale}px`,
                                     transform: `rotate(${item.rotation || 0}deg)`,
+                                    zIndex: isSelected ? 50 : 10,
                                 }}
                                 onMouseDown={(e) => handleMouseDownOnItem(e, item.id)}
                             >
-                                {/* Image Container */}
-                                <div className={`w-full h-full relative ${
-                                    isColliding || isOutOfBounds ? 'border-2 border-red-500 bg-red-500/20' : 
-                                    isSelected ? 'outline outline-2 outline-primary outline-offset-2' : ''
-                                }`}>
+                                <div className={`w-full h-full relative transition-all duration-150 
+                                    ${isSelected ? 'outline outline-2 outline-primary outline-offset-2' : ''}
+                                    ${isColliding || isOutOfBounds ? 'bg-red-500/20' : ''}
+                                `}>
                                     {item.imageUrl ? (
                                       <img 
                                           src={item.imageUrl} 
@@ -1044,31 +1046,24 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                       <div className="w-full h-full bg-zinc-800/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
                                     )}
                                     
-                                    {/* Warnings */}
-                                    {(isColliding || isOutOfBounds) && (
-                                        <div className="absolute top-0 right-0 bg-red-500 text-white p-0.5 rounded-bl">
-                                            <AlertTriangle className="w-3 h-3" />
-                                        </div>
+                                    {(isColliding || isOutOfBounds) && !isSelected && (
+                                        <div className="absolute inset-0 border-2 border-red-500 pointer-events-none"></div>
                                     )}
 
-                                    {/* Interaction Handles */}
                                     {isSelected && (
                                         <>
-                                            {/* Resize Handle */}
                                             <div 
-                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm"
+                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm z-10"
                                                 onMouseDown={(e) => handleMouseDownOnResizeHandle(e, item.id)}
                                             ></div>
-                                            {/* Rotate Handle */}
                                             <div 
-                                                className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-alias flex items-center justify-center"
+                                                className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-alias flex items-center justify-center z-10"
                                                 onMouseDown={(e) => handleMouseDownOnRotateHandle(e, item.id, itemRef.current!)}
                                             >
                                               <RotateCw className="w-3 h-3 text-primary"/>
                                             </div>
-                                            {/* Delete Button */}
                                             <button 
-                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
                                                 onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                                             >
                                               <X className="w-3 h-3" />
