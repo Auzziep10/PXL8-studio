@@ -14,7 +14,7 @@ import {
   SidebarInset,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Home, LayoutGrid, User, Settings, LogOut, DollarSign } from 'lucide-react';
+import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -22,6 +22,7 @@ import { signOut } from 'firebase/auth';
 import React, { useEffect, useState, cloneElement, Children } from 'react';
 import { doc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 
 export default function DashboardLayout({
@@ -58,13 +59,19 @@ export default function DashboardLayout({
     }
   }, [userProfile]);
 
-  const navItems = [
+  const siteNavItems = [
+    { href: '/build', label: 'Builder', icon: Wand2 },
+    { href: '/upload', label: 'Upload', icon: Upload },
+    { href: '/track', label: 'Track Order', icon: SearchIcon },
+  ];
+
+  const adminNavItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
     { href: '/admin', label: 'Fulfillment', icon: LayoutGrid, roles: ['admin'] },
     { href: '/admin/pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
   ];
   
-  const accessibleNavItems = navItems.filter(item => {
+  const accessibleAdminNavItems = adminNavItems.filter(item => {
     if (item.roles.includes('admin') && isAdmin) return true;
     if (item.roles.includes('customer') && !isAdmin) return true; // Only show overview for customers
     if (item.href === '/dashboard' && isAdmin) return true; // Admins should see overview too
@@ -92,9 +99,11 @@ export default function DashboardLayout({
     <SidebarProvider>
       <Sidebar className="pt-14">
         <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <PXL8Logo className="h-10 w-auto" />
-          </div>
+          <Link href="/">
+            <div className="flex items-center gap-2">
+              <PXL8Logo className="h-10 w-auto" />
+            </div>
+          </Link>
         </SidebarHeader>
         <SidebarContent>
           <SidebarMenu>
@@ -104,7 +113,7 @@ export default function DashboardLayout({
                  <div className="h-8 bg-muted rounded-md animate-pulse"/>
               </div>
             ) : (
-              accessibleNavItems.map((item) => (
+              accessibleAdminNavItems.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <Link href={item.href} passHref>
                   <SidebarMenuButton
@@ -148,25 +157,41 @@ export default function DashboardLayout({
       <SidebarInset className="pt-14">
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger className="sm:hidden" />
-            <div className='flex-1'>
-                <h1 className="text-xl font-semibold capitalize">
+            
+            <nav className="hidden md:flex items-center gap-2 text-sm">
+                {siteNavItems.map(item => (
+                    <Link 
+                        key={item.href} 
+                        href={item.href} 
+                        className={cn('transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
+                         pathname === item.href ? 'text-foreground bg-secondary' : 'text-foreground/60'
+                        )}
+                    >
+                        {item.label}
+                    </Link>
+                ))}
+            </nav>
+
+            <div className='flex-1 flex justify-end items-center gap-2'>
+                 <h1 className="text-sm font-semibold capitalize hidden lg:block">
                     {userProfile?.firstName ? `Welcome, ${userProfile.firstName}` : pageTitle}
                 </h1>
+
+                {isAdmin && (
+                  <Button variant="outline" size="icon" asChild>
+                    <Link href="/admin">
+                      <LayoutGrid className="h-5 w-5" />
+                      <span className="sr-only">Fulfillment</span>
+                    </Link>
+                  </Button>
+                )}
+                <Button variant="outline" size="icon" asChild>
+                    <Link href="/settings">
+                        <User className="h-5 w-5" />
+                        <span className="sr-only">My Account</span>
+                    </Link>
+                </Button>
             </div>
-            {isAdmin && (
-              <Button variant="outline" size="icon" asChild>
-                <Link href="/admin">
-                  <LayoutGrid className="h-5 w-5" />
-                  <span className="sr-only">Fulfillment</span>
-                </Link>
-              </Button>
-            )}
-            <Button variant="outline" size="icon" asChild>
-                <Link href="/dashboard">
-                    <User className="h-5 w-5" />
-                    <span className="sr-only">My Account</span>
-                </Link>
-            </Button>
         </header>
         <div className="flex-1 overflow-auto p-4 md:p-6">
           {children}
