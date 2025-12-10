@@ -147,14 +147,14 @@ export default function AdminPage() {
 
   // Firestore Queries
   const ordersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, 'orders')) : null),
-    [firestore, user]
+    () => (firestore && isAdmin ? query(collection(firestore, 'orders')) : null),
+    [firestore, isAdmin]
   );
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
   const usersQuery = useMemoFirebase(
-    () => (firestore && user ? query(collection(firestore, 'users')) : null),
-    [firestore, user]
+    () => (firestore && isAdmin ? query(collection(firestore, 'users')) : null),
+    [firestore, isAdmin]
   );
   const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
 
@@ -989,3 +989,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
