@@ -121,382 +121,321 @@ const AssetCard: React.FC<{
   );
 };
 
-export default function AdminPage() {
-  const firestore = useFirestore();
-  const { user, isUserLoading } = useUser();
-  const router = useRouter();
-  const searchParams = useSearchParams();
+function AdminFulfillmentContent() {
+    const firestore = useFirestore();
+    // Re-instantiate necessary hooks within the authorized component
+    const { user } = useUser();
+    const router = useRouter();
+    const searchParams = useSearchParams();
 
-  // Self-contained authorization
-  const [isAdmin, setIsAdmin] = useState(false);
-  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false);
+    // Firestore Queries - These are now safe because this component only renders for admins.
+    const ordersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders')) : null, [firestore]);
+    const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
+    const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+    const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
 
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+    // Component State
+    const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
+    const [searchTerm, setSearchTerm] = useState('');
+    const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+    const [
+        selectedCustomerForArchive,
+        setSelectedCustomerForArchive,
+    ] = useState<string | null>(null);
+    const [isZipping, setIsZipping] = useState(false);
+    const [previewImage, setPreviewImage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!isUserLoading && !isProfileLoading) {
-      if (userProfile && userProfile.role === 'admin') {
-        setIsAdmin(true);
-      } else {
-        setIsAdmin(false);
-        // If the user is definitively not an admin, redirect them.
-        router.push('/dashboard');
-      }
-      setIsAuthCheckComplete(true);
-    }
-  }, [user, userProfile, isUserLoading, isProfileLoading, router]);
+    const [
+        healthStatus,
+        setHealthStatus,
+    ] = useState<{ db: boolean; storage: boolean; message: string; bucketName?: string } | null>(
+        null
+    );
+    const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
-  // Firestore Queries - Gated by isAdmin check
-  const ordersQuery = useMemoFirebase(
-    () => {
-      // Return null and do not create the query unless the auth check is complete AND the user is an admin.
-      if (firestore && isAuthCheckComplete && isAdmin) {
-        return query(collection(firestore, 'orders'));
-      }
-      return null;
-    },
-    [firestore, isAuthCheckComplete, isAdmin]
-  );
-  const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
-
-  const usersQuery = useMemoFirebase(
-    () => {
-       // Return null and do not create the query unless the auth check is complete AND the user is an admin.
-      if (firestore && isAuthCheckComplete && isAdmin) {
-        return query(collection(firestore, 'users'));
-      }
-      return null;
-    },
-    [firestore, isAuthCheckComplete, isAdmin]
-  );
-  const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
-
-
-  // Component State
-  const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
-  const [
-    selectedCustomerForArchive,
-    setSelectedCustomerForArchive,
-  ] = useState<string | null>(null);
-  const [isZipping, setIsZipping] = useState(false);
-  const [previewImage, setPreviewImage] = useState<string | null>(null);
-
-  const [
-    healthStatus,
-    setHealthStatus,
-  ] = useState<{ db: boolean; storage: boolean; message: string; bucketName?: string } | null>(
-    null
-  );
-  const [isCheckingHealth, setIsCheckingHealth] = useState(false);
-
-  const [
-    sortConfig,
-    setSortConfig,
-  ] = useState<{ key: SortKey; direction: SortDirection }>({
-    key: 'date',
-    direction: 'desc',
-  });
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
-  
-  // Effect to handle URL query param for orderId
-  useEffect(() => {
-    const orderIdFromUrl = searchParams.get('orderId');
-    if (orderIdFromUrl && allOrders) {
-      // Find order by the new numeric ID format
-      const foundOrder = allOrders.find(o => o.orderId === orderIdFromUrl);
-      if (foundOrder) {
-        setSelectedOrderId(foundOrder.id);
-        // Clean the URL
-        router.replace('/admin', { scroll: false });
-      }
-    }
-  }, [searchParams, allOrders, router]);
-
-
-  const selectedOrder = useMemo(
-    () => allOrders?.find((o) => o.id === selectedOrderId) || null,
-    [allOrders, selectedOrderId]
-  );
-
-  const updateStatus = async (id: string, status: OrderStatus) => {
-    if (!firestore || !selectedOrder) return;
-    const orderDocRef = doc(firestore, 'orders', id);
-    await updateDoc(orderDocRef, { status });
-    setSelectedOrderId(null);
-  };
-
-  const customers = useMemo(() => {
-    if (!Array.isArray(allUsers)) return [];
-
-    return allUsers.filter(user => {
-      const term = searchTerm.toLowerCase();
-      const name = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
-      const email = (user.email || '').toLowerCase();
-      return name.includes(term) || email.includes(term);
+    const [
+        sortConfig,
+        setSortConfig,
+    ] = useState<{ key: SortKey; direction: SortDirection }>({
+        key: 'date',
+        direction: 'desc',
     });
-  }, [allUsers, searchTerm]);
-
-  const customerOrderData = useMemo(() => {
-      if (!allOrders) return new Map();
-      const map = new Map<string, { orderCount: number, totalSpend: number }>();
-      allOrders.forEach(order => {
-          const stats = map.get(order.customerId) || { orderCount: 0, totalSpend: 0 };
-          stats.orderCount += 1;
-          stats.totalSpend += order.total || 0;
-          map.set(order.customerId, stats);
-      });
-      return map;
-  }, [allOrders]);
-
-  useEffect(() => {
-    if (searchTerm.length >= 8 && !isNaN(Number(searchTerm))) {
-      const found = allOrders?.find(o => o.orderId === searchTerm);
-      if (found) {
-        setSelectedOrderId(found.id);
-        setViewMode('orders');
-      }
-    }
-  }, [searchTerm, allOrders]);
-
-  const runHealthCheck = async () => {
-    setIsCheckingHealth(true);
-    try {
-      const status = await checkHealth();
-      setHealthStatus(status);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setIsCheckingHealth(false);
-    }
-  };
-
-  const processedOrders = useMemo(() => {
-    if (!Array.isArray(allOrders)) return [];
-
-    let result = allOrders.filter((order) => {
-      const term = searchTerm.toLowerCase();
-      const id = (order.orderId || '').toLowerCase();
-      const name = (order.customerName || '').toLowerCase();
-      const items = Array.isArray(order.items) ? order.items : [];
-      const hasTracking = items.some(
-        (i: any) => i.id.toLowerCase().includes(term)
-      );
-
-      return id.includes(term) || name.includes(term) || hasTracking;
-    });
-
-    if (statusFilter !== 'ALL') {
-      result = result.filter((order) => order.status === statusFilter);
-    }
-
-    result.sort((a, b) => {
-      let aValue: any;
-      let bValue: any;
-
-      switch (sortConfig.key) {
-        case 'date':
-          const d1 = new Date(a.orderDate).getTime();
-          const d2 = new Date(b.orderDate).getTime();
-          aValue = isNaN(d1) ? 0 : d1;
-          bValue = isNaN(d2) ? 0 : d2;
-          break;
-        case 'totalPrice':
-          aValue = a.total || 0;
-          bValue = b.total || 0;
-          break;
-        case 'status':
-          aValue = a.status || '';
-          bValue = b.status || '';
-          break;
-        default:
-          aValue = new Date(a.orderDate).getTime();
-          bValue = new Date(b.orderDate).getTime();
-      }
-
-      if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
-
-    return result;
-  }, [allOrders, searchTerm, statusFilter, sortConfig]);
-
-  const handleSort = (key: SortKey) => {
-    setSortConfig((current) => ({
-      key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
-    }));
-  };
-
-  const getStatusColor = (status: OrderStatus) => {
-    switch (status) {
-      case OrderStatus.PENDING:
-        return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
-      case OrderStatus.PROCESSING:
-        return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
-      case OrderStatus.PRINTED:
-        return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
-      case OrderStatus.SHIPPED:
-        return 'bg-primary/20 text-primary border-primary/30';
-      case OrderStatus.DELIVERED:
-        return 'bg-accent/20 text-accent border-accent/30';
-      default:
-        return 'bg-zinc-800 text-zinc-400 border-zinc-700';
-    }
-  };
-
-  const statusWorkflow: OrderStatus[] = [
-    OrderStatus.PENDING,
-    OrderStatus.PROCESSING,
-    OrderStatus.PRINTED,
-    OrderStatus.SHIPPED,
-    OrderStatus.DELIVERED,
-  ];
-
-  const getNextStatus = (current: OrderStatus): OrderStatus | null => {
-    const idx = statusWorkflow.indexOf(current);
-    if (idx !== -1 && idx < statusWorkflow.length - 1) {
-      return statusWorkflow[idx + 1];
-    }
-    return null;
-  };
-
-  const handleDownloadAllZip = async (targetOrder: Order) => {
-    if (!targetOrder) return;
-    setIsZipping(true);
-    try {
-      const zip = new JSZip();
-      const folder = zip.folder(`Order-${targetOrder.orderId}`);
-
-      for (let i = 0; i < targetOrder.items.length; i++) {
-        const item = targetOrder.items[i];
-
-        const urlToUse = item.printReadyUrl;
-
-        if (urlToUse) {
-            try {
-              const response = await fetch(urlToUse);
-              const blob = await response.blob();
-              const fileName = `Sheet-${i + 1}-${
-                targetOrder.orderId || 'NoID'
-              }.png`;
-              folder?.file(fileName, blob);
-            } catch (e) {
-              console.warn('Could not fetch asset for zipping', urlToUse);
-            }
+    const [statusFilter, setStatusFilter] = useState<OrderStatus | 'ALL'>('ALL');
+    
+    // Effect to handle URL query param for orderId
+    useEffect(() => {
+        const orderIdFromUrl = searchParams.get('orderId');
+        if (orderIdFromUrl && allOrders) {
+        // Find order by the new numeric ID format
+        const foundOrder = allOrders.find(o => o.orderId === orderIdFromUrl);
+        if (foundOrder) {
+            setSelectedOrderId(foundOrder.id);
+            // Clean the URL
+            router.replace('/admin', { scroll: false });
         }
-      }
+        }
+    }, [searchParams, allOrders, router]);
 
-      const content = await zip.generateAsync({ type: 'blob' });
-      const saveFile = (FileSaver as any).saveAs || FileSaver;
-      saveFile(content, `Order-${targetOrder.orderId}-Production-Assets.zip`);
-    } catch (error) {
-      console.error('Failed to zip assets', error);
-      alert('Failed to generate zip file. Please check console.');
-    } finally {
-      setIsZipping(false);
-    }
-  };
 
-  const handlePrintPackingSlip = (targetOrder: Order) => {
-    if (!targetOrder) return;
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) return;
+    const selectedOrder = useMemo(
+        () => allOrders?.find((o) => o.id === selectedOrderId) || null,
+        [allOrders, selectedOrderId]
+    );
 
-    const address = targetOrder.shippingAddress || {
-      street: '123 Shipping Lane',
-      city: 'Print City',
-      state: 'NY',
-      zip: '10012',
+    const updateStatus = async (id: string, status: OrderStatus) => {
+        if (!firestore || !selectedOrder) return;
+        const orderDocRef = doc(firestore, 'orders', id);
+        await updateDoc(orderDocRef, { status });
+        setSelectedOrderId(null);
     };
 
-    const htmlContent = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Packing Slip - ${targetOrder.orderId}</title>
-            <style>
-                body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
-                .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
-                .brand h1 { margin: 0; font-size: 28px; letter-spacing: -1px; }
-                .brand span { color: #f97316; }
-                .order-details { text-align: right; }
-                .order-details h2 { margin: 0 0 5px 0; font-size: 24px; }
-                .section { margin-bottom: 30px; }
-                .section-title { font-size: 14px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px; color: #666; }
-                table { width: 100%; border-collapse: collapse; font-size: 14px; }
-                th { text-align: left; padding: 10px; background: #f4f4f4; border-bottom: 1px solid #ddd; }
-                td { padding: 10px; border-bottom: 1px solid #eee; }
-                .total { text-align: right; margin-top: 20px; font-size: 18px; font-weight: bold; }
-                .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
-            </style>
-        </head>
-        <body>
-            <div class="header">
-                <div class="brand"><h1>PXL<span>8</span> Fulfillment</h1></div>
-                <div class="order-details"><h2>#${
-                  targetOrder.orderId
-                }</h2><p>Date: ${new Date(
-      targetOrder.orderDate
-    ).toLocaleDateString()}</p></div>
-            </div>
-            <div class="section">
-                <div class="section-title">Customer</div>
-                <strong>${targetOrder.customerName}</strong><br>
-                ${address.street}<br>${address.city}, ${address.state} ${
-      address.zip
-    }
-            </div>
-            <div class="section">
-                <div class="section-title">Items</div>
-                <table>
-                    <thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead>
-                    <tbody>${targetOrder.items
-                      .map(
-                        (item: OrderItem, idx) =>
-                          `<tr><td>${idx + 1}</td><td>Gang Sheet ${
-                            item.sheetSizeName
-                          }</td><td>${item.quantity}</td></tr>`
-                      )
-                      .join('')}</tbody>
-                </table>
-            </div>
-            <script>window.onload = function() { window.print(); }</script>
-        </body>
-        </html>
-    `;
-    printWindow.document.write(htmlContent);
-    printWindow.document.close();
-  };
+    const customers = useMemo(() => {
+        if (!Array.isArray(allUsers)) return [];
 
-  if (isUserLoading || !isAuthCheckComplete) {
+        return allUsers.filter(user => {
+        const term = searchTerm.toLowerCase();
+        const name = `${user.firstName || ''} ${user.lastName || ''}`.toLowerCase();
+        const email = (user.email || '').toLowerCase();
+        return name.includes(term) || email.includes(term);
+        });
+    }, [allUsers, searchTerm]);
+
+    const customerOrderData = useMemo(() => {
+        if (!allOrders) return new Map();
+        const map = new Map<string, { orderCount: number, totalSpend: number }>();
+        allOrders.forEach(order => {
+            const stats = map.get(order.customerId) || { orderCount: 0, totalSpend: 0 };
+            stats.orderCount += 1;
+            stats.totalSpend += order.total || 0;
+            map.set(order.customerId, stats);
+        });
+        return map;
+    }, [allOrders]);
+
+    useEffect(() => {
+        if (searchTerm.length >= 8 && !isNaN(Number(searchTerm))) {
+        const found = allOrders?.find(o => o.orderId === searchTerm);
+        if (found) {
+            setSelectedOrderId(found.id);
+            setViewMode('orders');
+        }
+        }
+    }, [searchTerm, allOrders]);
+
+    const runHealthCheck = async () => {
+        setIsCheckingHealth(true);
+        try {
+        const status = await checkHealth();
+        setHealthStatus(status);
+        } catch (e) {
+        console.error(e);
+        } finally {
+        setIsCheckingHealth(false);
+        }
+    };
+
+    const processedOrders = useMemo(() => {
+        if (!Array.isArray(allOrders)) return [];
+
+        let result = allOrders.filter((order) => {
+        const term = searchTerm.toLowerCase();
+        const id = (order.orderId || '').toLowerCase();
+        const name = (order.customerName || '').toLowerCase();
+        const items = Array.isArray(order.items) ? order.items : [];
+        const hasTracking = items.some(
+            (i: any) => i.id.toLowerCase().includes(term)
+        );
+
+        return id.includes(term) || name.includes(term) || hasTracking;
+        });
+
+        if (statusFilter !== 'ALL') {
+        result = result.filter((order) => order.status === statusFilter);
+        }
+
+        result.sort((a, b) => {
+        let aValue: any;
+        let bValue: any;
+
+        switch (sortConfig.key) {
+            case 'date':
+            const d1 = new Date(a.orderDate).getTime();
+            const d2 = new Date(b.orderDate).getTime();
+            aValue = isNaN(d1) ? 0 : d1;
+            bValue = isNaN(d2) ? 0 : d2;
+            break;
+            case 'totalPrice':
+            aValue = a.total || 0;
+            bValue = b.total || 0;
+            break;
+            case 'status':
+            aValue = a.status || '';
+            bValue = b.status || '';
+            break;
+            default:
+            aValue = new Date(a.orderDate).getTime();
+            bValue = new Date(b.orderDate).getTime();
+        }
+
+        if (aValue < bValue) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (aValue > bValue) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
+        });
+
+        return result;
+    }, [allOrders, searchTerm, statusFilter, sortConfig]);
+
+    const handleSort = (key: SortKey) => {
+        setSortConfig((current) => ({
+        key,
+        direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc',
+        }));
+    };
+
+    const getStatusColor = (status: OrderStatus) => {
+        switch (status) {
+        case OrderStatus.PENDING:
+            return 'bg-yellow-500/20 text-yellow-500 border-yellow-500/30';
+        case OrderStatus.PROCESSING:
+            return 'bg-blue-500/20 text-blue-500 border-blue-500/30';
+        case OrderStatus.PRINTED:
+            return 'bg-purple-500/20 text-purple-500 border-purple-500/30';
+        case OrderStatus.SHIPPED:
+            return 'bg-primary/20 text-primary border-primary/30';
+        case OrderStatus.DELIVERED:
+            return 'bg-accent/20 text-accent border-accent/30';
+        default:
+            return 'bg-zinc-800 text-zinc-400 border-zinc-700';
+        }
+    };
+
+    const statusWorkflow: OrderStatus[] = [
+        OrderStatus.PENDING,
+        OrderStatus.PROCESSING,
+        OrderStatus.PRINTED,
+        OrderStatus.SHIPPED,
+        OrderStatus.DELIVERED,
+    ];
+
+    const getNextStatus = (current: OrderStatus): OrderStatus | null => {
+        const idx = statusWorkflow.indexOf(current);
+        if (idx !== -1 && idx < statusWorkflow.length - 1) {
+        return statusWorkflow[idx + 1];
+        }
+        return null;
+    };
+
+    const handleDownloadAllZip = async (targetOrder: Order) => {
+        if (!targetOrder) return;
+        setIsZipping(true);
+        try {
+        const zip = new JSZip();
+        const folder = zip.folder(`Order-${targetOrder.orderId}`);
+
+        for (let i = 0; i < targetOrder.items.length; i++) {
+            const item = targetOrder.items[i];
+
+            const urlToUse = item.printReadyUrl;
+
+            if (urlToUse) {
+                try {
+                const response = await fetch(urlToUse);
+                const blob = await response.blob();
+                const fileName = `Sheet-${i + 1}-${
+                    targetOrder.orderId || 'NoID'
+                }.png`;
+                folder?.file(fileName, blob);
+                } catch (e) {
+                console.warn('Could not fetch asset for zipping', urlToUse);
+                }
+            }
+        }
+
+        const content = await zip.generateAsync({ type: 'blob' });
+        const saveFile = (FileSaver as any).saveAs || FileSaver;
+        saveFile(content, `Order-${targetOrder.orderId}-Production-Assets.zip`);
+        } catch (error) {
+        console.error('Failed to zip assets', error);
+        alert('Failed to generate zip file. Please check console.');
+        } finally {
+        setIsZipping(false);
+        }
+    };
+
+    const handlePrintPackingSlip = (targetOrder: Order) => {
+        if (!targetOrder) return;
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const address = targetOrder.shippingAddress || {
+        street: '123 Shipping Lane',
+        city: 'Print City',
+        state: 'NY',
+        zip: '10012',
+        };
+
+        const htmlContent = `
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <title>Packing Slip - ${targetOrder.orderId}</title>
+                <style>
+                    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; color: #333; }
+                    .header { border-bottom: 2px solid #000; padding-bottom: 20px; margin-bottom: 30px; display: flex; justify-content: space-between; align-items: flex-start; }
+                    .brand h1 { margin: 0; font-size: 28px; letter-spacing: -1px; }
+                    .brand span { color: #f97316; }
+                    .order-details { text-align: right; }
+                    .order-details h2 { margin: 0 0 5px 0; font-size: 24px; }
+                    .section { margin-bottom: 30px; }
+                    .section-title { font-size: 14px; text-transform: uppercase; font-weight: bold; border-bottom: 1px solid #ddd; padding-bottom: 5px; margin-bottom: 15px; color: #666; }
+                    table { width: 100%; border-collapse: collapse; font-size: 14px; }
+                    th { text-align: left; padding: 10px; background: #f4f4f4; border-bottom: 1px solid #ddd; }
+                    td { padding: 10px; border-bottom: 1px solid #eee; }
+                    .total { text-align: right; margin-top: 20px; font-size: 18px; font-weight: bold; }
+                    .footer { margin-top: 50px; text-align: center; font-size: 12px; color: #888; border-top: 1px solid #eee; padding-top: 20px; }
+                </style>
+            </head>
+            <body>
+                <div class="header">
+                    <div class="brand"><h1>PXL<span>8</span> Fulfillment</h1></div>
+                    <div class="order-details"><h2>#${
+                    targetOrder.orderId
+                    }</h2><p>Date: ${new Date(
+        targetOrder.orderDate
+        ).toLocaleDateString()}</p></div>
+                </div>
+                <div class="section">
+                    <div class="section-title">Customer</div>
+                    <strong>${targetOrder.customerName}</strong><br>
+                    ${address.street}<br>${address.city}, ${address.state} ${
+        address.zip
+        }
+                </div>
+                <div class="section">
+                    <div class="section-title">Items</div>
+                    <table>
+                        <thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead>
+                        <tbody>${targetOrder.items
+                        .map(
+                            (item: OrderItem, idx) =>
+                            `<tr><td>${idx + 1}</td><td>Gang Sheet ${
+                                item.sheetSizeName
+                            }</td><td>${item.quantity}</td></tr>`
+                        )
+                        .join('')}</tbody>
+                    </table>
+                </div>
+                <script>window.onload = function() { window.print(); }</script>
+            </body>
+            </html>
+        `;
+        printWindow.document.write(htmlContent);
+        printWindow.document.close();
+    };
+
     return (
-        <div className="flex flex-col items-center justify-center h-full text-center">
-             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-             <p className="text-zinc-400 mt-4">Verifying credentials...</p>
-        </div>
-    );
-  }
-
-  if (!isAdmin) {
-    return (
-        <div className="flex flex-col items-center justify-center h-full text-center">
-            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-zinc-400">Redirecting to your dashboard...</p>
-        </div>
-    );
-  }
-
-  // Main render for Admins
-  return (
-    <div className="flex flex-col h-full max-w-7xl mx-auto w-full px-4 py-8">
+        <div className="flex flex-col h-full max-w-7xl mx-auto w-full px-4 py-8">
       {/* Header Area */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
@@ -1007,7 +946,58 @@ export default function AdminPage() {
         </div>
       )}
     </div>
-  );
+    )
 }
 
+export default function AdminPage() {
+  const { user, isUserLoading } = useUser();
+  const firestore = useFirestore();
+  const router = useRouter();
+
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false);
+
+  const userDocRef = useMemoFirebase(() => {
+    if (!firestore || !user) return null;
+    return doc(firestore, 'users', user.uid);
+  }, [firestore, user]);
+
+  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
+
+  useEffect(() => {
+    if (isUserLoading || isProfileLoading) {
+      return; // Wait for auth and profile to load
+    }
     
+    if (userProfile?.role === 'admin') {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+      // If not an admin, redirect them after check is complete
+      router.push('/dashboard');
+    }
+    setIsAuthCheckComplete(true);
+
+  }, [user, userProfile, isUserLoading, isProfileLoading, router]);
+
+  if (!isAuthCheckComplete) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+             <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+             <p className="text-zinc-400 mt-4">Verifying credentials...</p>
+        </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+        <div className="flex flex-col items-center justify-center h-full text-center">
+            <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
+            <p className="text-zinc-400">You do not have permission to view this page. Redirecting...</p>
+        </div>
+    );
+  }
+
+  // Main render for Admins
+  return <AdminFulfillmentContent />;
+}
