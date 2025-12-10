@@ -7,15 +7,26 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { generateDesign } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors } from 'lucide-react';
-import { Artwork } from '@/lib/types';
+import { Artwork, ServiceCartItem } from '@/lib/types';
 import GangSheetBuilder from './gang-sheet-builder';
 import { removeBackground } from '@/ai/flows/remove-background';
+import { useCart } from '@/hooks/use-cart';
 
 interface AiDesignGeneratorProps {
     onDesignGenerated: (artwork: Artwork) => void;
 }
 
+// Define the AI Design product details
+const AI_DESIGN_FEE_PRODUCT: Omit<ServiceCartItem, 'quantity'> = {
+    id: 'ai-design-service',
+    type: 'service',
+    name: 'AI Design Creation',
+    price: 5.00, // The per-creation fee
+};
+
+
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
+    const { addItem: addToCart } = useCart();
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
@@ -90,6 +101,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const handleAddArtToSheet = () => {
         if (!generatedImage) return;
 
+        // 1. Create the visual artwork to be added to the builder
         const newArtwork: Artwork = {
             id: `ai-${Date.now()}`,
             name: prompt.substring(0, 30) || 'AI Design',
@@ -99,14 +111,22 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             dpi: 300,
         };
         
+        // 2. Add the artwork to the gang sheet builder canvas
         onDesignGenerated(newArtwork);
 
-        toast({
-            title: 'Artwork Added',
-            description: 'The AI-generated design has been added to your gang sheet builder.',
+        // 3. Add the corresponding service fee to the cart
+        addToCart({
+            ...AI_DESIGN_FEE_PRODUCT,
+            quantity: 1, // Add one fee per creation
         });
 
-        // Switch to the builder view
+
+        toast({
+            title: 'Artwork Added & Fee Applied',
+            description: 'The design is on your sheet, and the creation fee is in your cart.',
+        });
+
+        // Switch to the builder view so the user can see their new art
         document.querySelector<HTMLButtonElement>('button[data-radix-collection-item][value="builder"]')?.click();
     };
 
@@ -123,7 +143,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     </div>
                     <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
                     <CardDescription className="text-zinc-400">
-                        Describe the design you want to create, and our AI will generate it for you.
+                        Describe the design you want to create, and our AI will generate it for you. Each generation added to a sheet costs $5.00.
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">

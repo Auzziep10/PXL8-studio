@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import type { CartItem } from '@/lib/types';
+import type { CartItem, ServiceCartItem } from '@/lib/types';
 
 interface CartContextType {
   items: CartItem[];
@@ -35,7 +35,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       // Don't save large, session-specific data to localStorage.
-      const storableItems = items.map(({ artworks, previewUrl, ...rest }) => rest);
+      const storableItems = items.map(item => {
+        if (item.type === 'sheet') {
+          // For sheets, remove the large, session-specific data
+          const { artworks, previewUrl, ...rest } = item;
+          return rest;
+        }
+        // For services, the whole item is storable
+        return item;
+      });
       localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
     } catch (error) {
       console.error('Failed to save cart to localStorage', error);
@@ -47,7 +55,17 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
   const addItem = (item: CartItem) => {
     setItems((prevItems) => {
-      // For this simplified logic, all new gang sheets are unique items
+       // If the item is a service, check if it already exists and update quantity
+      if (item.type === 'service') {
+        const existingItemIndex = prevItems.findIndex(i => i.id === item.id && i.type === 'service');
+        if (existingItemIndex > -1) {
+          const updatedItems = [...prevItems];
+          const existingItem = updatedItems[existingItemIndex] as ServiceCartItem;
+          existingItem.quantity += item.quantity;
+          return updatedItems;
+        }
+      }
+      // For new services or any sheet items, add them to the cart
       return [...prevItems, item];
     });
   };

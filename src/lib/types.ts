@@ -9,6 +9,7 @@ export interface User {
   lastName: string;
   email: string;
   role: UserRole;
+  address?: ShippingAddress;
 }
 
 export enum OrderStatus {
@@ -82,15 +83,28 @@ export interface SheetSize {
     usage: 'Builder' | 'Upload' | 'AI';
 }
 
-// This represents a complex item in the user's cart, before checkout.
-// It can contain temporary data like data: URLs.
-export interface CartItem {
+// Represents a physical gang sheet in the cart
+export interface SheetCartItem {
   id: string;
+  type: 'sheet';
   sheetSize: SheetSize;
   previewUrl: string; 
   artworks: ArtworkOnCanvas[];
   quantity: number;
 }
+
+// Represents a non-physical service item in the cart
+export interface ServiceCartItem {
+  id: string;
+  type: 'service';
+  name: string;
+  price: number;
+  quantity: number;
+}
+
+// The CartItem is a union of all possible item types in the cart.
+export type CartItem = SheetCartItem | ServiceCartItem;
+
 
 export enum SheetSizeEnum {
   SMALL = 'SMALL',
