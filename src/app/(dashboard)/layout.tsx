@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -19,7 +20,7 @@ import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
-import React, { useEffect, useState, cloneElement, Children } from 'react';
+import React, { useEffect, useState } from 'react';
 import { doc } from 'firebase/firestore';
 import type { User as AppUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
@@ -73,8 +74,10 @@ export default function DashboardLayout({
   
   const accessibleAdminNavItems = adminNavItems.filter(item => {
     if (item.roles.includes('admin') && isAdmin) return true;
-    if (item.roles.includes('customer') && !isAdmin) return true; // Only show overview for customers
-    if (item.href === '/dashboard' && isAdmin) return true; // Admins should see overview too
+    // Show 'Overview' to customers, but not other admin links.
+    if (item.roles.includes('customer') && !isAdmin && item.href === '/dashboard') return true;
+    // Admins should also see the 'Overview' link.
+    if (item.href === '/dashboard' && isAdmin) return true;
     return false;
   });
 
@@ -200,3 +203,5 @@ export default function DashboardLayout({
     </SidebarProvider>
   );
 }
+
+    

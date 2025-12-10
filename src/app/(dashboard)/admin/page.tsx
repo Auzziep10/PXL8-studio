@@ -144,14 +144,17 @@ export default function AdminPage() {
         setIsAdmin(true);
       } else {
         setIsAdmin(false);
+        // If the user is definitively not an admin, redirect them.
+        router.push('/dashboard');
       }
       setIsAuthCheckComplete(true);
     }
-  }, [user, userProfile, isUserLoading, isProfileLoading]);
+  }, [user, userProfile, isUserLoading, isProfileLoading, router]);
 
   // Firestore Queries - Gated by isAdmin check
   const ordersQuery = useMemoFirebase(
     () => {
+      // Return null and do not create the query unless the auth check is complete AND the user is an admin.
       if (firestore && isAuthCheckComplete && isAdmin) {
         return query(collection(firestore, 'orders'));
       }
@@ -163,6 +166,7 @@ export default function AdminPage() {
 
   const usersQuery = useMemoFirebase(
     () => {
+       // Return null and do not create the query unless the auth check is complete AND the user is an admin.
       if (firestore && isAuthCheckComplete && isAdmin) {
         return query(collection(firestore, 'users'));
       }
@@ -476,6 +480,7 @@ export default function AdminPage() {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center">
              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+             <p className="text-zinc-400 mt-4">Verifying credentials...</p>
         </div>
     );
   }
@@ -484,12 +489,12 @@ export default function AdminPage() {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center">
             <h2 className="text-2xl font-bold text-white mb-2">Access Denied</h2>
-            <p className="text-zinc-400">You do not have permission to view this page.</p>
+            <p className="text-zinc-400">Redirecting to your dashboard...</p>
         </div>
     );
   }
 
-  // Main render
+  // Main render for Admins
   return (
     <div className="flex flex-col h-full max-w-7xl mx-auto w-full px-4 py-8">
       {/* Header Area */}
@@ -1004,3 +1009,5 @@ export default function AdminPage() {
     </div>
   );
 }
+
+    
