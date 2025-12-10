@@ -1,8 +1,8 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, deleteDoc, doc, serverTimestamp, writeBatch } from 'firebase/firestore';
 import { SheetSize } from '@/lib/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +30,14 @@ import { formatCurrency } from '@/lib/utils';
 
 type SheetSizeWithId = SheetSize & { id: string };
 
+const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
+    { name: 'Small', width: 22, height: 24, price: 24.00 },
+    { name: 'Medium', width: 22, height: 36, price: 36.00 },
+    { name: 'Large', width: 22, height: 60, price: 55.00 },
+    { name: 'X-Large', width: 22, height: 120, price: 100.00 },
+    { name: 'XX-Large', width: 22, height: 240, price: 180.00 },
+];
+
 export default function PricingAdminPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
@@ -43,6 +51,33 @@ export default function PricingAdminPage() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSheet, setEditingSheet] = useState<SheetSizeWithId | null>(null);
   const [formData, setFormData] = useState({ name: '', width: '', height: '', price: '' });
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  // Effect to seed database if it's empty
+  useEffect(() => {
+    const seedDatabase = async () => {
+      if (firestore && !isLoading && sheetSizes && sheetSizes.length === 0 && !isSeeding) {
+        setIsSeeding(true);
+        toast({ title: 'No tiers found.', description: 'Seeding database with default pricing tiers...' });
+        try {
+          const batch = writeBatch(firestore);
+          defaultSheetSizes.forEach(sheet => {
+            const docRef = doc(collection(firestore, 'sheetSizes'));
+            batch.set(docRef, { ...sheet, createdAt: serverTimestamp() });
+          });
+          await batch.commit();
+          toast({ title: 'Success', description: 'Default tiers have been added.' });
+        } catch (error: any) {
+          console.error("Failed to seed pricing tiers:", error);
+          toast({ variant: 'destructive', title: 'Seeding Failed', description: error.message });
+        } finally {
+          setIsSeeding(false);
+        }
+      }
+    };
+    seedDatabase();
+  }, [firestore, sheetSizes, isLoading, toast, isSeeding]);
+
 
   const sortedSheetSizes = useMemo(() => {
     if (!sheetSizes) return [];
@@ -86,8 +121,8 @@ export default function PricingAdminPage() {
       price: parseFloat(formData.price),
     };
 
-    if (Object.values(sheetData).some(v => isNaN(v as number) && typeof v === 'number')) {
-      toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please ensure all numeric fields are valid numbers.' });
+    if (Object.values(sheetData).some(v => (typeof v === 'number' && isNaN(v)) || v === '')) {
+      toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please ensure all fields are filled and numeric fields are valid numbers.' });
       return;
     }
 
@@ -176,7 +211,7 @@ export default function PricingAdminPage() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {isLoading || isSeeding ? (
               <TableRow>
                 <TableCell colSpan={4} className="text-center text-zinc-500 py-8">
                   Loading pricing tiers...

@@ -13,22 +13,6 @@ interface CartContextType {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-// Helper function to safely stringify JSON, handling potential circular references
-// and removing large data URLs before storage.
-function safeStringifyForStorage(items: CartItem[]): string {
-  const storableItems = items.map(item => {
-    // Only store URLs for persistence, not the full data URLs if they are long
-    const { previewUrl, printReadyUrl, ...rest } = item;
-    return { 
-        ...rest, 
-        previewUrl: previewUrl.startsWith('data:') ? '' : previewUrl,
-        printReadyUrl: printReadyUrl.startsWith('data:') ? '' : printReadyUrl
-    };
-  });
-  return JSON.stringify(storableItems);
-}
-
-
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
 
@@ -37,8 +21,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const storedItems = localStorage.getItem('pxl8-cart');
       if (storedItems) {
-        // Since we don't store the image data, this is safe to parse.
-        // The app must handle cases where image URLs are empty.
+        // Since we don't store image data, this should be safe to parse.
+        // We only persist the non-volatile parts of the cart.
         setItems(JSON.parse(storedItems));
       }
     } catch (error) {
@@ -50,8 +34,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save to localStorage whenever items change
   useEffect(() => {
     try {
-      // Don't save image data or the large artworks array to local storage. It can exceed limits.
-      const storableItems = items.map(({ previewUrl, printReadyUrl, artworks, ...rest }) => rest);
+      // Don't save large, session-specific data to localStorage.
+      const storableItems = items.map(({ artworks, previewUrl, ...rest }) => rest);
       localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
     } catch (error) {
       console.error('Failed to save cart to localStorage', error);

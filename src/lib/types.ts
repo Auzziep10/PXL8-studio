@@ -86,9 +86,8 @@ export interface SheetSize {
 export interface CartItem {
   id: string;
   sheetSize: SheetSize;
-  previewUrl: string; // Customer-facing image (no QR)
-  printReadyUrl: string; // Production image (with QR) -> This will be generated at checkout now
-  artworks: ArtworkOnCanvas[]; // This is now for client-side state only, to regenerate the print file
+  previewUrl: string; 
+  artworks: ArtworkOnCanvas[];
   quantity: number;
 }
 

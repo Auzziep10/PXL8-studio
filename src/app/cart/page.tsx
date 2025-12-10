@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -19,7 +18,6 @@ import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/fi
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
-import { SHEET_DIMENSIONS } from '@/lib/constants';
 
 interface CheckoutFormData {
     firstName: string;
@@ -422,9 +420,20 @@ export default function CartPage() {
         }
     };
     
-    const handlePreview = (url: string, size: SheetSizeType) => {
-        setPreviewState({ url, size });
+    const handlePreview = (item: CartItem) => {
+        // Use the session-specific previewUrl from the cart item
+        if (item.previewUrl) {
+            setPreviewState({ url: item.previewUrl, size: item.sheetSize });
+        } else {
+            // As a fallback, you could try to generate it again, or show an error
+            toast({
+                variant: 'destructive',
+                title: 'Preview Unavailable',
+                description: 'The preview for this item could not be loaded.',
+            });
+        }
     };
+
 
     if (cartItems.length === 0) {
         return (
@@ -470,7 +479,7 @@ export default function CartPage() {
                                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
                                     <div 
                                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
-                                        onClick={() => handlePreview(item.previewUrl, item.sheetSize)}
+                                        onClick={() => handlePreview(item)}
                                     >
                                         <NextImage src={item.previewUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
                                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">

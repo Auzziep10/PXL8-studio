@@ -1,25 +1,40 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SheetSize, CartItem, ArtworkOnCanvas } from '@/lib/types';
-import { SHEET_DIMENSIONS } from '@/lib/constants';
+import { CartItem, ArtworkOnCanvas, SheetSize as SheetType } from '@/lib/types';
 import { Upload, FileText, CheckCircle, ArrowRight, Trash2, ShieldCheck, Ruler } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection } from 'firebase/firestore';
 
 export default function PrebuiltUploadPage() {
     const { addItem: onAddToCart } = useCart();
     const { toast } = useToast();
+    const firestore = useFirestore();
 
-    const [selectedSize, setSelectedSize] = useState<SheetSize>(SheetSize.MEDIUM);
+    const sheetSizesQuery = useMemoFirebase(
+        () => (firestore ? collection(firestore, 'sheetSizes') : null),
+        [firestore]
+    );
+    const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
+
+    const [selectedSizeId, setSelectedSizeId] = useState<string | null>(null);
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [detectedDimensions, setDetectedDimensions] = useState<{w: number, h: number} | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!selectedSizeId && sheetSizes && sheetSizes.length > 0) {
+            setSelectedSizeId(sheetSizes[1]?.id || sheetSizes[0].id); // Default to medium or first
+        }
+    }, [sheetSizes, selectedSizeId]);
+
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -52,22 +67,24 @@ export default function PrebuiltUploadPage() {
     };
 
     const autoSelectSize = (width: number, height: number) => {
-        let bestFit: SheetSize | null = null;
+        if (!sheetSizes) return;
+
+        let bestFitId: string | null = null;
         let smallestArea = Infinity;
 
-        Object.entries(SHEET_DIMENSIONS).forEach(([key, config]) => {
+        sheetSizes.forEach((config) => {
             const fitStandard = width <= config.width && height <= config.height;
             if (fitStandard) {
                 const area = config.width * config.height;
                 if (area < smallestArea) {
                     smallestArea = area;
-                    bestFit = key as SheetSize;
+                    bestFitId = config.id;
                 }
             }
         });
 
-        if (bestFit) {
-            setSelectedSize(bestFit);
+        if (bestFitId) {
+            setSelectedSizeId(bestFitId);
         }
     };
 
@@ -80,10 +97,20 @@ export default function PrebuiltUploadPage() {
             });
             return;
         }
+        
+        if (!selectedSizeId || !sheetSizes) {
+            toast({
+                variant: 'destructive',
+                title: 'Size not selected',
+                description: 'Please select a sheet size.',
+            });
+            return;
+        }
 
         setIsProcessing(true);
         try {
-            const sheetConfig = SHEET_DIMENSIONS[selectedSize];
+            const sheetConfig = sheetSizes.find(s => s.id === selectedSizeId);
+            if (!sheetConfig) throw new Error("Selected size not found");
 
             // Create a single artwork item representing the entire uploaded sheet
             const uploadedArtwork: ArtworkOnCanvas = {
@@ -102,12 +129,8 @@ export default function PrebuiltUploadPage() {
 
             const item: CartItem = {
                 id: `prebuilt-${Date.now()}`,
-                sheetSize: {
-                    name: `${sheetConfig.width}" x ${sheetConfig.height}"`,
-                    ...sheetConfig,
-                },
+                sheetSize: sheetConfig,
                 previewUrl: previewUrl, // The uploaded image serves as its own preview
-                printReadyUrl: '', // This will be generated at checkout
                 artworks: [uploadedArtwork], // Embed the single artwork
                 quantity: quantity,
             };
@@ -164,11 +187,13 @@ export default function PrebuiltUploadPage() {
                         </div>
                         
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2 builder-scroll">
-                             {Object.entries(SHEET_DIMENSIONS).map(([key, config]) => (
+                             {isLoadingSizes ? (
+                                <p>Loading sizes...</p>
+                             ) : sheetSizes?.map((config) => (
                                 <label 
-                                    key={key} 
+                                    key={config.id} 
                                     className={`relative group cursor-pointer rounded-2xl border p-6 transition-all duration-300 ${
-                                        selectedSize === key 
+                                        selectedSizeId === config.id 
                                         ? 'bg-zinc-800/80 border-primary ring-1 ring-primary/50 shadow-[0_0_20px_rgba(255,138,0,0.1)]' 
                                         : 'bg-zinc-900/40 border-white/10 hover:border-white/20 hover:bg-zinc-800/60'
                                     }`}
@@ -176,19 +201,19 @@ export default function PrebuiltUploadPage() {
                                     <input
                                         type="radio"
                                         name="sheetSize"
-                                        value={key}
-                                        checked={selectedSize === key}
-                                        onChange={(e) => setSelectedSize(e.target.value as SheetSize)}
+                                        value={config.id}
+                                        checked={selectedSizeId === config.id}
+                                        onChange={(e) => setSelectedSizeId(e.target.value)}
                                         className="sr-only"
                                     />
                                     <div className="flex justify-between items-start mb-4">
-                                        <div className={`p-2 rounded-lg ${selectedSize === key ? 'bg-primary text-black' : 'bg-zinc-800 text-zinc-400'}`}>
+                                        <div className={`p-2 rounded-lg ${selectedSizeId === config.id ? 'bg-primary text-black' : 'bg-zinc-800 text-zinc-400'}`}>
                                             <FileText className="w-6 h-6" />
                                         </div>
-                                        {selectedSize === key && <CheckCircle className="w-6 h-6 text-primary" />}
+                                        {selectedSizeId === config.id && <CheckCircle className="w-6 h-6 text-primary" />}
                                     </div>
                                     <div className="mb-1">
-                                         <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold">{key}</span>
+                                         <span className="text-xs text-zinc-500 uppercase tracking-wider font-bold">{config.name}</span>
                                          <h3 className="text-lg font-bold text-white">{config.width}" x {config.height}"</h3>
                                     </div>
                                     <p className="text-sm text-zinc-400 mb-4">Perfect for bulk runs</p>
