@@ -3,7 +3,6 @@
 import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from '@/ai/flows/improve-artwork-printability';
 import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
 import type { ShippingAddress, ShippingRate } from '@/lib/types';
-import EasyPostClient from '@easypost/api';
 
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
   try {
@@ -25,9 +24,7 @@ export async function generateDesign(input: GenerateDesignFromPromptInput) {
     }
 }
 
-// --- EasyPost Logic Moved Here ---
-
-const client = new EasyPostClient(process.env.EASYPOST_API_KEY as string);
+// --- EasyPost Logic Moved Here and Refactored ---
 
 const fromAddress = {
     street1: '417 MONTGOMERY ST',
@@ -40,15 +37,17 @@ const fromAddress = {
 };
 
 async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunces: number): Promise<ShippingRate[]> {
-    if (!process.env.EASYPOST_API_KEY || process.env.EASYPOST_API_KEY === 'YOUR_API_KEY_HERE') {
+    const apiKey = process.env.EASYPOST_API_KEY;
+
+    if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
         console.error("EasyPost API key is not configured.");
         return [];
     }
-    
-    try {
-        const shipment = await client.Shipment.create({
+
+    const shipmentPayload = {
+        shipment: {
             to_address: {
-                name: 'Recipient', // EasyPost requires a name
+                name: 'Recipient', // EasyPost requires a name, can be generic
                 street1: toAddress.street,
                 city: toAddress.city,
                 state: toAddress.state,
@@ -59,14 +58,32 @@ async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunc
             parcel: {
                 weight: weightOunces,
             },
+        }
+    };
+
+    try {
+        const response = await fetch('https://api.easypost.com/v2/shipments', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${apiKey}`
+            },
+            body: JSON.stringify(shipmentPayload)
         });
+
+        if (!response.ok) {
+            const errorBody = await response.json();
+            throw new Error(`EasyPost API Error: ${response.status} ${JSON.stringify(errorBody)}`);
+        }
+
+        const shipment = await response.json();
 
         if (!shipment.rates || shipment.rates.length === 0) {
             console.warn("No rates returned from EasyPost for this shipment.");
             return [];
         }
 
-        const formattedRates: ShippingRate[] = shipment.rates.map(rate => ({
+        const formattedRates: ShippingRate[] = shipment.rates.map((rate: any) => ({
             id: rate.id,
             carrier: rate.carrier,
             service: rate.service,
@@ -77,7 +94,7 @@ async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunc
         return formattedRates.sort((a,b) => a.rate - b.rate);
 
     } catch (error) {
-        console.error("EasyPost API Error:", error);
+        console.error("EasyPost API Fetch Error:", error);
         return [];
     }
 }
