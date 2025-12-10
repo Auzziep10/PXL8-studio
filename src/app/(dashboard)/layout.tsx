@@ -97,7 +97,7 @@ export default function DashboardLayout({
 
   return (
     <SidebarProvider>
-      <Sidebar className="pt-14">
+      <Sidebar>
         <SidebarHeader>
           <Link href="/">
             <div className="flex items-center gap-2">
@@ -154,7 +154,7 @@ export default function DashboardLayout({
             </SidebarMenu>
         </SidebarFooter>
       </Sidebar>
-      <SidebarInset className="pt-14">
+      <SidebarInset>
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 sm:px-6 backdrop-blur supports-[backdrop-filter]:bg-background/60">
             <SidebarTrigger className="sm:hidden" />
             
