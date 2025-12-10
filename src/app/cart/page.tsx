@@ -197,28 +197,21 @@ export default function CartPage() {
             items: cartItems.map((item: CartItem) => {
                 // Sanitize artworks to remove complex objects before saving to Firestore
                 const artworksForDb = item.artworks.map((art: ArtworkOnCanvas) => {
-                    // Explicitly create a plain object with only the fields we want.
-                    return {
-                        id: art.id,
-                        name: art.name,
-                        imageUrl: art.imageUrl,
-                        width: art.width,
-                        height: art.height,
-                        dpi: art.dpi,
-                        x: art.x,
-                        y: art.y,
-                        canvasWidth: art.canvasWidth,
-                        canvasHeight: art.canvasHeight,
-                        quantity: art.quantity
-                    };
+                    const { analysis, analysisLoading, ...rest } = art;
+                    return rest;
                 });
     
-                // Rebuild the entire item to ensure no extra properties are included
-                const sanitizedItem: CartItem = {
+                // Rebuild the entire item to ensure no extra properties are included and nested objects are flattened.
+                const sanitizedItem = {
                     id: item.id,
-                    sheetSize: item.sheetSize,
                     quantity: item.quantity,
-                    compositeImageUrl: item.compositeImageUrl, // This is crucial
+                    compositeImageUrl: item.compositeImageUrl,
+                    sheetSize: { // Flatten the sheetSize object
+                        name: item.sheetSize.name,
+                        width: item.sheetSize.width,
+                        height: item.sheetSize.height,
+                        price: item.sheetSize.price
+                    },
                     artworks: artworksForDb,
                 };
     
@@ -601,5 +594,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    
