@@ -121,6 +121,15 @@ service cloud.firestore {
     function isOrderDataImmutableOnUpdate() {
       return request.resource.data.userId == resource.data.userId;
     }
+
+    /**
+     * isCreatingOwnOrder
+     * Validates that the order's internal 'customerId' field matches the creator's UID.
+     * This enforces the ownership link for the central orders collection.
+     */
+    function isCreatingOwnOrder() {
+        return request.resource.data.customerId == request.auth.uid;
+    }
     
     /**
      * isAdmin
@@ -261,15 +270,15 @@ service cloud.firestore {
      * @description Controls access to the central `orders` collection for fulfillment.
      * @path /orders/{orderId}
      * @allow An admin user reading, listing, or updating any order. (get, list, update)
-     * @allow Any authenticated user creating a new order. (create)
+     * @allow Any authenticated user creating a new order FOR THEMSELVES. (create)
      * @deny Non-admins from listing or updating orders. (list, update)
      */
      match /orders/{orderId} {
         // Admins have full read/update access for fulfillment.
         allow get, list, update: if isAdmin();
         
-        // Any signed-in user can create an order during checkout.
-        allow create: if isSignedIn();
+        // Any signed-in user can create an order, but only for themselves.
+        allow create: if isSignedIn() && isCreatingOwnOrder();
         
         // Orders should not be deleted from the central log.
         allow delete: if false;
