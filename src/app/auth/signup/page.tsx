@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
@@ -40,14 +40,6 @@ export default function SignUpPage() {
     }
     setIsLoading(true);
     try {
-      // Check if any users already exist to determine role
-      const usersCollectionRef = collection(firestore, 'users');
-      // Query for just one document to check for existence, which is more efficient
-      const q = query(usersCollectionRef, limit(1));
-      const usersSnapshot = await getDocs(q);
-      const isFirstUser = usersSnapshot.empty;
-      const role = isFirstUser ? 'admin' : 'customer';
-
       const userCredential = await createUserWithEmailAndPassword(
         auth,
         email,
@@ -55,29 +47,20 @@ export default function SignUpPage() {
       );
       const user = userCredential.user;
 
-      // Create a user document in Firestore
+      // Create a user document in Firestore, always with the 'customer' role.
       await setDoc(doc(firestore, 'users', user.uid), {
         id: user.uid,
         email: user.email,
         firstName: fullName.split(' ')[0] || '',
         lastName: fullName.split(' ').slice(1).join(' ') || '',
-        role: role,
+        role: 'customer', // Always assign 'customer' role
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
       });
-      
-      // If the user is the first-ever admin, also create a document in the roles_admin collection
-      if (role === 'admin') {
-        await setDoc(doc(firestore, 'roles_admin', user.uid), {
-            isAdmin: true,
-            createdAt: serverTimestamp(),
-        });
-      }
-
 
       toast({
         title: 'Account Created!',
-        description: `You've been successfully signed up as a ${role}.`,
+        description: `You've been successfully signed up as a customer.`,
       });
       router.push('/dashboard');
     } catch (error: any) {
