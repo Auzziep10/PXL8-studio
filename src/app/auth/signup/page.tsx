@@ -15,7 +15,7 @@ import { Label } from '@/components/ui/label';
 import Link from 'next/link';
 import { useAuth, useFirestore } from '@/firebase';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp, collection, getDocs } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, getDocs, query, limit } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 
 export default function SignUpPage() {
@@ -42,7 +42,9 @@ export default function SignUpPage() {
     try {
       // Check if any users already exist to determine role
       const usersCollectionRef = collection(firestore, 'users');
-      const usersSnapshot = await getDocs(usersCollectionRef);
+      // Query for just one document to check for existence, which is more efficient
+      const q = query(usersCollectionRef, limit(1));
+      const usersSnapshot = await getDocs(q);
       const isFirstUser = usersSnapshot.empty;
       const role = isFirstUser ? 'admin' : 'customer';
 
@@ -64,10 +66,11 @@ export default function SignUpPage() {
         updatedAt: serverTimestamp(),
       });
       
-      // If the user is an admin, also create a document in the roles_admin collection
+      // If the user is the first-ever admin, also create a document in the roles_admin collection
       if (role === 'admin') {
         await setDoc(doc(firestore, 'roles_admin', user.uid), {
-            isAdmin: true
+            isAdmin: true,
+            createdAt: serverTimestamp(),
         });
       }
 
