@@ -79,6 +79,7 @@ export interface SheetSize {
     width: number; // inches
     height: number; // inches
     price: number;
+    usage: 'Builder' | 'Upload' | 'AI';
 }
 
 // This represents a complex item in the user's cart, before checkout.

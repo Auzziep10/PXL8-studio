@@ -24,18 +24,22 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
-import { PlusCircle, Edit, Trash2, DollarSign, Ruler } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { formatCurrency } from '@/lib/utils';
 
 type SheetSizeWithId = SheetSize & { id: string };
 
 const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
-    { name: 'Small', width: 22, height: 24, price: 24.00 },
-    { name: 'Medium', width: 22, height: 36, price: 36.00 },
-    { name: 'Large', width: 22, height: 60, price: 55.00 },
-    { name: 'X-Large', width: 22, height: 120, price: 100.00 },
-    { name: 'XX-Large', width: 22, height: 240, price: 180.00 },
+    { name: 'Small', width: 22, height: 24, price: 24.00, usage: 'Builder' },
+    { name: 'Medium', width: 22, height: 36, price: 36.00, usage: 'Builder' },
+    { name: 'Large', width: 22, height: 60, price: 55.00, usage: 'Builder' },
+    { name: 'X-Large', width: 22, height: 120, price: 100.00, usage: 'Builder' },
+    { name: 'XX-Large', width: 22, height: 240, price: 180.00, usage: 'Builder' },
+    { name: 'Standard Upload', width: 22, height: 36, price: 36.00, usage: 'Upload' },
+    { name: 'Large Upload', width: 22, height: 60, price: 55.00, usage: 'Upload' },
+    { name: 'AI Default', width: 22, height: 24, price: 15.00, usage: 'AI' },
 ];
 
 export default function PricingAdminPage() {
@@ -50,7 +54,7 @@ export default function PricingAdminPage() {
 
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingSheet, setEditingSheet] = useState<SheetSizeWithId | null>(null);
-  const [formData, setFormData] = useState({ name: '', width: '', height: '', price: '' });
+  const [formData, setFormData] = useState({ name: '', width: '', height: '', price: '', usage: 'Builder' });
   const [isSeeding, setIsSeeding] = useState(false);
 
   // Effect to seed database if it's empty
@@ -92,10 +96,11 @@ export default function PricingAdminPage() {
         width: String(sheet.width),
         height: String(sheet.height),
         price: String(sheet.price),
+        usage: sheet.usage || 'Builder',
       });
     } else {
       setEditingSheet(null);
-      setFormData({ name: '', width: '', height: '', price: '' });
+      setFormData({ name: '', width: '', height: '', price: '', usage: 'Builder' });
     }
     setIsDialogOpen(true);
   };
@@ -109,6 +114,10 @@ export default function PricingAdminPage() {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
   };
+  
+  const handleUsageChange = (value: string) => {
+    setFormData(prev => ({...prev, usage: value}));
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -119,6 +128,7 @@ export default function PricingAdminPage() {
       width: parseFloat(formData.width),
       height: parseFloat(formData.height),
       price: parseFloat(formData.price),
+      usage: formData.usage as 'Builder' | 'Upload' | 'AI',
     };
 
     if (Object.values(sheetData).some(v => (typeof v === 'number' && isNaN(v)) || v === '')) {
@@ -153,6 +163,15 @@ export default function PricingAdminPage() {
     }
   };
 
+  const getUsageBadgeColor = (usage: string) => {
+    switch (usage) {
+        case 'Builder': return 'bg-blue-500/20 text-blue-400 border-blue-500/30';
+        case 'Upload': return 'bg-purple-500/20 text-purple-400 border-purple-500/30';
+        case 'AI': return 'bg-pink-500/20 text-pink-400 border-pink-500/30';
+        default: return 'bg-zinc-700 text-zinc-300 border-zinc-600';
+    }
+  }
+
   return (
     <div className="max-w-4xl mx-auto">
       <div className="flex justify-between items-center mb-8">
@@ -185,9 +204,24 @@ export default function PricingAdminPage() {
                   <Input id="height" name="height" type="number" step="0.1" value={formData.height} onChange={handleFormChange} required />
                 </div>
               </div>
-              <div>
-                <Label htmlFor="price">Price (USD)</Label>
-                <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleFormChange} required />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="price">Price (USD)</Label>
+                  <Input id="price" name="price" type="number" step="0.01" value={formData.price} onChange={handleFormChange} required />
+                </div>
+                <div>
+                    <Label htmlFor="usage">Usage</Label>
+                    <Select value={formData.usage} onValueChange={handleUsageChange}>
+                        <SelectTrigger id="usage">
+                            <SelectValue placeholder="Select where this tier is used" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Builder">Builder</SelectItem>
+                            <SelectItem value="Upload">Upload</SelectItem>
+                            <SelectItem value="AI">AI Creation</SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
               </div>
               <DialogFooter>
                 <DialogClose asChild>
@@ -206,6 +240,7 @@ export default function PricingAdminPage() {
             <TableRow>
               <TableHead>Name</TableHead>
               <TableHead className="flex items-center"><Ruler className="mr-2 h-4 w-4"/>Dimensions</TableHead>
+              <TableHead><Settings className="mr-2 h-4 w-4"/>Usage</TableHead>
               <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Price</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -213,7 +248,7 @@ export default function PricingAdminPage() {
           <TableBody>
             {isLoading || isSeeding ? (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-zinc-500 py-8">
+                <TableCell colSpan={5} className="text-center text-zinc-500 py-8">
                   Loading pricing tiers...
                 </TableCell>
               </TableRow>
@@ -222,6 +257,11 @@ export default function PricingAdminPage() {
                 <TableRow key={sheet.id}>
                   <TableCell className="font-medium text-white">{sheet.name}</TableCell>
                   <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
+                  <TableCell>
+                    <span className={`px-2 py-1 text-xs font-bold rounded-full border ${getUsageBadgeColor(sheet.usage)}`}>
+                        {sheet.usage}
+                    </span>
+                  </TableCell>
                   <TableCell className="text-right font-mono text-white">{formatCurrency(sheet.price)}</TableCell>
                   <TableCell className="text-right">
                     <Button variant="ghost" size="icon" onClick={() => handleOpenDialog(sheet)}>
@@ -235,7 +275,7 @@ export default function PricingAdminPage() {
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={4} className="text-center text-zinc-500 py-8">
+                <TableCell colSpan={5} className="text-center text-zinc-500 py-8">
                   No pricing tiers found. Add one to get started.
                 </TableCell>
               </TableRow>

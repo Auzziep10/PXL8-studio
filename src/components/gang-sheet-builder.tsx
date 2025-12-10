@@ -9,7 +9,7 @@ import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import AiAnalysisPanel from './ai-analysis-panel';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
 import QRCode from 'qrcode';
@@ -28,7 +28,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ newArtworks }: { newArtworks?: Artwork[] }) {
+export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?: Artwork[], usage: 'Builder' | 'AI' }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -38,8 +38,8 @@ export default function GangSheetBuilder({ newArtworks }: { newArtworks?: Artwor
   const firestore = useFirestore();
 
   const sheetSizesQuery = useMemoFirebase(
-    () => (firestore ? collection(firestore, 'sheetSizes') : null),
-    [firestore]
+    () => (firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', usage)) : null),
+    [firestore, usage]
   );
   const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
 
@@ -561,10 +561,12 @@ export default function GangSheetBuilder({ newArtworks }: { newArtworks?: Artwor
   return (
     <div className="min-h-screen pb-12 select-none">
       <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-white">Gang Sheet Builder</h1>
-          <p className="mt-2 text-zinc-400">Upload designs and drag them to arrange.</p>
-        </div>
+        {usage === 'Builder' && (
+            <div className="mb-8">
+                <h1 className="text-3xl font-bold text-white">Gang Sheet Builder</h1>
+                <p className="mt-2 text-zinc-400">Upload designs and drag them to arrange.</p>
+            </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Controls */}
@@ -585,7 +587,9 @@ export default function GangSheetBuilder({ newArtworks }: { newArtworks?: Artwor
                   )}
               </div>
               <div className="space-y-3">
-                {sheetSizes?.map((config) => (
+                {sheetSizes?.length === 0 ? (
+                    <p className="text-zinc-400 text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
+                ) : sheetSizes?.map((config) => (
                   <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
                     <div className="flex items-center relative z-10">
                       <input

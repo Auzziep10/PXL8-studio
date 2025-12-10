@@ -186,9 +186,14 @@
         "price": {
           "type": "number",
           "description": "Price for this sheet size in USD."
+        },
+        "usage": {
+          "type": "string",
+          "description": "Determines where this pricing tier is available.",
+          "enum": ["Builder", "Upload", "AI"]
         }
       },
-      "required": ["id", "name", "width", "height", "price"]
+      "required": ["id", "name", "width", "height", "price", "usage"]
     }
   },
   "auth": {

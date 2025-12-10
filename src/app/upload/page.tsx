@@ -8,7 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
-import { collection } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 
 export default function PrebuiltUploadPage() {
     const { addItem: onAddToCart } = useCart();
@@ -16,7 +16,7 @@ export default function PrebuiltUploadPage() {
     const firestore = useFirestore();
 
     const sheetSizesQuery = useMemoFirebase(
-        () => (firestore ? collection(firestore, 'sheetSizes') : null),
+        () => (firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Upload')) : null),
         [firestore]
     );
     const { data: sheetSizes, isLoading: isLoadingSizes } = useCollection<SheetType & {id: string}>(sheetSizesQuery);
@@ -189,6 +189,8 @@ export default function PrebuiltUploadPage() {
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-h-[600px] overflow-y-auto pr-2 builder-scroll">
                              {isLoadingSizes ? (
                                 <p>Loading sizes...</p>
+                             ) : sheetSizes?.length === 0 ? (
+                                <p className="text-zinc-400 col-span-2">No pricing tiers available for "Upload". Please configure them in the admin pricing manager.</p>
                              ) : sheetSizes?.map((config) => (
                                 <label 
                                     key={config.id} 
