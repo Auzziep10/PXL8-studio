@@ -262,7 +262,7 @@ export default function AdminPage() {
           o.orderId === searchTerm ||
           (Array.isArray(o.items) &&
             o.items.some(
-              (i) => i.id.includes(searchTerm)
+              (i: any) => i.id.includes(searchTerm)
             ))
       );
       if (found) {
@@ -293,7 +293,7 @@ export default function AdminPage() {
       const name = (order.customerName || '').toLowerCase();
       const items = Array.isArray(order.items) ? order.items : [];
       const hasTracking = items.some(
-        (i) => i.id.toLowerCase().includes(term)
+        (i: any) => i.id.toLowerCase().includes(term)
       );
 
       return id.includes(term) || name.includes(term) || hasTracking;
@@ -383,7 +383,7 @@ export default function AdminPage() {
       const folder = zip.folder(`Order-${targetOrder.orderId}`);
 
       for (let i = 0; i < targetOrder.items.length; i++) {
-        const item = targetOrder.items[i];
+        const item = targetOrder.items[i] as any; // Cast to any to access flattened props
 
         const urlToUse = item.compositeImageUrl;
 
@@ -475,9 +475,9 @@ export default function AdminPage() {
                     <thead><tr><th>#</th><th>Description</th><th>Qty</th></tr></thead>
                     <tbody>${targetOrder.items
                       .map(
-                        (item, idx) =>
+                        (item: any, idx) => // Cast to any
                           `<tr><td>${idx + 1}</td><td>Gang Sheet ${
-                            item.sheetSize.name
+                            item.sheetSizeName
                           }</td><td>${item.quantity}</td></tr>`
                       )
                       .join('')}</tbody>
@@ -768,7 +768,7 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className="text-xs font-medium text-white bg-zinc-800 px-2 py-1 rounded border border-white/5">
-                            {order.items[0].sheetSize.name}
+                            {(order.items[0] as any).sheetSizeName}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
@@ -885,7 +885,7 @@ export default function AdminPage() {
                       <div className="p-4 bg-black/20">
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                           {Array.isArray(order.items) &&
-                            order.items.map((item, idx: number) => (
+                            order.items.map((item: any, idx: number) => (
                               <div
                                 key={idx}
                                 className="relative aspect-square bg-checkerboard-dark rounded-lg border border-white/5 overflow-hidden group cursor-zoom-in"
@@ -1004,7 +1004,7 @@ export default function AdminPage() {
                 </div>
                 <div className="space-y-6">
                   {Array.isArray(selectedOrder.items) &&
-                    selectedOrder.items.map((item, idx) => {
+                    selectedOrder.items.map((item: any, idx) => {
                       const gangSheetItem: GangSheetItem = {
                         id: item.id,
                         file: null,
@@ -1012,8 +1012,8 @@ export default function AdminPage() {
                         originalUrl: '', // Original URL is not stored with this new model
                         previewUrl: item.compositeImageUrl,
                         originalFileName: `sheet-${idx + 1}.png`,
-                        width: item.sheetSize.width,
-                        height: item.sheetSize.height,
+                        width: item.sheetWidth,
+                        height: item.sheetHeight,
                         quantity: item.quantity,
                         trackingId: item.id,
                         originalHeightPx: 0,

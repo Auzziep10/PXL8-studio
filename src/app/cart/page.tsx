@@ -195,19 +195,16 @@ export default function CartPage() {
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
             items: cartItems.map((item: CartItem) => {
-                // The item data is now much simpler.
-                // We just need to ensure we save the plain object.
+                // FORCE a plain object by reconstructing it field by field.
+                // This is the definitive fix for "invalid nested entity".
                 const plainItem = {
                     id: item.id,
                     quantity: item.quantity,
-                    compositeImageUrl: item.compositeImageUrl, // This now includes the QR header
-                    sheetSize: {
-                        name: item.sheetSize.name,
-                        width: item.sheetSize.width,
-                        height: item.sheetSize.height,
-                        price: item.sheetSize.price
-                    },
-                    artworks: [] // This is now empty, as per the new design
+                    compositeImageUrl: item.compositeImageUrl,
+                    sheetSizeName: item.sheetSize.name,
+                    sheetWidth: item.sheetSize.width,
+                    sheetHeight: item.sheetSize.height,
+                    sheetPrice: item.sheetSize.price,
                 };
                 return plainItem;
             }),

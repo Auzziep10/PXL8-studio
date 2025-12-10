@@ -28,6 +28,19 @@ export interface ShippingAddress {
     country: string;
 }
 
+// This represents the structure of an item once it's part of an Order.
+// It's a "flattened" version for simple database storage.
+export interface OrderItem {
+  id: string;
+  quantity: number;
+  compositeImageUrl: string;
+  sheetSizeName: string;
+  sheetWidth: number;
+  sheetHeight: number;
+  sheetPrice: number;
+}
+
+
 export interface Order {
   id: string;
   orderId: string;
@@ -35,7 +48,7 @@ export interface Order {
   customerName: string;
   orderDate: string;
   status: OrderStatus;
-  items: CartItem[];
+  items: OrderItem[];
   total: number;
   shippingAddress: ShippingAddress;
   trackingId: string;
@@ -69,11 +82,13 @@ export interface SheetSize {
     price: number;
 }
 
+// This represents a complex item in the user's cart, before checkout.
+// It can contain temporary data like data: URLs.
 export interface CartItem {
-  id: string; // This will now be the tracking ID (e.g., TRK-1678886400000)
+  id: string;
   sheetSize: SheetSize;
   compositeImageUrl: string;
-  artworks: ArtworkOnCanvas[]; // This will now be empty when saved to the order
+  artworks: ArtworkOnCanvas[]; // This is now for client-side state only
   quantity: number;
 }
 
