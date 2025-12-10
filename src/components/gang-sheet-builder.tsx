@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -512,6 +513,36 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
       }
   };
 
+    const getRotatedBoundingBox = (item: ArtworkOnCanvas) => {
+        const rad = (item.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const w = item.width;
+        const h = item.height;
+        const cx = item.x + w / 2;
+        const cy = item.y + h / 2;
+
+        const corners = [
+            { x: -w / 2, y: -h / 2 },
+            { x: w / 2, y: -h / 2 },
+            { x: w / 2, y: h / 2 },
+            { x: -w / 2, y: h / 2 },
+        ];
+
+        const rotatedCorners = corners.map(corner => ({
+            x: cx + corner.x * cos - corner.y * sin,
+            y: cy + corner.x * sin + corner.y * cos,
+        }));
+        
+        return {
+            minX: Math.min(...rotatedCorners.map(c => c.x)),
+            maxX: Math.max(...rotatedCorners.map(c => c.x)),
+            minY: Math.min(...rotatedCorners.map(c => c.y)),
+            maxY: Math.max(...rotatedCorners.map(c => c.y)),
+        };
+    };
+
   const handleMouseMove = useCallback((e: MouseEvent) => {
       if (rotatingState && draggingId && containerRef.current) {
           const sheetRect = containerRef.current.querySelector('.sheet-canvas')?.getBoundingClientRect();
@@ -547,29 +578,37 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
       
       if (!draggingId || !containerRef.current) return;
       
-      // We need to convert mouse movement (pixels) to sheet coordinates (inches)
       const sheetRect = containerRef.current.querySelector('.sheet-canvas')?.getBoundingClientRect();
       if (!sheetRect) return;
 
-      const mouseX = e.clientX - sheetRect.left - dragOffset.x;
-      const mouseY = e.clientY - sheetRect.top - dragOffset.y;
-
-      let newX = mouseX / (PPI * scale);
-      let newY = mouseY / (PPI * scale);
-
       const item = items.find(i => i.id === draggingId);
-      if (item) {
-          // Clamp to stay within sheet boundaries
-          newX = Math.max(0, Math.min(newX, sheetConfig.width - item.width));
-          newY = Math.max(0, Math.min(newY, sheetConfig.height - item.height)); 
-      }
+      if (!item) return;
 
-      setItems(prev => prev.map(i => {
-          if (i.id === draggingId) {
-              return { ...i, x: newX, y: newY };
-          }
-          return i;
-      }));
+      const mouseXOnSheet = e.clientX - sheetRect.left;
+      const mouseYOnSheet = e.clientY - sheetRect.top;
+
+      const dragOffsetXInSheet = dragOffset.x;
+      const dragOffsetYInSheet = dragOffset.y;
+
+      // Proposed top-left in sheet pixels
+      const sheetPixelX = mouseXOnSheet - dragOffsetXInSheet;
+      const sheetPixelY = mouseYOnSheet - dragOffsetYInSheet;
+
+      // Convert to inches
+      let newX = sheetPixelX / (PPI * scale);
+      let newY = sheetPixelY / (PPI * scale);
+
+      // Get the bounding box of the rotated item at the new potential position
+      const tempItem = { ...item, x: newX, y: newY };
+      const bbox = getRotatedBoundingBox(tempItem);
+
+      // Adjust newX and newY if the bounding box is out of bounds
+      if (bbox.minX < 0) newX -= bbox.minX;
+      if (bbox.maxX > sheetConfig.width) newX -= (bbox.maxX - sheetConfig.width);
+      if (bbox.minY < 0) newY -= bbox.minY;
+      if (bbox.maxY > sheetConfig.height) newY -= (bbox.maxY - sheetConfig.height);
+
+      setItems(prev => prev.map(i => i.id === draggingId ? { ...i, x: newX, y: newY } : i));
 
   }, [draggingId, dragOffset, scale, sheetConfig.width, sheetConfig.height, items, resizingState, rotatingState]);
 
@@ -654,7 +693,10 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
       });
   };
 
-  const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
+  const isSheetOverflowing = items.some(i => {
+    const bbox = getRotatedBoundingBox(i);
+    return bbox.maxY > sheetConfig.height;
+  });
 
   const generatePreviewSheet = async (): Promise<string> => {
     const BASE_DPI = 300;
@@ -681,7 +723,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
     items.forEach(item => {
         const img = imageCache[item.imageUrl];
-        if (img && (item.y + item.height <= sheetConfig.height)) {
+        if (img && !isSheetOverflowing) {
             const centerX = (item.x + item.width / 2) * BASE_DPI;
             const centerY = (item.y + item.height / 2) * BASE_DPI;
 
@@ -1012,8 +1054,17 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                  >
                     {items.map((item) => {
                         const isSelected = selectedItemId === item.id;
-                        const isColliding = checkCollision(item);
-                        const isOutOfBounds = (item.y + item.height) > sheetConfig.height || (item.x + item.width) > sheetConfig.width;
+                        
+                        const itemBBox = getRotatedBoundingBox(item);
+                        const isOutOfBounds = itemBBox.minX < 0 || itemBBox.maxX > sheetConfig.width || itemBBox.minY < 0 || itemBBox.maxY > sheetConfig.height;
+
+                        const isColliding = items.some(other => {
+                            if (other.id === item.id) return false;
+                            const thisBBox = itemBBox;
+                            const otherBBox = getRotatedBoundingBox(other);
+
+                            return !(thisBBox.maxX <= otherBBox.minX || thisBBox.minX >= otherBBox.maxX || thisBBox.maxY <= otherBBox.minY || thisBBox.minY >= otherBBox.maxY);
+                        });
                         
                         const itemRef = React.createRef<HTMLDivElement>();
 
@@ -1027,15 +1078,18 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                     top: `${item.y * PPI * scale}px`,
                                     width: `${item.width * PPI * scale}px`,
                                     height: `${item.height * PPI * scale}px`,
+                                    transformOrigin: 'center center',
                                     transform: `rotate(${item.rotation || 0}deg)`,
                                     zIndex: isSelected ? 50 : 10,
                                 }}
                                 onMouseDown={(e) => handleMouseDownOnItem(e, item.id)}
                             >
-                                <div className={`w-full h-full relative transition-all duration-150 
-                                    ${isSelected ? 'outline outline-2 outline-primary outline-offset-2' : ''}
-                                    ${isColliding || isOutOfBounds ? 'bg-red-500/20' : ''}
-                                `}>
+                                <div className={`w-full h-full relative transition-all duration-150`}>
+                                    <div className={`absolute -inset-0.5 border-2 rounded transition-all duration-150 pointer-events-none 
+                                        ${isSelected ? 'border-primary' : 'border-transparent'}
+                                        ${(isColliding || isOutOfBounds) ? '!border-red-500' : ''}
+                                    `}></div>
+
                                     {item.imageUrl ? (
                                       <img 
                                           src={item.imageUrl} 
@@ -1045,25 +1099,21 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                     ) : (
                                       <div className="w-full h-full bg-zinc-800/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
                                     )}
-                                    
-                                    {(isColliding || isOutOfBounds) && !isSelected && (
-                                        <div className="absolute inset-0 border-2 border-red-500 pointer-events-none"></div>
-                                    )}
 
                                     {isSelected && (
                                         <>
                                             <div 
-                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm z-10"
+                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm z-20"
                                                 onMouseDown={(e) => handleMouseDownOnResizeHandle(e, item.id)}
                                             ></div>
                                             <div 
-                                                className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-alias flex items-center justify-center z-10"
+                                                className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-alias flex items-center justify-center z-20"
                                                 onMouseDown={(e) => handleMouseDownOnRotateHandle(e, item.id, itemRef.current!)}
                                             >
                                               <RotateCw className="w-3 h-3 text-primary"/>
                                             </div>
                                             <button 
-                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-10"
+                                                className="absolute -top-2 -right-2 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform z-20 border-2 border-background"
                                                 onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
                                             >
                                               <X className="w-3 h-3" />
