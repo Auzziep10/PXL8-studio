@@ -567,7 +567,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           return i;
       }));
 
-  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, rotatingState, updateItem]);
+  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, rotatingState]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
@@ -812,7 +812,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
               </div>
             </div>
 
-            {selectedItem && (
+            {selectedItem ? (
                  <div className="glass-panel rounded-2xl p-6 space-y-4">
                      <div className="flex justify-between items-center">
                         <h3 className="text-lg font-semibold text-white">Selected Artwork</h3>
@@ -897,6 +897,10 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                       </Button>
                       <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
                  </div>
+            ) : (
+                <div className="glass-panel rounded-2xl p-6">
+                    <p className="text-sm text-center text-zinc-400">Select an artwork on the canvas to see its details and use AI tools.</p>
+                </div>
             )}
 
             {/* 2. Upload & Item List */}

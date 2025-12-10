@@ -36,6 +36,27 @@ export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAn
       )
   }
 
+  if (artwork.analysisLoading) {
+    return (
+      <Card className="bg-secondary">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wand2 className="text-primary" />
+            AI Artwork Analysis
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="text-center">
+          <p className="text-sm text-muted-foreground mb-4">
+            Checking your artwork for printability issues and get a safety assessment.
+          </p>
+          <Button onClick={onAnalyze} disabled={true}>
+            Analyzing...
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
   if (!analysis) {
     return (
       <Card className="bg-secondary">
