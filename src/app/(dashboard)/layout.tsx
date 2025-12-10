@@ -14,7 +14,7 @@ import {
   SidebarInset,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Home, LayoutGrid, User, Settings, LogOut } from 'lucide-react';
+import { Home, LayoutGrid, User, Settings, LogOut, DollarSign } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -61,6 +61,7 @@ export default function DashboardLayout({
   const navItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
     { href: '/admin', label: 'Fulfillment', icon: LayoutGrid, roles: ['admin'] },
+    { href: '/admin/pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
   ];
   
   const accessibleNavItems = navItems.filter(item => {

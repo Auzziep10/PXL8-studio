@@ -160,6 +160,35 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "SheetSize": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "SheetSize",
+      "type": "object",
+      "description": "Represents a pricing tier for a gang sheet size.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the SheetSize entity."
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name for the sheet size (e.g., Small, 22x24)."
+        },
+        "width": {
+          "type": "number",
+          "description": "Width of the sheet in inches."
+        },
+        "height": {
+          "type": "number",
+          "description": "Height of the sheet in inches."
+        },
+        "price": {
+          "type": "number",
+          "description": "Price for this sheet size in USD."
+        }
+      },
+      "required": ["id", "name", "width", "height", "price"]
     }
   },
   "auth": {
@@ -225,8 +254,24 @@
             }
           ]
         }
+      },
+      {
+        "path": "/sheetSizes/{sheetSizeId}",
+        "definition": {
+          "entityName": "SheetSize",
+          "schema": {
+            "$ref": "#/backend/entities/SheetSize"
+          },
+          "description": "Stores global pricing tiers for gang sheet sizes. Writable only by admins.",
+          "params": [
+            {
+              "name": "sheetSizeId",
+              "description": "The unique identifier for the sheet size."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "The Firestore structure is designed to store user data, gang sheets, and orders in a way that prioritizes security, scalability, and ease of debugging. Authorization Independence is achieved by leveraging path-based ownership for gang sheets and orders, eliminating the need for complex `get()` calls in security rules. All `list` operations are secured by the path-based ownership, ensuring that users can only access their own data. This also adheres to the principle that \"Rules are not Filters\" (QAPs). The structure uses explicit state modeling via the 'status' field in the Order entity. Furthermore, the data model enforces radical consistency by utilizing semantic naming conventions for collections, documents, and fields (e.g., always `userId` for user references). The use of hierarchical paths for User-owned entities like GangSheets (`/users/{userId}/gangSheets/{gangSheetId}`) and Orders (`/users/{userId}/orders/{orderId}`) ensures that ownership-based security rules are simple and efficient. This structure facilitates secure `list` operations since rules can simply check `request.auth.uid == userId`."
+    "reasoning": "The Firestore structure is designed to store user data, gang sheets, and orders in a way that prioritizes security, scalability, and ease of debugging. Authorization Independence is achieved by leveraging path-based ownership for gang sheets and orders, eliminating the need for complex `get()` calls in security rules. All `list` operations are secured by the path-based ownership, ensuring that users can only access their own data. This also adheres to the principle that \"Rules are not Filters\" (QAPs). The structure uses explicit state modeling via the 'status' field in the Order entity. Furthermore, the data model enforces radical consistency by utilizing semantic naming conventions for collections, documents, and fields (e.g., always `userId` for user references). The use of hierarchical paths for User-owned entities like GangSheets (`/users/{userId}/gangSheets/{gangSheetId}`) and Orders (`/users/{userId}/orders/{orderId}`) ensures that ownership-based security rules are simple and efficient. This structure facilitates secure `list` operations since rules can simply check `request.auth.uid == userId`. The new `/sheetSizes` collection is a global, root-level collection for pricing information, readable by all authenticated users but writable only by admins."
   }
 }
