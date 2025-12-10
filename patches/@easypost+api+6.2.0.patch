@@ -1,0 +1,26 @@
+diff --git a/node_modules/@easypost/api/dist/easypost.js b/node_modules/@easypost/api/dist/easypost.js
+index 0570530..220310e 100644
+--- a/node_modules/@easypost/api/dist/easypost.js
++++ b/node_modules/@easypost/api/dist/easypost.js
+@@ -524,7 +524,11 @@
+       const contentType = res.headers.get('content-type');
+ 
+       if (contentType && contentType.includes('application/json')) {
+-        return res.json();
++        try {
++          return res.json();
++        } catch (e) {
++          return res.text();
++        }
+       }
+ 
+       return res.text();
+@@ -628,7 +632,7 @@
+   }
+ 
+   async _handleMultipart(req) {
+-    const formidable = await import('formidable');
++    const formidable = (await import('formidable')).default;
+     const form = formidable({
+       multiples: true,
+     });
