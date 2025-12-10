@@ -1,36 +1,4 @@
 
-/**
- * Core Philosophy: This ruleset enforces a strict user-ownership model where all
- * user-generated data is private and accessible only by its creator. The security
- * model is designed for simplicity, performance, and clear authorization boundaries.
- *
- * Data Structure: All data is hierarchically organized under the /users/{userId}
- * path. Each user has their own "data tree," containing their profile and subcollections
- * for their private content like 'gangSheets' and 'orders'. This structure inherently
- * links data to its owner via the document path.
- *
- * Key Security Decisions:
- * - User Isolation: Users are completely isolated from one another. They cannot
- *   read, write, or even list data belonging to other users.
- * - No Global Listing: Listing documents from the top-level '/users' collection is
- *   explicitly forbidden to prevent user enumeration attacks.
- * - Path-Based Security: Authorization relies on the {userId} wildcard in the path,
- *   making rules fast and efficient by avoiding costly `get()` or `exists()` calls
- *   to other documents for ownership checks.
- * - Relational Integrity: On document creation, the rules validate that the internal
- *   `userId` field matches the `userId` in the path, ensuring data consistency.
- *   This foreign key is immutable on update.
- *
- * Denormalization for Authorization: The hierarchical structure `/users/{userId}/...`
- * is a form of denormalization for authorization. By placing user content in a
- * subcollection, the ownership is baked into the path itself. This allows for simple,
- * performant rules like `request.auth.uid == userId` without needing extra lookups.
- *
- * Structural Segregation: The system uses a strict hierarchical structure, with all
- * user-specific data (profiles, gang sheets, orders) segregated into subcollections
- * under that user's root document. This is inherently more secure than a flat
- * collection with an owner ID field, especially for list operations.
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
@@ -134,11 +102,11 @@ service cloud.firestore {
     
     /**
      * isAdmin
-     * Checks if the user has an 'admin' custom claim on their auth token.
-     * This is the secure way to check for admin privileges.
+     * Checks if the user is an admin by looking at custom claims OR a document in the roles_admin collection.
      */
     function isAdmin() {
-      return isSignedIn() && request.auth.token.admin == true;
+      return isSignedIn() && 
+             (request.auth.token.admin == true || exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid)));
     }
 
     //-------------------------------------------------------------------------//

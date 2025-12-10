@@ -1,7 +1,7 @@
 
 'use client';
 import React, { useState, useEffect, useMemo } from 'react';
-import { Order, OrderStatus, GangSheetItem, User as AppUser, OrderItem } from '@/lib/types';
+import { Order, User as AppUser, OrderItem } from '@/lib/types';
 import {
   Printer,
   Search,
@@ -26,8 +26,9 @@ import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { checkHealth } from '@/services/backend';
 import { isCloudEnabled } from '@/lib/constants';
 import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, updateDoc, doc } from 'firebase/firestore';
+import { collection, query, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { OrderStatus } from '@/lib/types';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
@@ -121,19 +122,24 @@ const AssetCard: React.FC<{
   );
 };
 
-function AdminFulfillmentContent() {
+function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     const firestore = useFirestore();
-    // Re-instantiate necessary hooks within the authorized component
-    const { user } = useUser();
     const router = useRouter();
     const searchParams = useSearchParams();
 
-    // Firestore Queries - These are now safe because this component only renders for admins.
-    const ordersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'orders')) : null, [firestore]);
+    // Firestore Queries - Gated by isAdmin prop
+    const ordersQuery = useMemoFirebase(() => {
+        if (!firestore || !isAdmin) return null;
+        return query(collection(firestore, 'orders'));
+    }, [firestore, isAdmin]);
     const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
-    const usersQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'users')) : null, [firestore]);
+    const usersQuery = useMemoFirebase(() => {
+        if (!firestore || !isAdmin) return null;
+        return query(collection(firestore, 'users'));
+    }, [firestore, isAdmin]);
     const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
+
 
     // Component State
     const [viewMode, setViewMode] = useState<'orders' | 'customers'>('orders');
@@ -957,28 +963,49 @@ export default function AdminPage() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false);
 
-  const userDocRef = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
-    return doc(firestore, 'users', user.uid);
-  }, [firestore, user]);
-
-  const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
-
   useEffect(() => {
-    if (isUserLoading || isProfileLoading) {
-      return; // Wait for auth and profile to load
+    if (isUserLoading || !firestore) {
+      return; // Wait for auth and firestore to be available
+    }
+
+    if (!user) {
+      // Not logged in, not an admin
+      setIsAdmin(false);
+      setIsAuthCheckComplete(true);
+      router.push('/auth/login');
+      return;
     }
     
-    if (userProfile?.role === 'admin') {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
-      // If not an admin, redirect them after check is complete
-      router.push('/dashboard');
-    }
-    setIsAuthCheckComplete(true);
+    // Check for admin role in two places: custom claim and roles_admin collection
+    const checkAdminStatus = async () => {
+        try {
+            // 1. Check custom claims first for performance
+            const idTokenResult = await user.getIdTokenResult();
+            if (idTokenResult.claims.admin === true) {
+                setIsAdmin(true);
+                setIsAuthCheckComplete(true);
+                return;
+            }
 
-  }, [user, userProfile, isUserLoading, isProfileLoading, router]);
+            // 2. Fallback to checking the roles_admin collection
+            const adminRoleDoc = await getDoc(doc(firestore, 'roles_admin', user.uid));
+            if (adminRoleDoc.exists()) {
+                setIsAdmin(true);
+            } else {
+                setIsAdmin(false);
+            }
+        } catch (error) {
+            console.error("Error checking admin status:", error);
+            setIsAdmin(false);
+        } finally {
+            setIsAuthCheckComplete(true);
+        }
+    };
+    
+    checkAdminStatus();
+
+  }, [user, isUserLoading, firestore, router]);
+
 
   if (!isAuthCheckComplete) {
     return (
@@ -999,7 +1026,5 @@ export default function AdminPage() {
   }
 
   // Main render for Admins
-  return <AdminFulfillmentContent />;
+  return <AdminFulfillmentContent isAdmin={isAdmin} />;
 }
-
-    
