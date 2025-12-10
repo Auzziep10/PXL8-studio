@@ -133,11 +133,11 @@ service cloud.firestore {
     
     /**
      * isAdmin
-     * Checks if the user has an admin role document.
-     * This is a secure way to check for admin privileges.
+     * Checks if the user has an 'admin' custom claim on their auth token.
+     * This is the secure way to check for admin privileges.
      */
     function isAdmin() {
-      return isSignedIn() && exists(/databases/$(database)/documents/roles_admin/$(request.auth.uid));
+      return isSignedIn() && request.auth.token.admin == true;
     }
 
     //-------------------------------------------------------------------------//
