@@ -129,6 +129,7 @@ export default function AdminPage() {
 
   // Self-contained authorization
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isAuthCheckComplete, setIsAuthCheckComplete] = useState(false);
 
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -138,23 +139,26 @@ export default function AdminPage() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (userProfile && userProfile.role === 'admin') {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
+    if (!isProfileLoading) {
+      if (userProfile && userProfile.role === 'admin') {
+        setIsAdmin(true);
+      } else {
+        setIsAdmin(false);
+      }
+      setIsAuthCheckComplete(true);
     }
-  }, [userProfile]);
+  }, [userProfile, isProfileLoading]);
 
-  // Firestore Queries
+  // Firestore Queries - Gated by isAdmin check
   const ordersQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collection(firestore, 'orders')) : null),
-    [firestore, isAdmin]
+    () => (firestore && isAdmin && isAuthCheckComplete ? query(collection(firestore, 'orders')) : null),
+    [firestore, isAdmin, isAuthCheckComplete]
   );
   const { data: allOrders, isLoading: isLoadingOrders } = useCollection<Order>(ordersQuery);
 
   const usersQuery = useMemoFirebase(
-    () => (firestore && isAdmin ? query(collection(firestore, 'users')) : null),
-    [firestore, isAdmin]
+    () => (firestore && isAdmin && isAuthCheckComplete ? query(collection(firestore, 'users')) : null),
+    [firestore, isAdmin, isAuthCheckComplete]
   );
   const { data: allUsers, isLoading: isLoadingUsers } = useCollection<AppUser>(usersQuery);
 
@@ -457,7 +461,7 @@ export default function AdminPage() {
     printWindow.document.close();
   };
 
-  if (isProfileLoading || isUserLoading) {
+  if (isProfileLoading || isUserLoading || !isAuthCheckComplete) {
     return (
         <div className="flex flex-col items-center justify-center h-full text-center">
              <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
