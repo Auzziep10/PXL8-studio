@@ -210,7 +210,7 @@ export default function CartPage() {
                 return {
                     ...item,
                     artworks: artworksForDb,
-                    compositeImageUrl: '', // This will be generated and stored on the backend
+                    compositeImageUrl: item.compositeImageUrl, // This was the bug, it was empty.
                 };
             }),
             total: total,
