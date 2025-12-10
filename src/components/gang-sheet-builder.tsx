@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType } from '@/lib/types';
+import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem } from '@/lib/types';
 import { PPI } from '@/lib/constants';
 import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
@@ -28,7 +28,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?: Artwork[], usage: 'Builder' | 'AI' }) {
+export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?: Artwork[], usage: 'Builder' }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -511,8 +511,8 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     try {
         const previewUrl = await generatePreviewSheet();
         
-        const config = sheetConfig;
-        const cartItem: CartItem = {
+        const config = sheetConfig as SheetType & { id: string };
+        const cartItem: SheetCartItem = {
           id: `GNG-${Date.now()}`,
           type: 'sheet',
           sheetSize: {

@@ -1,38 +1,54 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Button } from './ui/button';
 import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors } from 'lucide-react';
-import { Artwork, ServiceCartItem } from '@/lib/types';
+import { Artwork, ServiceCartItem, ServiceAddOn } from '@/lib/types';
 import GangSheetBuilder from './gang-sheet-builder';
 import { removeBackground } from '@/ai/flows/remove-background';
 import { useCart } from '@/hooks/use-cart';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 
 interface AiDesignGeneratorProps {
     onDesignGenerated: (artwork: Artwork) => void;
 }
 
-// Define the AI Design product details
-const AI_DESIGN_FEE_PRODUCT: Omit<ServiceCartItem, 'quantity'> = {
-    id: 'ai-design-service',
-    type: 'service',
-    name: 'AI Design Creation',
-    price: 5.00, // The per-creation fee
-};
-
-
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
     const { addItem: addToCart } = useCart();
+    const { toast } = useToast();
+    const firestore = useFirestore();
+
     const [prompt, setPrompt] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const { toast } = useToast();
     const [view, setView] = useState<'generate' | 'edit' | 'sheet'>('generate');
+    
+    // Fetch service add-ons to find the AI design fee
+    const addOnsQuery = useMemoFirebase(() => {
+        if (!firestore) return null;
+        return query(collection(firestore, 'serviceAddOns'), where('name', '==', 'AI Design Creation'));
+    }, [firestore]);
+
+    const { data: aiDesignService, isLoading: isLoadingService } = useCollection<ServiceAddOn>(addOnsQuery);
+
+    const aiDesignFeeProduct = useMemo(() => {
+        if (aiDesignService && aiDesignService.length > 0) {
+            const service = aiDesignService[0];
+            return {
+                id: service.id,
+                type: 'service' as const,
+                name: service.name,
+                price: service.price,
+            };
+        }
+        return null;
+    }, [aiDesignService]);
 
     const handleGenerate = async () => {
         if (!prompt) {
@@ -40,6 +56,15 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 variant: 'destructive',
                 title: 'Prompt is required',
                 description: 'Please enter a description for the design you want to create.',
+            });
+            return;
+        }
+
+        if (!aiDesignFeeProduct && !isLoadingService) {
+             toast({
+                variant: 'destructive',
+                title: 'Pricing Error',
+                description: 'AI Design pricing is not configured. Please contact support.',
             });
             return;
         }
@@ -99,7 +124,14 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     };
 
     const handleAddArtToSheet = () => {
-        if (!generatedImage) return;
+        if (!generatedImage || !aiDesignFeeProduct) {
+             toast({
+                variant: 'destructive',
+                title: 'Cannot Add Artwork',
+                description: !generatedImage ? 'No image has been generated.' : 'AI pricing is not available.',
+            });
+            return;
+        };
 
         // 1. Create the visual artwork to be added to the builder
         const newArtwork: Artwork = {
@@ -116,14 +148,14 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         // 3. Add the corresponding service fee to the cart
         addToCart({
-            ...AI_DESIGN_FEE_PRODUCT,
+            ...aiDesignFeeProduct,
             quantity: 1, // Add one fee per creation
         });
 
 
         toast({
             title: 'Artwork Added & Fee Applied',
-            description: 'The design is on your sheet, and the creation fee is in your cart.',
+            description: `The design is on your sheet, and a ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)} fee is in your cart.`,
         });
 
         // Switch to the builder view so the user can see their new art
@@ -131,8 +163,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     };
 
     if (view === 'sheet') {
-        return <GangSheetBuilder usage="AI" />;
+        return <GangSheetBuilder usage="Builder" />;
     }
+
+    const generationFeeText = (aiDesignFeeProduct && !isLoadingService) 
+        ? `Each generation added to a sheet costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}.`
+        : 'Loading pricing...';
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
@@ -143,7 +179,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     </div>
                     <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
                     <CardDescription className="text-zinc-400">
-                        Describe the design you want to create, and our AI will generate it for you. Each generation added to a sheet costs $5.00.
+                        Describe the design you want to create, and our AI will generate it for you. {generationFeeText}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -158,7 +194,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             />
                             <Button
                                 onClick={handleGenerate}
-                                disabled={isLoading}
+                                disabled={isLoading || isLoadingService}
                                 className="w-full mt-4 text-lg py-6"
                             >
                                 {isLoading ? (

@@ -57,7 +57,7 @@ export interface Order {
 }
 
 export interface Artwork {
-  id: string;
+  id:string;
   name: string;
   imageUrl: string;
   width: number; // inches
@@ -76,14 +76,16 @@ export interface ArtworkOnCanvas extends Artwork {
 }
 
 export interface SheetSize {
+    id: string;
     name: string;
     width: number; // inches
     height: number; // inches
     price: number;
-    usage: 'Builder' | 'Upload' | 'AI';
+    usage: 'Builder' | 'Upload';
 }
 
 export interface ServiceAddOn {
+    id: string;
     name: string;
     description: string;
     price: number;
@@ -93,7 +95,7 @@ export interface ServiceAddOn {
 export interface SheetCartItem {
   id: string;
   type: 'sheet';
-  sheetSize: SheetSize;
+  sheetSize: Omit<SheetSize, 'id' | 'usage'> & { usage?: 'Builder' | 'Upload' };
   previewUrl: string; 
   artworks: ArtworkOnCanvas[];
   quantity: number;

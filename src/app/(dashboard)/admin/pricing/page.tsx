@@ -42,10 +42,10 @@ const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
     { name: 'XX-Large', width: 22, height: 240, price: 180.00, usage: 'Builder' },
     { name: 'Standard Upload', width: 22, height: 36, price: 36.00, usage: 'Upload' },
     { name: 'Large Upload', width: 22, height: 60, price: 55.00, usage: 'Upload' },
-    { name: 'AI Default', width: 22, height: 24, price: 15.00, usage: 'AI' },
 ];
 
 const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
+    { name: 'AI Design Creation', description: 'Fee for generating one design using the AI studio.', price: 5.00 },
     { name: 'Rush Order', description: 'Priority processing and shipping.', price: 25.00 },
     { name: 'Pantone Color Match', description: 'Precise color matching for brand consistency.', price: 50.00 }
 ];
@@ -58,12 +58,10 @@ export default function PricingAdminPage() {
   // Queries for different pricing types
   const builderSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Builder')) : null, [firestore]);
   const uploadSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Upload')) : null, [firestore]);
-  const aiSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'AI')) : null, [firestore]);
   const addOnsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'serviceAddOns')) : null, [firestore]);
 
   const { data: builderSizes, isLoading: isLoadingBuilder } = useCollection<SheetSizeWithId>(builderSizesQuery as Query<SheetSizeWithId> | null);
   const { data: uploadSizes, isLoading: isLoadingUpload } = useCollection<SheetSizeWithId>(uploadSizesQuery as Query<SheetSizeWithId> | null);
-  const { data: aiSizes, isLoading: isLoadingAI } = useCollection<SheetSizeWithId>(aiSizesQuery as Query<SheetSizeWithId> | null);
   const { data: serviceAddOns, isLoading: isLoadingAddOns } = useCollection<ServiceAddOnWithId>(addOnsQuery as Query<ServiceAddOnWithId> | null);
 
   const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
@@ -76,22 +74,22 @@ export default function PricingAdminPage() {
   const [addOnFormData, setAddOnFormData] = useState({ name: '', description: '', price: '' });
 
   const [isSeeding, setIsSeeding] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Builder' | 'Upload' | 'AI' | 'Add-on'>('Builder');
+  const [activeTab, setActiveTab] = useState<'Builder' | 'Upload' | 'Add-on'>('Builder');
 
   // Effect to seed database if it's empty
   useEffect(() => {
     const seedDatabase = async () => {
-      if (firestore && !isLoadingBuilder && builderSizes?.length === 0 && !isSeeding) {
+      if (firestore && !isLoadingBuilder && builderSizes?.length === 0 && !isLoadingAddOns && serviceAddOns?.length === 0 && !isSeeding) {
         setIsSeeding(true);
-        toast({ title: 'No tiers found.', description: 'Seeding database with default pricing...' });
+        toast({ title: 'No pricing found.', description: 'Seeding database with default values...' });
         try {
           const batch = writeBatch(firestore);
-          // Seed sheet sizes
+          
           defaultSheetSizes.forEach(sheet => {
             const docRef = doc(collection(firestore, 'sheetSizes'));
             batch.set(docRef, { ...sheet, createdAt: serverTimestamp() });
           });
-          // Seed add-ons
+          
           defaultAddOns.forEach(addOn => {
               const docRef = doc(collection(firestore, 'serviceAddOns'));
               batch.set(docRef, {...addOn, createdAt: serverTimestamp() });
@@ -108,12 +106,11 @@ export default function PricingAdminPage() {
       }
     };
     seedDatabase();
-  }, [firestore, builderSizes, isLoadingBuilder, toast, isSeeding]);
+  }, [firestore, builderSizes, serviceAddOns, isLoadingBuilder, isLoadingAddOns, toast, isSeeding]);
 
 
   const sortedBuilderSizes = useMemo(() => builderSizes ? [...builderSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [builderSizes]);
   const sortedUploadSizes = useMemo(() => uploadSizes ? [...uploadSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [uploadSizes]);
-  const sortedAISizes = useMemo(() => aiSizes ? [...aiSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [aiSizes]);
   const sortedAddOns = useMemo(() => serviceAddOns ? [...serviceAddOns].sort((a, b) => a.price - b.price) : [], [serviceAddOns]);
 
 
@@ -165,7 +162,7 @@ export default function PricingAdminPage() {
       width: parseFloat(sheetFormData.width),
       height: parseFloat(sheetFormData.height),
       price: parseFloat(sheetFormData.price),
-      usage: sheetFormData.usage as 'Builder' | 'Upload' | 'AI',
+      usage: sheetFormData.usage as 'Builder' | 'Upload',
     };
 
     if (Object.values(sheetData).some(v => v === '' || (typeof v === 'number' && isNaN(v)))) {
@@ -311,15 +308,13 @@ export default function PricingAdminPage() {
         </div>
 
         <Tabs defaultValue="Builder" onValueChange={(v) => setActiveTab(v as any)} className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="Builder"><Box className="mr-2 h-4 w-4"/>Builder Sheets</TabsTrigger>
                 <TabsTrigger value="Upload"><UploadIcon className="mr-2 h-4 w-4"/>Upload Sheets</TabsTrigger>
-                <TabsTrigger value="AI"><Wand2 className="mr-2 h-4 w-4"/>AI Sheets</TabsTrigger>
                 <TabsTrigger value="Add-on"><Sparkles className="mr-2 h-4 w-4"/>Service Add-ons</TabsTrigger>
             </TabsList>
             <TabsContent value="Builder" className="mt-6">{renderSheetTable(sortedBuilderSizes, isLoadingBuilder)}</TabsContent>
             <TabsContent value="Upload" className="mt-6">{renderSheetTable(sortedUploadSizes, isLoadingUpload)}</TabsContent>
-            <TabsContent value="AI" className="mt-6">{renderSheetTable(sortedAISizes, isLoadingAI)}</TabsContent>
             <TabsContent value="Add-on" className="mt-6">{renderAddOnTable(sortedAddOns, isLoadingAddOns)}</TabsContent>
         </Tabs>
         
@@ -341,7 +336,6 @@ export default function PricingAdminPage() {
                   <SelectContent>
                       <SelectItem value="Builder">Builder</SelectItem>
                       <SelectItem value="Upload">Upload</SelectItem>
-                      <SelectItem value="AI">AI</SelectItem>
                   </SelectContent>
               </Select>
               <DialogFooter>
