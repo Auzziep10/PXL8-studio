@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
-import { fetchShippingRates } from '@/services/easyPostService';
+import { getShippingRates } from '@/app/actions';
 import NextImage from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
@@ -227,12 +227,17 @@ export default function CartPage() {
         };
 
         try {
-            const rates = await fetchShippingRates(address, weightOz);
-            setAvailableRates(rates);
-            if (rates.length > 0) {
-                const cheapest = rates.reduce((prev, curr) => prev.rate < curr.rate ? prev : curr);
-                setSelectedRateId(cheapest.id);
+            const result = await getShippingRates(address, weightOz);
+            if (result.success && result.data) {
+                setAvailableRates(result.data);
+                if (result.data.length > 0) {
+                    const cheapest = result.data.reduce((prev, curr) => prev.rate < curr.rate ? prev : curr);
+                    setSelectedRateId(cheapest.id);
+                }
+            } else {
+                 throw new Error(result.error || "Failed to fetch rates");
             }
+           
         } catch (error) {
             console.error("Failed to fetch rates", error);
         } finally {
@@ -270,7 +275,7 @@ export default function CartPage() {
     const handleCheckoutProcess = async (e: React.FormEvent) => {
         e.preventDefault();
         
-        if (!firestore) {
+        if (!firestore || !storage) {
              toast({ variant: 'destructive', title: 'Database not available', description: 'Please try again later.' });
              return;
         }
@@ -318,7 +323,7 @@ export default function CartPage() {
             const finalOrderItems: OrderItem[] = [];
             for (const item of cartItems) {
                 // Generate the final print-ready image with the QR code and all info
-                const finalPrintReadyUrl = await generateFinalSheetForPrint(
+                const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
                     item.artworks, 
                     item.sheetSize, 
                     orderId,
@@ -333,7 +338,7 @@ export default function CartPage() {
                 // Upload preview from cart, and new print-ready image
                 const [previewSnapshot, printReadySnapshot] = await Promise.all([
                     uploadString(previewStorageRef, item.previewUrl, 'data_url'),
-                    uploadString(printReadyStorageRef, finalPrintReadyUrl, 'data_url'),
+                    uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
                 ]);
                 
                 const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
