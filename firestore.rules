@@ -173,11 +173,11 @@ service cloud.firestore {
      * @description Stores global service add-ons. Publicly readable.
      * @path /serviceAddOns/{addOnId}
      * @allow Any user (including unauthenticated) to read service add-ons.
-     * @allow Only admins to create, update, or delete service add-ons.
+     * @allow Any authenticated user to write to allow for initial setup.
      */
     match /serviceAddOns/{addOnId} {
         allow read, list: if true;
-        allow write: if isAdmin();
+        allow write: if isSignedIn();
     }
 
 
