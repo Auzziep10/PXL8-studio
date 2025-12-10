@@ -70,9 +70,25 @@ const generateFinalSheetForPrint = async (
     artworks.forEach(item => {
         const img = imageCache[item.imageUrl];
         if (img) {
-            // For pre-built sheets, the artwork itself is the sheet. Draw it to fit.
+            // For pre-built sheets, the artwork itself is the sheet.
             if (artworks.length === 1 && item.x === 0 && item.y === 0) {
-                 sheetCtx.drawImage(img, 0, 0, sheetCanvas.width, sheetCanvas.height);
+                // Preserve aspect ratio
+                const canvasAspect = sheetCanvas.width / sheetCanvas.height;
+                const imgAspect = img.width / img.height;
+                let drawWidth, drawHeight, drawX, drawY;
+
+                if (imgAspect > canvasAspect) { // Image is wider than canvas
+                    drawWidth = sheetCanvas.width;
+                    drawHeight = drawWidth / imgAspect;
+                    drawX = 0;
+                    drawY = (sheetCanvas.height - drawHeight) / 2;
+                } else { // Image is taller than or equal to canvas aspect
+                    drawHeight = sheetCanvas.height;
+                    drawWidth = drawHeight * imgAspect;
+                    drawY = 0;
+                    drawX = (sheetCanvas.width - drawWidth) / 2;
+                }
+                sheetCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
             } else {
                 // For builder items, draw at specified coordinates
                 sheetCtx.drawImage(
@@ -737,3 +753,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    
