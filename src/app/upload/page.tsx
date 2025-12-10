@@ -1,8 +1,8 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
-import { SheetSize, GangSheetItem, CartItem } from '@/lib/types';
-import { SHEET_DIMENSIONS, PPI } from '@/lib/constants';
+import { SheetSize, CartItem, ArtworkOnCanvas } from '@/lib/types';
+import { SHEET_DIMENSIONS } from '@/lib/constants';
 import { Upload, FileText, CheckCircle, ArrowRight, Trash2, ShieldCheck, Ruler } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -72,7 +72,7 @@ export default function PrebuiltUploadPage() {
     };
 
     const handleAddToCart = async () => {
-        if (!file || !previewUrl) {
+        if (!file || !previewUrl || !detectedDimensions) {
             toast({
                 variant: 'destructive',
                 title: 'File required',
@@ -84,14 +84,31 @@ export default function PrebuiltUploadPage() {
         setIsProcessing(true);
         try {
             const sheetConfig = SHEET_DIMENSIONS[selectedSize];
+
+            // Create a single artwork item representing the entire uploaded sheet
+            const uploadedArtwork: ArtworkOnCanvas = {
+                id: `prebuilt-art-${Date.now()}`,
+                name: file.name,
+                imageUrl: previewUrl,
+                width: detectedDimensions.w,
+                height: detectedDimensions.h,
+                dpi: 300, // Assume 300 dpi for uploaded file
+                x: 0,
+                y: 0,
+                canvasWidth: detectedDimensions.w,
+                canvasHeight: detectedDimensions.h,
+                quantity: 1, // Quantity is handled at the cart item level
+            };
+
             const item: CartItem = {
                 id: `prebuilt-${Date.now()}`,
                 sheetSize: {
                     name: `${sheetConfig.width}" x ${sheetConfig.height}"`,
                     ...sheetConfig,
                 },
-                compositeImageUrl: previewUrl,
-                artworks: [],
+                previewUrl: previewUrl, // The uploaded image serves as its own preview
+                printReadyUrl: '', // This will be generated at checkout
+                artworks: [uploadedArtwork], // Embed the single artwork
                 quantity: quantity,
             };
 
@@ -101,6 +118,7 @@ export default function PrebuiltUploadPage() {
                 description: `${quantity} x ${sheetConfig.width}" x ${sheetConfig.height}" pre-built sheet added.`,
             });
             
+            // Reset state
             setFile(null);
             setPreviewUrl(null);
             setDetectedDimensions(null);
@@ -241,7 +259,7 @@ export default function PrebuiltUploadPage() {
                                         )}
                                         <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center">
                                             <ShieldCheck className="w-4 h-4 text-accent mr-2" />
-                                            <span className="text-xs text-white font-medium">Ready for AI Scan</span>
+                                            <span className="text-xs text-white font-medium">Ready for Checkout</span>
                                         </div>
                                     </div>
 

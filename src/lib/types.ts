@@ -93,11 +93,11 @@ export interface CartItem {
 }
 
 export enum SheetSizeEnum {
-  SMALL = '22x24',
-  MEDIUM = '22x36',
-  LARGE = '22x60',
-  XL = '22x120',
-  XXL = '22x240'
+  SMALL = 'SMALL',
+  MEDIUM = 'MEDIUM',
+  LARGE = 'LARGE',
+  XL = 'XL',
+  XXL = 'XXL'
 }
 export { SheetSizeEnum as SheetSize };
 

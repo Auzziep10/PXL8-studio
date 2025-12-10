@@ -70,13 +70,19 @@ const generateFinalSheetForPrint = async (
     artworks.forEach(item => {
         const img = imageCache[item.imageUrl];
         if (img) {
-            sheetCtx.drawImage(
-                img,
-                item.x * BASE_DPI,
-                item.y * BASE_DPI,
-                item.width * BASE_DPI,
-                item.height * BASE_DPI
-            );
+            // For pre-built sheets, the artwork itself is the sheet. Draw it to fit.
+            if (artworks.length === 1 && item.x === 0 && item.y === 0) {
+                 sheetCtx.drawImage(img, 0, 0, sheetCanvas.width, sheetCanvas.height);
+            } else {
+                // For builder items, draw at specified coordinates
+                sheetCtx.drawImage(
+                    img,
+                    item.x * BASE_DPI,
+                    item.y * BASE_DPI,
+                    item.width * BASE_DPI,
+                    item.height * BASE_DPI
+                );
+            }
         }
     });
 
