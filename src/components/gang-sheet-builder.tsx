@@ -433,26 +433,28 @@ export default function GangSheetBuilder() {
 
   const isSheetOverflowing = items.some(i => (i.y + i.height) > sheetConfig.height);
 
-  // --- Generation ---
-  const generateCompositeSheet = async (qrData: string, includeHeader: boolean): Promise<string> => {
+  const generatePreviewSheet = async (): Promise<string> => {
     const BASE_DPI = 300;
-    const HEADER_HEIGHT_INCHES = includeHeader ? 1 : 0; // Changed to 1 inch
-    const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
-
     const sheetCanvas = document.createElement('canvas');
     const sheetCtx = sheetCanvas.getContext('2d');
-    if (!sheetCtx) throw new Error('No sheet context');
+    if (!sheetCtx) throw new Error('Could not create canvas context');
+
     sheetCanvas.width = sheetConfig.width * BASE_DPI;
     sheetCanvas.height = sheetConfig.height * BASE_DPI;
 
     const imageCache: Record<string, HTMLImageElement> = {};
-    await Promise.all(items.map(item => new Promise<void>((resolve, reject) => {
-        if (imageCache[item.imageUrl]) return resolve();
-        const img = new Image();
-        if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
-        img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
-        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); }; // Don't reject, just skip
-    })));
+    await Promise.all(
+        items.map(item =>
+            new Promise<void>((resolve) => {
+                if (imageCache[item.imageUrl]) return resolve();
+                const img = new Image();
+                if (!item.imageUrl.startsWith('data:')) img.crossOrigin = 'Anonymous';
+                img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
+                img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
+                img.src = item.imageUrl;
+            })
+        )
+    );
 
     items.forEach(item => {
         const img = imageCache[item.imageUrl];
@@ -467,62 +469,17 @@ export default function GangSheetBuilder() {
         }
     });
 
-    if (!includeHeader) {
-        return sheetCanvas.toDataURL('image/png');
-    }
-    
-    const finalCanvas = document.createElement('canvas');
-    const finalCtx = finalCanvas.getContext('2d');
-    if (!finalCtx) throw new Error('No final context');
-    finalCanvas.width = sheetConfig.width * BASE_DPI;
-    finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
-
-    // Draw white header background
-    finalCtx.fillStyle = 'white';
-    finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
-
-    // QR Code
-    const qrCodeDataUrl = await QRCode.toDataURL(qrData, { 
-      width: HEADER_HEIGHT_PX - 20, // Make it slightly smaller than header
-      margin: 1 
-    });
-    const qrImg = new Image();
-    await new Promise<void>(resolve => {
-        qrImg.onload = () => resolve();
-        qrImg.src = qrCodeDataUrl;
-    });
-    finalCtx.drawImage(qrImg, 10, 10);
-    
-    // Text Info
-    finalCtx.fillStyle = 'black';
-    finalCtx.font = `bold ${BASE_DPI / 3}px Arial`; // Smaller font
-    finalCtx.textAlign = 'left';
-    finalCtx.textBaseline = 'top';
-
-    // Extract info from QR data for display
-    const qrInfo = JSON.parse(qrData);
-    finalCtx.fillText(`ID: ${qrInfo.orderId}`, HEADER_HEIGHT_PX, 15);
-    finalCtx.font = `${BASE_DPI / 4}px Arial`;
-    finalCtx.fillText(`Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10);
-    finalCtx.fillText(`To: ${qrInfo.customerName}`, HEADER_HEIGHT_PX, 15 + (BASE_DPI / 3) + 10 + (BASE_DPI / 4) + 10);
-
-
-    // Draw the main gang sheet content below the header
-    finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
-
-    return finalCanvas.toDataURL('image/png');
+    return sheetCanvas.toDataURL('image/png');
   };
 
   const handleProcessAndAddToCart = async () => {
     setIsGenerating(true);
     try {
-        const trackingId = `TRK-${Date.now()}`;
-        // We now generate a simple preview for the cart, and the final print file will be generated at checkout
-        const previewUrl = await generateCompositeSheet(trackingId, false);
+        const previewUrl = await generatePreviewSheet();
         
         const config = SHEET_DIMENSIONS[selectedSize];
         const cartItem: CartItem = {
-          id: trackingId,
+          id: `GNG-${Date.now()}`,
           sheetSize: {
             name: `${config.width}" x ${config.height}"`,
             width: config.width,
@@ -531,7 +488,7 @@ export default function GangSheetBuilder() {
           },
           previewUrl: previewUrl,
           printReadyUrl: '', // This will be generated at checkout
-          artworks: items, // Pass the full artwork data to the cart
+          artworks: items, 
           quantity: 1,
         };
 
@@ -540,6 +497,8 @@ export default function GangSheetBuilder() {
           title: "Added to Cart",
           description: `${cartItem.sheetSize.name} gang sheet.`
         });
+        
+        // Reset state after adding to cart
         setItems([]);
         setSelectedItemId(null);
         if (user && gangSheetDocRef) {
@@ -553,12 +512,13 @@ export default function GangSheetBuilder() {
         toast({
             variant: "destructive",
             title: "Error Generating Sheet",
-            description: "Could not generate the print file. The canvas might be too large."
+            description: "Could not generate the print file. Please try again."
         });
     } finally {
         setIsGenerating(false);
     }
   };
+
 
   if (isUserLoading || !isLoaded) {
     return (
