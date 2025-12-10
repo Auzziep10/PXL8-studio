@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, ArtworkOnCanvas } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -195,22 +195,37 @@ export default function CartPage() {
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
             items: cartItems.map((item: CartItem) => {
-                const artworksForDb = item.artworks.map(art => {
-                    const { imageUrl, analysis, ...restOfArt } = art;
-                    const finalArt: any = { ...restOfArt };
-                    if (analysis) {
-                        finalArt.analysis = {
-                            ...analysis,
-                            imageDataUri: '', // Clear large field
-                        };
-                    }
-                    return finalArt;
+                // Sanitize artworks to remove complex objects before saving to Firestore
+                const artworksForDb = item.artworks.map((art: ArtworkOnCanvas) => {
+                    const { analysis, analysisLoading, ...simpleArt } = art;
+                    const sanitizedArt: Partial<ArtworkOnCanvas> = { ...simpleArt };
+
+                    // Remove any fields that are not plain data
+                    delete sanitizedArt.analysis;
+                    delete sanitizedArt.analysisLoading;
+                    
+                    // Reconstruct a plain object
+                    const plainArt = {
+                        id: sanitizedArt.id,
+                        name: sanitizedArt.name,
+                        imageUrl: sanitizedArt.imageUrl,
+                        width: sanitizedArt.width,
+                        height: sanitizedArt.height,
+                        dpi: sanitizedArt.dpi,
+                        x: sanitizedArt.x,
+                        y: sanitizedArt.y,
+                        canvasWidth: sanitizedArt.canvasWidth,
+                        canvasHeight: sanitizedArt.canvasHeight,
+                        quantity: sanitizedArt.quantity
+                    };
+
+                    return plainArt;
                 });
 
                 return {
                     ...item,
                     artworks: artworksForDb,
-                    compositeImageUrl: item.compositeImageUrl, // This was the bug, it was empty.
+                    compositeImageUrl: item.compositeImageUrl,
                 };
             }),
             total: total,
