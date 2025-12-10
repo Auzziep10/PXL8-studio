@@ -167,6 +167,15 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   // Dragging State
   const [draggingId, setDraggingId] = useState<string | null>(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
+  // Resizing State
+  type ResizingState = {
+    initialX: number;
+    initialY: number;
+    initialWidth: number;
+    initialHeight: number;
+  } | null;
+  const [resizingState, setResizingState] = useState<ResizingState>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -446,7 +455,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
   // --- Drag and Drop Handlers ---
-  const handleMouseDown = (e: React.MouseEvent, id: string) => {
+  const handleMouseDownOnItem = (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
       e.preventDefault();
 
@@ -493,6 +502,19 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+      if (resizingState && draggingId) {
+          const dx = (e.clientX - resizingState.initialX) / scale;
+          const newWidth = (resizingState.initialWidth * PPI + dx) / PPI;
+          
+          const item = items.find(i => i.id === draggingId);
+          if (item && newWidth > 0.5) { // Minimum width 0.5 inch
+              const ratio = item.canvasHeight / item.canvasWidth;
+              const newHeight = newWidth * ratio;
+              updateItem(draggingId, { width: parseFloat(newWidth.toFixed(2)), height: parseFloat(newHeight.toFixed(2))});
+          }
+          return;
+      }
+      
       if (!draggingId || !containerRef.current) return;
       
       // We need to convert mouse movement (pixels) to sheet coordinates (inches)
@@ -520,15 +542,31 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           return i;
       }));
 
-  }, [draggingId, dragOffset, scale, sheetConfig.width, items]);
+  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, updateItem]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
+      setResizingState(null);
   };
   
   const handleMouseLeave = () => {
     setDraggingId(null);
+    setResizingState(null);
   }
+
+  const handleMouseDownOnResizeHandle = (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    const item = items.find(i => i.id === id);
+    if (!item) return;
+
+    setDraggingId(id); // Use draggingId to indicate an action is happening
+    setResizingState({
+        initialX: e.clientX,
+        initialY: e.clientY,
+        initialWidth: item.width,
+        initialHeight: item.height,
+    });
+  };
 
   useEffect(() => {
       if (draggingId) {
@@ -919,7 +957,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                     width: `${item.width * PPI * scale}px`,
                                     height: `${item.height * PPI * scale}px`,
                                 }}
-                                onMouseDown={(e) => handleMouseDown(e, item.id)}
+                                onMouseDown={(e) => handleMouseDownOnItem(e, item.id)}
                             >
                                 {/* Image Container */}
                                 <div className={`w-full h-full relative ${
@@ -944,13 +982,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                         </div>
                                     )}
 
-                                    {/* Resize Handles (Visual Only for now) */}
+                                    {/* Resize Handles */}
                                     {isSelected && (
                                         <>
-                                            <div className="absolute -top-1 -left-1 w-2 h-2 bg-white border border-primary"></div>
-                                            <div className="absolute -top-1 -right-1 w-2 h-2 bg-white border border-primary"></div>
-                                            <div className="absolute -bottom-1 -left-1 w-2 h-2 bg-white border border-primary"></div>
-                                            <div className="absolute -bottom-1 -right-1 w-2 h-2 bg-white border border-primary"></div>
+                                            <div 
+                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize"
+                                                onMouseDown={(e) => handleMouseDownOnResizeHandle(e, item.id)}
+                                            ></div>
+                                            {/* Other handles can be added here */}
                                         </>
                                     )}
                                 </div>
