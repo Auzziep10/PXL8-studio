@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -33,6 +33,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [isColorPickerActive, setIsColorPickerActive] = useState(false);
   
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -340,6 +341,74 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     }
   }
 
+  const removeColor = (imageUrl: string, colorToRemove: {r: number, g: number, b: number}) => {
+    return new Promise<string>((resolve, reject) => {
+        const img = new Image();
+        if (!imageUrl.startsWith('data:')) {
+            img.crossOrigin = 'Anonymous';
+        }
+        img.onload = () => {
+            const canvas = document.createElement('canvas');
+            canvas.width = img.width;
+            canvas.height = img.height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) return reject('Could not get canvas context');
+            
+            ctx.drawImage(img, 0, 0);
+            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = imageData.data;
+            const tolerance = 20;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i];
+                const g = data[i + 1];
+                const b = data[i + 2];
+                
+                if (Math.abs(r - colorToRemove.r) < tolerance && 
+                    Math.abs(g - colorToRemove.g) < tolerance && 
+                    Math.abs(b - colorToRemove.b) < tolerance) {
+                    data[i + 3] = 0; // Make transparent
+                }
+            }
+            ctx.putImageData(imageData, 0, 0);
+            resolve(canvas.toDataURL());
+        };
+        img.onerror = () => reject('Failed to load image for color removal.');
+        img.src = imageUrl;
+    });
+  };
+
+  const handleRemoveColor = async (color: {r:number, g: number, b: number}) => {
+    if (!selectedItem) return;
+
+    toast({title: 'Processing...', description: 'Removing selected color from the image.'});
+
+    try {
+        const newImageUrl = await removeColor(selectedItem.imageUrl, color);
+        // For guest users, we just update the data URL
+        if (!user) {
+            updateItem(selectedItem.id, { imageUrl: newImageUrl });
+            toast({title: 'Color Removed!', description: 'The background color has been made transparent.'});
+            return;
+        }
+
+        // For logged-in users, we need to re-upload the new image to get a permanent URL
+        const blob = await (await fetch(newImageUrl)).blob();
+        const file = new File([blob], selectedItem.name, { type: 'image/png' });
+        
+        const permanentUrl = await uploadFileAndGetURL(file, user.uid);
+        updateItem(selectedItem.id, { imageUrl: permanentUrl });
+
+        toast({title: 'Color Removed!', description: 'The new version of your artwork has been saved.'});
+
+    } catch (error) {
+        console.error("Color removal failed:", error);
+        toast({variant: 'destructive', title: 'Error', description: 'Could not remove color from image.'});
+    } finally {
+        setIsColorPickerActive(false);
+    }
+  };
+
 
   // --- Item Management ---
   const updateItem = (id: string, updates: Partial<ArtworkOnCanvas>) => {
@@ -380,6 +449,32 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const handleMouseDown = (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
       e.preventDefault();
+
+      if (isColorPickerActive && selectedItemId === id) {
+          const rect = (e.target as Element).getBoundingClientRect();
+          const x = e.clientX - rect.left;
+          const y = e.clientY - rect.top;
+          
+          const canvas = document.createElement('canvas');
+          const item = items.find(i => i.id === id);
+          if (!item) return;
+
+          canvas.width = item.width * PPI;
+          canvas.height = item.height * PPI;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) return;
+          
+          const img = new Image();
+          img.crossOrigin = "Anonymous";
+          img.onload = () => {
+              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+              const pixelData = ctx.getImageData(x / scale, y / scale, 1, 1).data;
+              handleRemoveColor({ r: pixelData[0], g: pixelData[1], b: pixelData[2] });
+          };
+          img.src = item.imageUrl;
+
+          return; // Don't start dragging
+      }
       
       const item = items.find(i => i.id === id);
       if (!item) return;
@@ -696,6 +791,10 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                </button>
                            </div>
                       </div>
+                       <Button variant="outline" onClick={() => setIsColorPickerActive(prev => !prev)} className={isColorPickerActive ? 'bg-blue-500/20 border-blue-500' : ''}>
+                          <Droplet className="w-4 h-4 mr-2" />
+                          {isColorPickerActive ? 'Picker Active - Click on Image' : 'Remove Color'}
+                      </Button>
                       <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
                  </div>
             )}
@@ -790,7 +889,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
             {/* The Sheet Canvas */}
             <div 
-                className="relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center"
+                className={`relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center ${isColorPickerActive ? 'cursor-eyedropper' : ''}`}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseLeave}
             >
@@ -801,7 +900,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                         height: `${displayHeight}px`,
                         transition: 'height 0.3s ease'
                     }}
-                    onMouseDown={() => setSelectedItemId(null)} // Deselect if clicking background
+                    onMouseDown={() => { if (!isColorPickerActive) setSelectedItemId(null); }} // Deselect if clicking background
                  >
                     {items.map((item) => {
                         const isSelected = selectedItemId === item.id;
@@ -811,7 +910,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                         return (
                             <div
                                 key={item.id}
-                                className={`absolute draggable-item cursor-move group ${
+                                className={`absolute draggable-item ${isColorPickerActive && isSelected ? 'cursor-eyedropper' : 'cursor-move'} group ${
                                     isSelected ? 'z-50' : 'z-10'
                                 }`}
                                 style={{
