@@ -35,12 +35,12 @@ import { Textarea } from '@/components/ui/textarea';
 type SheetSizeWithId = SheetSize & { id: string };
 type ServiceAddOnWithId = ServiceAddOn & { id: string };
 
-const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
-    { name: 'Small', width: 22, height: 24, price: 24.00, usage: 'Builder' },
-    { name: 'Medium', width: 22, height: 36, price: 36.00, usage: 'Builder' },
-    { name: 'Large', width: 22, height: 60, price: 55.00, usage: 'Builder' },
-    { name: 'X-Large', width: 22, height: 120, price: 100.00, usage: 'Builder' },
-    { name: 'XX-Large', width: 22, height: 240, price: 180.00, usage: 'Builder' },
+const defaultSheetSizes: Omit<SheetSize, 'id' | 'price'>[] = [
+    { name: 'Small', width: 22, height: 24, usage: 'Builder' },
+    { name: 'Medium', width: 22, height: 36, usage: 'Builder' },
+    { name: 'Large', width: 22, height: 60, usage: 'Builder' },
+    { name: 'X-Large', width: 22, height: 120, usage: 'Builder' },
+    { name: 'XX-Large', width: 22, height: 240, usage: 'Builder' },
 ];
 
 const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
@@ -64,14 +64,13 @@ export default function PricingAdminPage() {
   const [otherAddOns, setOtherAddOns] = useState<ServiceAddOnWithId[]>([]);
   const [newSqInchPrice, setNewSqInchPrice] = useState('');
 
-
   const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
   const [isAddOnDialogOpen, setIsAddOnDialogOpen] = useState(false);
   
   const [editingSheet, setEditingSheet] = useState<SheetSizeWithId | null>(null);
   const [editingAddOn, setEditingAddOn] = useState<ServiceAddOnWithId | null>(null);
 
-  const [sheetFormData, setSheetFormData] = useState({ name: '', width: '', height: '', price: '', usage: 'Builder' });
+  const [sheetFormData, setSheetFormData] = useState({ name: '', width: '', height: '', usage: 'Builder' });
   const [addOnFormData, setAddOnFormData] = useState({ name: '', description: '', price: '' });
 
   const [isSeeding, setIsSeeding] = useState(false);
@@ -100,7 +99,9 @@ export default function PricingAdminPage() {
           
           defaultSheetSizes.forEach(sheet => {
             const docRef = doc(collection(firestore, 'sheetSizes'));
-            batch.set(docRef, { ...sheet, createdAt: serverTimestamp() });
+            const pricePerSqIn = defaultAddOns.find(a => a.type === 'per_sq_inch')?.price || 0.12;
+            const price = sheet.width * sheet.height * pricePerSqIn;
+            batch.set(docRef, { ...sheet, price, createdAt: serverTimestamp() });
           });
           
           defaultAddOns.forEach(addOn => {
@@ -133,12 +134,11 @@ export default function PricingAdminPage() {
         name: sheet.name,
         width: String(sheet.width),
         height: String(sheet.height),
-        price: String(sheet.price),
         usage: sheet.usage || 'Builder',
       });
     } else {
       setEditingSheet(null);
-      setSheetFormData({ name: '', width: '', height: '', price: '', usage: 'Builder' });
+      setSheetFormData({ name: '', width: '', height: '', usage: 'Builder' });
     }
     setIsSheetDialogOpen(true);
   };
@@ -167,17 +167,25 @@ export default function PricingAdminPage() {
 
   const handleSheetFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!firestore) return;
+    if (!firestore || !perSqInchPrice) {
+        toast({ variant: 'destructive', title: 'Error', description: 'Pricing service not available.' });
+        return;
+    }
 
-    const sheetData: Omit<SheetSize, 'id'> = {
+    const width = parseFloat(sheetFormData.width);
+    const height = parseFloat(sheetFormData.height);
+    const price = width * height * perSqInchPrice.price;
+
+    const sheetData: SheetSize = {
+      id: editingSheet?.id || '',
       name: sheetFormData.name,
-      width: parseFloat(sheetFormData.width),
-      height: parseFloat(sheetFormData.height),
-      price: parseFloat(sheetFormData.price),
+      width: width,
+      height: height,
+      price: price,
       usage: 'Builder',
     };
 
-    if (Object.values(sheetData).some(v => v === '' || (typeof v === 'number' && isNaN(v)))) {
+    if (!sheetData.name || isNaN(sheetData.width) || isNaN(sheetData.height)) {
       toast({ variant: 'destructive', title: 'Invalid Input', description: 'Please fill out all fields correctly.' });
       return;
     }
@@ -264,27 +272,30 @@ export default function PricingAdminPage() {
                 <TableRow>
                     <TableHead>Name</TableHead>
                     <TableHead className="flex items-center"><Ruler className="mr-2 h-4 w-4"/>Dimensions</TableHead>
-                    <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Price</TableHead>
+                    <TableHead className="text-right flex items-center justify-end"><DollarSign className="mr-2 h-4 w-4"/>Calculated Price</TableHead>
                     <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
-                {isLoading || isSeeding ? (
+                {isLoading || isSeeding || isLoadingAddOns ? (
                     <TableRow><TableCell colSpan={4} className="text-center py-8">Loading tiers...</TableCell></TableRow>
-                ) : sizes.length > 0 ? (
-                    sizes.map((sheet) => (
-                        <TableRow key={sheet.id}>
-                            <TableCell className="font-medium text-white">{sheet.name}</TableCell>
-                            <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
-                            <TableCell className="text-right font-mono text-white">{formatCurrency(sheet.price)}</TableCell>
-                            <TableCell className="text-right">
-                                <Button variant="ghost" size="icon" onClick={() => handleOpenSheetDialog(sheet)}><Edit className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(sheet.id, 'sheet')}><Trash2 className="h-4 w-4" /></Button>
-                            </TableCell>
-                        </TableRow>
-                    ))
+                ) : sizes.length > 0 && perSqInchPrice ? (
+                    sizes.map((sheet) => {
+                        const calculatedPrice = sheet.width * sheet.height * (perSqInchPrice.price || 0);
+                        return (
+                            <TableRow key={sheet.id}>
+                                <TableCell className="font-medium text-white">{sheet.name}</TableCell>
+                                <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
+                                <TableCell className="text-right font-mono text-white">{formatCurrency(calculatedPrice)}</TableCell>
+                                <TableCell className="text-right">
+                                    <Button variant="ghost" size="icon" onClick={() => handleOpenSheetDialog(sheet)}><Edit className="h-4 w-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(sheet.id, 'sheet')}><Trash2 className="h-4 w-4" /></Button>
+                                </TableCell>
+                            </TableRow>
+                        )
+                    })
                 ) : (
-                    <TableRow><TableCell colSpan={4} className="text-center py-8">No pricing tiers found for this category.</TableCell></TableRow>
+                    <TableRow><TableCell colSpan={4} className="text-center py-8">No pricing tiers found. Please set a 'Price Per Square Inch' in Dynamic Pricing first.</TableCell></TableRow>
                 )}
             </TableBody>
         </Table>
@@ -352,8 +363,7 @@ export default function PricingAdminPage() {
                     <CardHeader>
                         <CardTitle>Price Per Square Inch</CardTitle>
                         <CardDescription>
-                            Set the price for dynamically sized, user-uploaded gang sheets. 
-                            The final price will be calculated as (Width x Height) x this value.
+                            This single value controls the pricing for both uploaded sheets and pre-defined builder sheets.
                         </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -396,7 +406,6 @@ export default function PricingAdminPage() {
                 <Input name="width" type="number" value={sheetFormData.width} onChange={(e) => setSheetFormData({...sheetFormData, width: e.target.value})} placeholder="Width (in)" required />
                 <Input name="height" type="number" value={sheetFormData.height} onChange={(e) => setSheetFormData({...sheetFormData, height: e.target.value})} placeholder="Height (in)" required />
               </div>
-              <Input name="price" type="number" value={sheetFormData.price} onChange={(e) => setSheetFormData({...sheetFormData, price: e.target.value})} placeholder="Price (USD)" required />
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                 <Button type="submit">Save</Button>
