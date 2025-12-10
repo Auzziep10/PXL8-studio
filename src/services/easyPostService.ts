@@ -58,11 +58,6 @@ export async function fetchShippingRates(toAddress: ShippingAddress, weightOunce
             deliveryDays: '2 business days'
         }
     ];
-
-    // Simulate a random failure chance
-    if (Math.random() < 0.05) {
-        throw new Error("Mock API Error: Failed to fetch shipping rates.");
-    }
     
     return mockRates.sort((a,b) => a.rate - b.rate);
 }
