@@ -190,6 +190,7 @@ export default function AdminPage() {
   useEffect(() => {
     const orderIdFromUrl = searchParams.get('orderId');
     if (orderIdFromUrl && allOrders) {
+      // Find order by the new numeric ID format
       const foundOrder = allOrders.find(o => o.orderId === orderIdFromUrl);
       if (foundOrder) {
         setSelectedOrderId(foundOrder.id);
@@ -236,15 +237,8 @@ export default function AdminPage() {
   }, [allOrders]);
 
   useEffect(() => {
-    if (searchTerm.startsWith('TRK-') || searchTerm.startsWith('ORD-')) {
-      const found = allOrders?.find(
-        (o) =>
-          o.orderId === searchTerm ||
-          (Array.isArray(o.items) &&
-            o.items.some(
-              (i: any) => i.id.includes(searchTerm)
-            ))
-      );
+    if (searchTerm.length >= 8 && !isNaN(Number(searchTerm))) {
+      const found = allOrders?.find(o => o.orderId === searchTerm);
       if (found) {
         setSelectedOrderId(found.id);
         setViewMode('orders');
@@ -578,7 +572,7 @@ export default function AdminPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
             placeholder={
               viewMode === 'orders'
-                ? 'Search by Order ID, Customer Name, or Tracking ID...'
+                ? 'Search by Order ID, Customer Name...'
                 : 'Search by Name or Email...'
             }
             className="w-full bg-zinc-900 border border-white/10 rounded-xl pl-10 pr-4 py-3 text-white focus:ring-primary focus:border-primary transition-all"
@@ -724,7 +718,7 @@ export default function AdminPage() {
                               DTF
                             </div>
                             <div className="ml-4">
-                              <div className="text-sm font-medium text-white">
+                              <div className="text-sm font-medium text-white font-mono">
                                 {order.orderId}
                               </div>
                               <div className="text-xs text-zinc-500">
@@ -823,7 +817,7 @@ export default function AdminPage() {
                             <Package className="w-5 h-5 text-zinc-400" />
                           </div>
                           <div>
-                            <h3 className="text-white font-bold text-sm">
+                            <h3 className="text-white font-bold text-sm font-mono">
                               Order #{order.orderId}
                             </h3>
                             <p className="text-zinc-500 text-xs">
@@ -896,7 +890,7 @@ export default function AdminPage() {
           <div className="relative w-full max-w-2xl bg-[#09090b] h-full shadow-2xl border-l border-white/10 flex flex-col animate-in slide-in-from-right-full duration-500">
             <div className="p-6 border-b border-white/10 flex justify-between items-center bg-zinc-900/50">
               <div>
-                <h2 className="text-2xl font-bold text-white">
+                <h2 className="text-2xl font-bold text-white font-mono">
                   Order #{selectedOrder.orderId}
                 </h2>
                 <span

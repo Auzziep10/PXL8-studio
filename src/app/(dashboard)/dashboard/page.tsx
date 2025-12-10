@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useMemo } from 'react';
@@ -201,8 +202,8 @@ export default function CustomerDashboardPage() {
               <TableBody>
                 {userOrders && userOrders.length > 0 ? userOrders.slice(0, 5).map((order: Order) => (
                   <TableRow key={order.orderId}>
-                    <TableCell className="font-medium">
-                      <Button variant="link" asChild className="p-0 h-auto">
+                    <TableCell className="font-medium font-mono">
+                      <Button variant="link" asChild className="p-0 h-auto font-mono">
                         <Link href={`/track?id=${order.orderId}`}>{order.orderId}</Link>
                       </Button>
                     </TableCell>

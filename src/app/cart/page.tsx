@@ -16,7 +16,7 @@ import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
 import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/firebase';
-import { doc, setDoc, serverTimestamp, collection, addDoc } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
 import { SHEET_DIMENSIONS } from '@/lib/constants';
@@ -270,6 +270,11 @@ export default function CartPage() {
     const handleCheckoutProcess = async (e: React.FormEvent) => {
         e.preventDefault();
         
+        if (!firestore) {
+             toast({ variant: 'destructive', title: 'Database not available', description: 'Please try again later.' });
+             return;
+        }
+
         if (formData.createAccount && !currentUser && !formData.password) {
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
             return;
@@ -283,8 +288,24 @@ export default function CartPage() {
         setIsCheckingOut(true);
 
         try {
+            // --- Generate New Order ID ---
+            const now = new Date();
+            const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+            const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+
+            const ordersRef = collection(firestore, 'orders');
+            const q = query(ordersRef, where('orderDate', '>=', startOfDay.toISOString()), where('orderDate', '<', endOfDay.toISOString()));
+            const todaysOrdersSnapshot = await getDocs(q);
+            const dailyOrderCount = todaysOrdersSnapshot.size;
+
+            const year = now.getFullYear().toString().slice(-2);
+            const month = (now.getMonth() + 1).toString().padStart(2, '0');
+            const day = now.getDate().toString().padStart(2, '0');
+            const newOrderCount = (dailyOrderCount + 1).toString().padStart(2, '0');
+            const orderId = `${year}${month}${day}${newOrderCount}`;
+            // --- End Order ID Generation ---
+
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
-            const orderId = `ORD-${Date.now()}`;
             const customerName = `${formData.firstName} ${formData.lastName}`;
             const shippingAddress: ShippingAddress = {
                 street: formData.street,
@@ -346,20 +367,18 @@ export default function CartPage() {
                 trackingId: '',
             };
 
-            if (firestore) {
-                const centralOrdersRef = collection(firestore, 'orders');
-                const centralOrderDoc = await addDoc(centralOrdersRef, {
+            const centralOrdersRef = collection(firestore, 'orders');
+            const centralOrderDoc = await addDoc(centralOrdersRef, {
+                ...newOrderData,
+                createdAt: serverTimestamp()
+            });
+
+            if (currentUser) {
+                const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
+                await setDoc(doc(userOrdersRef, centralOrderDoc.id), {
                     ...newOrderData,
                     createdAt: serverTimestamp()
                 });
-
-                if (currentUser) {
-                    const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
-                    await setDoc(doc(userOrdersRef, centralOrderDoc.id), {
-                        ...newOrderData,
-                        createdAt: serverTimestamp()
-                    });
-                }
             }
 
             if (!isTestMode) {

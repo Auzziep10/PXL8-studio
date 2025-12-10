@@ -1,3 +1,6 @@
+
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -21,7 +24,7 @@ export default function TrackOrderPage() {
       <Card>
         <CardHeader>
           <CardTitle>Track Your Order</CardTitle>
-          <p className="text-muted-foreground">Enter your Order ID (e.g., ORD-1001) or Tracking ID.</p>
+          <p className="text-muted-foreground">Enter your Order ID (e.g., 24073101).</p>
         </CardHeader>
         <CardContent>
           <div className="flex w-full items-center space-x-2">
@@ -45,7 +48,7 @@ export default function TrackOrderPage() {
       {showResults ? (
         <Card className="mt-8">
             <CardHeader>
-                <CardTitle>Order ORD-1003 Status</CardTitle>
+                <CardTitle>Order 24073101 Status</CardTitle>
                 <p className="text-muted-foreground">Current status: <span className="text-primary font-semibold">Shipped</span></p>
             </CardHeader>
             <CardContent>
