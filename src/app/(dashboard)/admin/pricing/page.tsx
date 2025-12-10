@@ -54,14 +54,15 @@ export default function PricingAdminPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  const builderSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Builder')) : null, [firestore]);
-  const addOnsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'serviceAddOns')) : null, [firestore]);
+  const sheetSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes')) : null, [firestore]);
+  const serviceAddOnsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'serviceAddOns')) : null, [firestore]);
 
-  const { data: builderSizes, isLoading: isLoadingBuilder } = useCollection<SheetSizeWithId>(builderSizesQuery as Query<SheetSizeWithId> | null);
-  const { data: serviceAddOns, isLoading: isLoadingAddOns } = useCollection<ServiceAddOnWithId>(addOnsQuery as Query<ServiceAddOnWithId> | null);
-  
+  const { data: allSheetSizes, isLoading: isLoadingSizes } = useCollection<SheetSizeWithId>(sheetSizesQuery as Query<SheetSizeWithId> | null);
+  const { data: allServiceAddOns, isLoading: isLoadingAddOns } = useCollection<ServiceAddOnWithId>(serviceAddOnsQuery as Query<ServiceAddOnWithId> | null);
+
   const [perSqInchPrice, setPerSqInchPrice] = useState<ServiceAddOnWithId | null>(null);
   const [otherAddOns, setOtherAddOns] = useState<ServiceAddOnWithId[]>([]);
+  const [builderSizes, setBuilderSizes] = useState<SheetSizeWithId[]>([]);
   const [newSqInchPrice, setNewSqInchPrice] = useState('');
 
   const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
@@ -77,35 +78,43 @@ export default function PricingAdminPage() {
   const [activeTab, setActiveTab] = useState<'Builder' | 'Dynamic' | 'Add-on'>('Builder');
 
   useEffect(() => {
-    if (serviceAddOns) {
-        const sqInchItem = serviceAddOns.find(item => item.type === 'per_sq_inch') || null;
-        const regularAddOns = serviceAddOns.filter(item => item.type !== 'per_sq_inch');
+    if (allServiceAddOns) {
+        const sqInchItem = allServiceAddOns.find(item => item.type === 'per_sq_inch') || null;
+        const regularAddOns = allServiceAddOns.filter(item => item.type !== 'per_sq_inch');
         setPerSqInchPrice(sqInchItem);
         setOtherAddOns(regularAddOns);
         if (sqInchItem) {
             setNewSqInchPrice(String(sqInchItem.price));
-        } else if (!isLoadingAddOns && !isSeeding) {
-            // If the price isn't set, auto-switch to the Dynamic Pricing tab
-            setActiveTab('Dynamic');
+        } else if (!isLoadingAddOns && !isSeeding && !isLoadingSizes) {
+            // Auto-switch to Dynamic Pricing tab if not set, after everything has loaded
+            if (allSheetSizes?.length === 0 && allServiceAddOns?.length === 0) {
+                 setActiveTab('Dynamic');
+            }
         }
     }
-  }, [serviceAddOns, isLoadingAddOns, isSeeding]);
+    if (allSheetSizes) {
+        const builderItems = allSheetSizes.filter(s => s.usage === 'Builder');
+        setBuilderSizes(builderItems);
+    }
+  }, [allServiceAddOns, allSheetSizes, isLoadingAddOns, isLoadingSizes, isSeeding]);
 
 
   useEffect(() => {
     const seedDatabase = async () => {
-      if (firestore && !isLoadingBuilder && builderSizes?.length === 0 && !isLoadingAddOns && serviceAddOns?.length === 0 && !isSeeding) {
+      if (firestore && !isLoadingSizes && !isLoadingAddOns && allSheetSizes?.length === 0 && allServiceAddOns?.length === 0 && !isSeeding) {
         setIsSeeding(true);
         toast({ title: 'No pricing found.', description: 'Seeding database with default values...' });
         try {
           const batch = writeBatch(firestore);
           
+          // Seed add-ons first
+          const pricePerSqIn = defaultAddOns.find(a => a.type === 'per_sq_inch')?.price || 0.12;
           defaultAddOns.forEach(addOn => {
               const docRef = doc(collection(firestore, 'serviceAddOns'));
               batch.set(docRef, {...addOn, createdAt: serverTimestamp() });
           });
           
-          const pricePerSqIn = defaultAddOns.find(a => a.type === 'per_sq_inch')?.price || 0.12;
+          // Then seed builder sheets using the default sq inch price
           defaultSheetSizes.forEach(sheet => {
             const docRef = doc(collection(firestore, 'sheetSizes'));
             const basePrice = sheet.width * sheet.height * pricePerSqIn;
@@ -124,7 +133,7 @@ export default function PricingAdminPage() {
       }
     };
     seedDatabase();
-  }, [firestore, builderSizes, serviceAddOns, isLoadingBuilder, isLoadingAddOns, toast, isSeeding]);
+  }, [firestore, allSheetSizes, allServiceAddOns, isLoadingSizes, isLoadingAddOns, toast, isSeeding]);
 
 
   const sortedBuilderSizes = useMemo(() => builderSizes ? [...builderSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [builderSizes]);
@@ -249,7 +258,7 @@ export default function PricingAdminPage() {
   };
   
     const handleUpdateSqInchPrice = async () => {
-        if (!firestore || !perSqInchPrice) return;
+        if (!firestore) return;
         const newPrice = parseFloat(newSqInchPrice);
         if (isNaN(newPrice) || newPrice < 0) {
             toast({ variant: 'destructive', title: 'Invalid Price', description: 'Please enter a valid positive number.' });
@@ -257,8 +266,18 @@ export default function PricingAdminPage() {
         }
 
         try {
-            const docRef = doc(firestore, 'serviceAddOns', perSqInchPrice.id);
-            await updateDoc(docRef, { price: newPrice, updatedAt: serverTimestamp() });
+            if (perSqInchPrice) {
+                const docRef = doc(firestore, 'serviceAddOns', perSqInchPrice.id);
+                await updateDoc(docRef, { price: newPrice, updatedAt: serverTimestamp() });
+            } else {
+                const newAddOn: Omit<ServiceAddOn, 'id'> = {
+                    name: 'Price Per Square Inch',
+                    description: 'Dynamic price for uploaded custom-sized sheets.',
+                    price: newPrice,
+                    type: 'per_sq_inch'
+                };
+                await addDoc(collection(firestore, 'serviceAddOns'), { ...newAddOn, createdAt: serverTimestamp() });
+            }
             toast({ title: 'Success', description: 'Price per square inch has been updated.' });
         } catch (error: any) {
             toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
@@ -374,7 +393,7 @@ export default function PricingAdminPage() {
                 <TabsTrigger value="Dynamic"><DollarSign className="mr-2 h-4 w-4"/>Dynamic Pricing</TabsTrigger>
                 <TabsTrigger value="Add-on"><Sparkles className="mr-2 h-4 w-4"/>Service Add-ons</TabsTrigger>
             </TabsList>
-            <TabsContent value="Builder" className="mt-6">{renderSheetTable(sortedBuilderSizes, isLoadingBuilder)}</TabsContent>
+            <TabsContent value="Builder" className="mt-6">{renderSheetTable(sortedBuilderSizes, isLoadingSizes)}</TabsContent>
             
             <TabsContent value="Dynamic" className="mt-6">
                 <Card>
@@ -387,7 +406,7 @@ export default function PricingAdminPage() {
                     <CardContent>
                         {isLoadingAddOns || isSeeding ? (
                             <p>Loading setting...</p>
-                        ) : perSqInchPrice ? (
+                        ) : (
                             <div className="flex items-center space-x-4">
                                 <div className="relative flex-grow">
                                     <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
@@ -402,8 +421,9 @@ export default function PricingAdminPage() {
                                 </div>
                                 <Button onClick={handleUpdateSqInchPrice}>Save Change</Button>
                             </div>
-                        ) : (
-                            <p className="text-red-500">Pricing setting not found. Please re-seed the database or add it manually.</p>
+                        )}
+                        {!perSqInchPrice && !isLoadingAddOns && !isSeeding && (
+                             <p className="mt-4 text-red-500">Pricing setting not found. Please set a price and save.</p>
                         )}
                     </CardContent>
                 </Card>
