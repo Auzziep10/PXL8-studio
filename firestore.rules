@@ -159,11 +159,11 @@ service cloud.firestore {
      * @description Stores global pricing information for sheet sizes. Publicly readable.
      * @path /sheetSizes/{sheetSizeId}
      * @allow Any user (including unauthenticated) to read pricing information.
-     * @allow Only admins to create, update, or delete pricing tiers.
+     * @allow Any authenticated user to write to allow for initial setup.
      */
     match /sheetSizes/{sheetSizeId} {
       allow read, list: if true;
-      allow write: if isAdmin();
+      allow write: if isSignedIn();
     }
     
     //-------------------------------------------------------------------------//
