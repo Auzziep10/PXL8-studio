@@ -29,18 +29,6 @@ export async function generateDesignFromPrompt(input: GenerateDesignFromPromptIn
   return generateDesignFromPromptFlow(input);
 }
 
-const prompt = ai.definePrompt({
-  name: 'generateDesignFromPromptPrompt',
-  input: {schema: GenerateDesignFromPromptInputSchema},
-  output: {schema: GenerateDesignFromPromptOutputSchema},
-  prompt: `You are an AI assistant specialized in generating initial gang sheet layouts for direct-to-film (DTF) printing, based on user prompts.
-
-  Based on the description, create a single image representing the entire gang sheet layout, to be printed on a transparent film.
-
-  Description: {{{prompt}}}
-  `,
-});
-
 const generateDesignFromPromptFlow = ai.defineFlow(
   {
     name: 'generateDesignFromPromptFlow',
@@ -49,7 +37,7 @@ const generateDesignFromPromptFlow = ai.defineFlow(
   },
   async input => {
     const {media} = await ai.generate({
-      prompt: input.prompt,
+      prompt: `A single, high-resolution design element for a t-shirt transfer, on a transparent background. The design should be: ${input.prompt}`,
       model: 'googleai/imagen-4.0-fast-generate-001',
     });
 
