@@ -35,7 +35,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         return query(collection(firestore, 'serviceAddOns'), where('name', '==', 'AI Design Creation'));
     }, [firestore]);
 
-    const { data: aiDesignService, isLoading: isLoadingService } = useCollection<ServiceAddOn>(addOnsQuery);
+    const { data: aiDesignService, isLoading: isLoadingService } = useCollection<ServiceAddOn & { id: string }>(addOnsQuery);
 
     const aiDesignFeeProduct = useMemo(() => {
         if (aiDesignService && aiDesignService.length > 0) {
@@ -166,9 +166,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         return <GangSheetBuilder usage="Builder" />;
     }
 
-    const generationFeeText = (aiDesignFeeProduct && !isLoadingService) 
+    const generationFeeText = isLoadingService
+        ? 'Loading pricing...'
+        : aiDesignFeeProduct
         ? `Each generation added to a sheet costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}.`
-        : 'Loading pricing...';
+        : 'AI design pricing not configured.';
 
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
@@ -194,7 +196,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             />
                             <Button
                                 onClick={handleGenerate}
-                                disabled={isLoading || isLoadingService}
+                                disabled={isLoading || isLoadingService || !aiDesignFeeProduct}
                                 className="w-full mt-4 text-lg py-6"
                             >
                                 {isLoading ? (
