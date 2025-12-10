@@ -1,3 +1,4 @@
+
 /**
  * Core Philosophy: This ruleset enforces a strict user-ownership model where all
  * user-generated data is private and accessible only by its creator. The security
@@ -155,13 +156,13 @@ service cloud.firestore {
     // Collection: sheetSizes
     //-------------------------------------------------------------------------//
     /**
-     * @description Stores global pricing information for sheet sizes.
+     * @description Stores global pricing information for sheet sizes. Publicly readable.
      * @path /sheetSizes/{sheetSizeId}
-     * @allow Any authenticated user to read pricing information for display.
+     * @allow Any user (including unauthenticated) to read pricing information.
      * @allow Only admins to create, update, or delete pricing tiers.
      */
     match /sheetSizes/{sheetSizeId} {
-      allow read, list: if isSignedIn();
+      allow read, list: if true;
       allow write: if isAdmin();
     }
     
@@ -169,13 +170,13 @@ service cloud.firestore {
     // Collection: serviceAddOns
     //-------------------------------------------------------------------------//
     /**
-     * @description Stores global service add-ons.
+     * @description Stores global service add-ons. Publicly readable.
      * @path /serviceAddOns/{addOnId}
-     * @allow Any authenticated user to read service add-ons.
+     * @allow Any user (including unauthenticated) to read service add-ons.
      * @allow Only admins to create, update, or delete service add-ons.
      */
     match /serviceAddOns/{addOnId} {
-        allow read, list: if isSignedIn();
+        allow read, list: if true;
         allow write: if isAdmin();
     }
 
