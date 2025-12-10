@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -176,6 +176,16 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     initialHeight: number;
   } | null;
   const [resizingState, setResizingState] = useState<ResizingState>(null);
+
+  // Rotating State
+  type RotatingState = {
+    itemCenterX: number;
+    itemCenterY: number;
+    startAngle: number;
+    initialRotation: number;
+  } | null;
+  const [rotatingState, setRotatingState] = useState<RotatingState>(null);
+
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -266,6 +276,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           dpi: dpi,
           x: pos.x,
           y: pos.y,
+          rotation: 0,
           canvasWidth: w * PPI,
           canvasHeight: h * PPI
         };
@@ -454,7 +465,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
       setDuplicateCount(1); // Reset after adding
   };
 
-  // --- Drag and Drop Handlers ---
+  // --- Drag, Resize, Rotate Handlers ---
   const handleMouseDownOnItem = (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
       e.preventDefault();
@@ -502,6 +513,20 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   };
 
   const handleMouseMove = useCallback((e: MouseEvent) => {
+      if (rotatingState && draggingId && containerRef.current) {
+          const sheetRect = containerRef.current.querySelector('.sheet-canvas')?.getBoundingClientRect();
+          if (!sheetRect) return;
+
+          const dx = e.clientX - rotatingState.itemCenterX;
+          const dy = e.clientY - rotatingState.itemCenterY;
+          const currentAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+          const angleDelta = currentAngle - rotatingState.startAngle;
+
+          let newRotation = rotatingState.initialRotation + angleDelta;
+          updateItem(draggingId, { rotation: newRotation });
+          return;
+      }
+
       if (resizingState && draggingId) {
           const dx = (e.clientX - resizingState.initialX) / scale;
           const newWidth = (resizingState.initialWidth * PPI + dx) / PPI;
@@ -542,16 +567,18 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
           return i;
       }));
 
-  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, updateItem]);
+  }, [draggingId, dragOffset, scale, sheetConfig.width, items, resizingState, rotatingState, updateItem]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
       setResizingState(null);
+      setRotatingState(null);
   };
   
   const handleMouseLeave = () => {
     setDraggingId(null);
     setResizingState(null);
+    setRotatingState(null);
   }
 
   const handleMouseDownOnResizeHandle = (e: React.MouseEvent, id: string) => {
@@ -567,6 +594,29 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         initialHeight: item.height,
     });
   };
+
+  const handleMouseDownOnRotateHandle = (e: React.MouseEvent, id: string, itemRef: HTMLDivElement) => {
+      e.stopPropagation();
+      const item = items.find(i => i.id === id);
+      if (!item || !itemRef) return;
+      
+      const rect = itemRef.getBoundingClientRect();
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+
+      const dx = e.clientX - centerX;
+      const dy = e.clientY - centerY;
+      const startAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+      setDraggingId(id); // Indicate action is happening
+      setRotatingState({
+          itemCenterX: centerX,
+          itemCenterY: centerY,
+          startAngle: startAngle,
+          initialRotation: item.rotation || 0,
+      });
+  };
+
 
   useEffect(() => {
       if (draggingId) {
@@ -587,6 +637,8 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
   // --- Collision Detection Helper ---
   const checkCollision = (currentItem: ArtworkOnCanvas) => {
+      // Simplified collision check for rotated items is complex.
+      // For now, we'll use bounding box which isn't perfect for rotated rectangles.
       return items.some(other => {
           if (other.id === currentItem.id) return false;
           return !(
@@ -626,6 +678,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     items.forEach(item => {
         const img = imageCache[item.imageUrl];
         if (img && (item.y + item.height <= sheetConfig.height)) {
+            const centerX = (item.x + item.width / 2) * BASE_DPI;
+            const centerY = (item.y + item.height / 2) * BASE_DPI;
+
+            sheetCtx.save();
+            sheetCtx.translate(centerX, centerY);
+            sheetCtx.rotate((item.rotation || 0) * Math.PI / 180);
+            sheetCtx.translate(-centerX, -centerY);
+            
             sheetCtx.drawImage(
                 img,
                 item.x * BASE_DPI,
@@ -633,6 +693,8 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 item.width * BASE_DPI,
                 item.height * BASE_DPI
             );
+
+            sheetCtx.restore();
         }
     });
 
@@ -944,10 +1006,13 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                         const isSelected = selectedItemId === item.id;
                         const isColliding = checkCollision(item);
                         const isOutOfBounds = (item.y + item.height) > sheetConfig.height || (item.x + item.width) > sheetConfig.width;
+                        
+                        const itemRef = React.createRef<HTMLDivElement>();
 
                         return (
                             <div
                                 key={item.id}
+                                ref={itemRef}
                                 className={`absolute draggable-item ${isColorPickerActive && isSelected ? 'cursor-eyedropper' : 'cursor-move'} group ${
                                     isSelected ? 'z-50' : 'z-10'
                                 }`}
@@ -956,14 +1021,14 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                     top: `${item.y * PPI * scale}px`,
                                     width: `${item.width * PPI * scale}px`,
                                     height: `${item.height * PPI * scale}px`,
+                                    transform: `rotate(${item.rotation || 0}deg)`,
                                 }}
                                 onMouseDown={(e) => handleMouseDownOnItem(e, item.id)}
                             >
                                 {/* Image Container */}
                                 <div className={`w-full h-full relative ${
                                     isColliding || isOutOfBounds ? 'border-2 border-red-500 bg-red-500/20' : 
-                                    isSelected ? 'border-2 border-primary bg-primary/5' : 
-                                    'border border-blue-400/30 hover:border-blue-400'
+                                    isSelected ? 'outline outline-2 outline-primary outline-offset-2' : ''
                                 }`}>
                                     {item.imageUrl ? (
                                       <img 
@@ -982,14 +1047,28 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                         </div>
                                     )}
 
-                                    {/* Resize Handles */}
+                                    {/* Interaction Handles */}
                                     {isSelected && (
                                         <>
+                                            {/* Resize Handle */}
                                             <div 
-                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize"
+                                                className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm"
                                                 onMouseDown={(e) => handleMouseDownOnResizeHandle(e, item.id)}
                                             ></div>
-                                            {/* Other handles can be added here */}
+                                            {/* Rotate Handle */}
+                                            <div 
+                                                className="absolute -top-6 left-1/2 -translate-x-1/2 w-5 h-5 bg-white border-2 border-primary rounded-full cursor-alias flex items-center justify-center"
+                                                onMouseDown={(e) => handleMouseDownOnRotateHandle(e, item.id, itemRef.current!)}
+                                            >
+                                              <RotateCw className="w-3 h-3 text-primary"/>
+                                            </div>
+                                            {/* Delete Button */}
+                                            <button 
+                                                className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white rounded-full flex items-center justify-center cursor-pointer hover:scale-110 transition-transform"
+                                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                            >
+                                              <X className="w-3 h-3" />
+                                            </button>
                                         </>
                                     )}
                                 </div>

@@ -66,8 +66,9 @@ export interface Artwork {
 }
 
 export interface ArtworkOnCanvas extends Artwork {
-  x: number; // px
-  y: number; // px
+  x: number; // inches
+  y: number; // inches
+  rotation: number; // degrees
   canvasWidth: number; // px
   canvasHeight: number; // px
   quantity: number;
