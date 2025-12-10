@@ -40,8 +40,14 @@ async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunc
     const apiKey = process.env.EASYPOST_API_KEY;
 
     if (!apiKey || apiKey === 'YOUR_API_KEY_HERE') {
-        console.error("EasyPost API key is not configured.");
-        return [];
+        console.warn("EasyPost API key is not configured. Returning mock rates.");
+        // Return mock rates if API key is not set
+        const mockRates: ShippingRate[] = [
+            { id: 'rate_1', carrier: 'USPS', service: 'GroundAdvantage', rate: 7.55, deliveryDays: '3-5 business days' },
+            { id: 'rate_2', carrier: 'USPS', service: 'Priority', rate: 9.50, deliveryDays: '2-3 business days' },
+            { id: 'rate_3', carrier: 'FedEx', service: 'Ground', rate: 12.50, deliveryDays: '1-5 business days' },
+        ];
+        return mockRates.sort((a,b) => a.rate - b.rate);
     }
 
     const shipmentPayload = {
@@ -95,7 +101,7 @@ async function fetchEasyPostShippingRates(toAddress: ShippingAddress, weightOunc
 
     } catch (error) {
         console.error("EasyPost API Fetch Error:", error);
-        return [];
+        return []; // Return empty array on failure
     }
 }
 
