@@ -1,3 +1,4 @@
+
 import type { ImproveArtworkPrintabilityOutput } from '@/ai/flows/improve-artwork-printability';
 import type { User as FirebaseUser } from 'firebase/auth';
 
@@ -91,8 +92,8 @@ export interface ServiceAddOn {
     name: string;
     description: string;
     price: number;
-    // Adding a 'type' to distinguish different kinds of add-ons, like the new sq/in pricing
-    type?: 'per_sq_inch' | 'one_time_fee';
+    // Adding a 'type' to distinguish different kinds of add-ons
+    type?: 'per_sq_inch' | 'one_time_fee' | 'wide_format_discount';
 }
 
 // Represents a physical gang sheet in the cart

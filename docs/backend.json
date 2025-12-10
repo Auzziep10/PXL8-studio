@@ -1,3 +1,4 @@
+
 {
   "entities": {
     "User": {
@@ -201,7 +202,7 @@
         "usage": {
           "type": "string",
           "description": "Determines where this pricing tier is available.",
-          "enum": ["Builder", "Upload", "AI"]
+          "enum": ["Builder", "Upload"]
         },
         "discount": {
           "type": "number",
@@ -231,6 +232,11 @@
         "price": {
           "type": "number",
           "description": "Price for this service in USD."
+        },
+        "type": {
+          "type": "string",
+          "description": "The type of service add-on, used for specific logic.",
+          "enum": ["one_time_fee", "per_sq_inch", "wide_format_discount"]
         }
       },
       "required": ["id", "name", "description", "price"]

@@ -1,8 +1,9 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DynamicSheetCartItem, ServiceAddOn } from '@/lib/types';
-import { Upload, FileText, CheckCircle, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign } from 'lucide-react';
+import { Upload, FileText, CheckCircle, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -10,43 +11,64 @@ import { Input } from '@/components/ui/input';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { Label } from '@/components/ui/label';
+
+type UploadWidthTier = 'standard' | 'wide';
 
 export default function PrebuiltUploadPage() {
     const { addItem: onAddToCart } = useCart();
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const sqInchPriceQuery = useMemoFirebase(
-        () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
+    const addOnsQuery = useMemoFirebase(
+        () => (firestore ? query(collection(firestore, 'serviceAddOns')) : null),
         [firestore]
     );
-    const { data: sqInchPriceData, isLoading: isLoadingPrice } = useCollection<ServiceAddOn & {id: string}>(sqInchPriceQuery);
+    const { data: addOns, isLoading: isLoadingPrice } = useCollection<ServiceAddOn & {id: string}>(addOnsQuery);
     
-    const pricePerSqInch = useMemo(() => {
-        if (sqInchPriceData && sqInchPriceData.length > 0) {
-            return sqInchPriceData[0].price;
+    const { pricePerSqInch, wideFormatDiscount } = useMemo(() => {
+        if (addOns && addOns.length > 0) {
+            const sqInch = addOns.find(a => a.type === 'per_sq_inch')?.price || null;
+            const discount = addOns.find(a => a.type === 'wide_format_discount')?.price || 0;
+            return { pricePerSqInch: sqInch, wideFormatDiscount: discount };
         }
-        return null;
-    }, [sqInchPriceData]);
+        return { pricePerSqInch: null, wideFormatDiscount: 0 };
+    }, [addOns]);
 
-
+    const [widthTier, setWidthTier] = useState<UploadWidthTier>('standard');
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [quantity, setQuantity] = useState(1);
     const [detectedDimensions, setDetectedDimensions] = useState<{w: number, h: number} | null>(null);
     const [isProcessing, setIsProcessing] = useState(false);
     const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+    const [validationError, setValidationError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
+
+    const maxWidth = widthTier === 'standard' ? 22 : 43;
 
     useEffect(() => {
         if (detectedDimensions && pricePerSqInch !== null) {
+            // Validate width
+            if (detectedDimensions.w > maxWidth) {
+                setValidationError(`Image width (${detectedDimensions.w.toFixed(1)}") exceeds the maximum allowed width of ${maxWidth}" for this tier.`);
+                setCalculatedPrice(null);
+                return;
+            }
+            setValidationError(null);
+
             const area = detectedDimensions.w * detectedDimensions.h;
-            const price = area * pricePerSqInch;
+            let price = area * pricePerSqInch;
+            
+            if (widthTier === 'wide' && wideFormatDiscount > 0) {
+                price = price - (price * (wideFormatDiscount / 100));
+            }
             setCalculatedPrice(price);
         } else {
             setCalculatedPrice(null);
         }
-    }, [detectedDimensions, pricePerSqInch]);
+    }, [detectedDimensions, pricePerSqInch, widthTier, maxWidth, wideFormatDiscount]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -55,6 +77,7 @@ export default function PrebuiltUploadPage() {
             setFile(uploadedFile);
             setDetectedDimensions(null);
             setCalculatedPrice(null);
+            setValidationError(null);
             
             if (uploadedFile.type.startsWith('image/')) {
                 const reader = new FileReader();
@@ -64,7 +87,7 @@ export default function PrebuiltUploadPage() {
 
                     const img = new Image();
                     img.onload = () => {
-                        const dpi = 300;
+                        const dpi = 300; // Assume 300 DPI
                         const widthInch = img.naturalWidth / dpi;
                         const heightInch = img.naturalHeight / dpi;
                         
@@ -75,16 +98,34 @@ export default function PrebuiltUploadPage() {
                 reader.readAsDataURL(uploadedFile);
             } else {
                 setPreviewUrl(null);
+                setValidationError("Unsupported file type. Please upload an image.");
             }
         }
     };
+    
+    const resetState = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setDetectedDimensions(null);
+        setCalculatedPrice(null);
+        setQuantity(1);
+        setValidationError(null);
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleTierChange = (tier: UploadWidthTier) => {
+        setWidthTier(tier);
+        resetState();
+    };
 
     const handleAddToCart = async () => {
-        if (!file || !previewUrl || !detectedDimensions || calculatedPrice === null) {
+        if (!file || !previewUrl || !detectedDimensions || calculatedPrice === null || validationError) {
             toast({
                 variant: 'destructive',
-                title: 'File and Price Required',
-                description: 'Please upload a valid image to calculate the price.',
+                title: 'Cannot Add to Cart',
+                description: validationError || 'Please upload a valid image to calculate the price.',
             });
             return;
         }
@@ -94,7 +135,7 @@ export default function PrebuiltUploadPage() {
             const item: DynamicSheetCartItem = {
                 id: `dyn-${Date.now()}`,
                 type: 'dynamic_sheet',
-                name: file.name,
+                name: `Custom Upload (${widthTier})`,
                 previewUrl: previewUrl,
                 width: detectedDimensions.w,
                 height: detectedDimensions.h,
@@ -108,11 +149,7 @@ export default function PrebuiltUploadPage() {
                 description: `${quantity} x ${detectedDimensions.w.toFixed(1)}" x ${detectedDimensions.h.toFixed(1)}" custom sheet added.`,
             });
             
-            setFile(null);
-            setPreviewUrl(null);
-            setDetectedDimensions(null);
-            setCalculatedPrice(null);
-            setQuantity(1);
+            resetState();
 
         } catch (err) {
             console.error("Error processing item", err);
@@ -132,9 +169,28 @@ export default function PrebuiltUploadPage() {
                 <div className="mb-12 text-center">
                     <h1 className="text-4xl font-bold text-white mb-4">Upload Ready-to-Print Sheet</h1>
                     <p className="text-zinc-400 max-w-2xl mx-auto">
-                        Already have your gang sheet built? Upload your finished PNG, PDF, AI, or PSD file here. 
-                        We'll automatically detect the size and calculate the price for you.
+                        Have your gang sheet pre-built? Upload it here. We'll automatically detect the size and calculate the price for you based on the width tier you select.
                     </p>
+                </div>
+
+                <div className="mb-8">
+                    <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
+                        <div 
+                            onClick={() => handleTierChange('standard')}
+                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'standard' ? 'border-primary' : 'border-zinc-700 hover:border-zinc-500')}
+                        >
+                            <h3 className="font-bold text-white">Standard</h3>
+                            <p className="text-zinc-400 text-sm">Up to 22" Wide</p>
+                        </div>
+                         <div 
+                            onClick={() => handleTierChange('wide')}
+                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'wide' ? 'border-primary' : 'border-zinc-700 hover:border-zinc-500')}
+                        >
+                            <h3 className="font-bold text-white">Wide Format</h3>
+                            <p className="text-zinc-400 text-sm">Up to 43" Wide</p>
+                            {wideFormatDiscount > 0 && <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2 py-1 text-xs font-medium text-accent"><Percent className="h-3 w-3" />{wideFormatDiscount}% Off</span>}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
@@ -148,9 +204,9 @@ export default function PrebuiltUploadPage() {
                             </div>
                             <h3 className="text-xl font-medium text-white mb-2">Click to upload or drag and drop</h3>
                             <p className="text-zinc-500 text-sm max-w-xs mx-auto mb-6">
-                                PDF, PNG, AI, or PSD. 300 DPI Recommended. Background must be transparent.
+                                Max width {maxWidth}". Length is unlimited. PNG recommended with transparent background.
                             </p>
-                            <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
+                            <Button variant="secondary" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                                 Select File
                             </Button>
                         </div>
@@ -169,7 +225,7 @@ export default function PrebuiltUploadPage() {
                                 <Button 
                                     variant="ghost"
                                     size="icon"
-                                    onClick={() => { setFile(null); setPreviewUrl(null); setDetectedDimensions(null); }}
+                                    onClick={resetState}
                                     className="hover:bg-red-500/10 hover:text-red-500 text-zinc-500"
                                 >
                                     <Trash2 className="w-5 h-5" />
@@ -208,10 +264,23 @@ export default function PrebuiltUploadPage() {
                                                 <span className="flex items-center"><DollarSign className="w-4 h-4 mr-2"/> Price / sq. in.</span>
                                                 <span className="font-mono text-white">{pricePerSqInch ? formatCurrency(pricePerSqInch) : 'N/A'}</span>
                                             </div>
+                                            {widthTier === 'wide' && wideFormatDiscount > 0 && (
+                                                 <div className="flex justify-between items-center text-sm text-accent mt-2 pt-2 border-t border-white/5">
+                                                    <span className="flex items-center"><Percent className="w-4 h-4 mr-2"/> Wide Discount</span>
+                                                    <span className="font-mono text-white">{wideFormatDiscount}%</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                    
+                                    {validationError && (
+                                        <div className="bg-red-500/10 p-3 rounded-lg border border-red-500/20 text-red-400 text-sm flex items-start gap-2">
+                                            <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
+                                            {validationError}
                                         </div>
                                     )}
 
-                                    {calculatedPrice !== null && (
+                                    {calculatedPrice !== null && !validationError && (
                                         <div className="text-center">
                                             <p className="text-zinc-400 text-sm">Calculated Price</p>
                                             <p className="text-4xl font-bold text-white">{formatCurrency(calculatedPrice)}</p>
@@ -220,7 +289,7 @@ export default function PrebuiltUploadPage() {
 
                                     <div className="grid grid-cols-3 gap-4">
                                          <div className="col-span-1">
-                                             <label className="block text-xs text-zinc-400 mb-1 ml-1">Quantity</label>
+                                             <Label className="block text-xs text-zinc-400 mb-1 ml-1">Quantity</Label>
                                              <Input 
                                                 type="number" 
                                                 min="1" 
@@ -231,7 +300,7 @@ export default function PrebuiltUploadPage() {
                                          </div>
                                          <Button 
                                             onClick={handleAddToCart}
-                                            disabled={isProcessing || calculatedPrice === null}
+                                            disabled={isProcessing || calculatedPrice === null || !!validationError}
                                             className="col-span-2 text-lg h-auto"
                                          >
                                             {isProcessing ? (

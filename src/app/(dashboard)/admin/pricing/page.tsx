@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -46,7 +47,8 @@ const defaultSheetSizes: Omit<SheetSize, 'id' | 'price'>[] = [
 const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
     { name: 'AI Design Creation', description: 'Fee for generating one design using the AI studio.', price: 5.00, type: 'one_time_fee' },
     { name: 'Rush Order', description: 'Priority processing and shipping.', price: 25.00, type: 'one_time_fee' },
-    { name: 'Price Per Square Inch', description: 'Dynamic price for uploaded custom-sized sheets.', price: 0.12, type: 'per_sq_inch' }
+    { name: 'Price Per Square Inch', description: 'Dynamic price for uploaded custom-sized sheets.', price: 0.12, type: 'per_sq_inch' },
+    { name: 'Wide Format Discount', description: 'Percentage discount for uploads up to 43" wide.', price: 5, type: 'wide_format_discount' }
 ];
 
 
@@ -358,7 +360,9 @@ export default function PricingAdminPage() {
                         <TableRow key={addOn.id}>
                             <TableCell className="font-medium text-white">{addOn.name}</TableCell>
                             <TableCell className="text-zinc-400">{addOn.description}</TableCell>
-                            <TableCell className="text-right font-mono text-white">{formatCurrency(addOn.price)}</TableCell>
+                            <TableCell className="text-right font-mono text-white">
+                                {addOn.type === 'wide_format_discount' ? `${addOn.price}%` : formatCurrency(addOn.price)}
+                            </TableCell>
                             <TableCell className="text-right">
                                 <Button variant="ghost" size="icon" onClick={() => handleOpenAddOnDialog(addOn)}><Edit className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="text-red-500/70 hover:text-red-500" onClick={() => handleDelete(addOn.id, 'addOn')}><Trash2 className="h-4 w-4" /></Button>
@@ -465,7 +469,7 @@ export default function PricingAdminPage() {
                  <form onSubmit={handleAddOnFormSubmit} className="space-y-4">
                      <Input name="name" value={addOnFormData.name} onChange={(e) => setAddOnFormData({...addOnFormData, name: e.target.value})} placeholder="Add-on Name, e.g., Rush Order" required />
                      <Textarea name="description" value={addOnFormData.description} onChange={(e) => setAddOnFormData({...addOnFormData, description: e.target.value})} placeholder="Brief description of the service" required />
-                     <Input name="price" type="number" value={addOnFormData.price} onChange={(e) => setAddOnFormData({...addOnFormData, price: e.target.value})} placeholder="Price (USD)" required />
+                     <Input name="price" type="number" value={addOnFormData.price} onChange={(e) => setAddOnFormData({...addOnFormData, price: e.target.value})} placeholder="Price (USD) or Percentage (%) for discounts" required />
                      <DialogFooter>
                         <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                         <Button type="submit">Save</Button>
