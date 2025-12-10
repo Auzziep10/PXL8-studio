@@ -125,8 +125,8 @@ export default function DashboardLayout({
         <SidebarFooter>
             <SidebarMenu>
                 <SidebarMenuItem>
-                    <Link href="/dashboard/settings" passHref>
-                        <SidebarMenuButton asChild tooltip={{ children: 'Settings' }} isActive={pathname === '/dashboard/settings'}>
+                    <Link href="/settings" passHref>
+                        <SidebarMenuButton asChild tooltip={{ children: 'Settings' }} isActive={pathname === '/settings'}>
                             <span>
                                 <Settings />
                                 <span>Settings</span>
