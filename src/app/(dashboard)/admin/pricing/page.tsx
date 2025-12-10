@@ -84,9 +84,12 @@ export default function PricingAdminPage() {
         setOtherAddOns(regularAddOns);
         if (sqInchItem) {
             setNewSqInchPrice(String(sqInchItem.price));
+        } else if (!isLoadingAddOns && !isSeeding) {
+            // If the price isn't set, auto-switch to the Dynamic Pricing tab
+            setActiveTab('Dynamic');
         }
     }
-  }, [serviceAddOns]);
+  }, [serviceAddOns, isLoadingAddOns, isSeeding]);
 
 
   useEffect(() => {
@@ -129,6 +132,11 @@ export default function PricingAdminPage() {
 
 
   const handleOpenSheetDialog = (sheet?: SheetSizeWithId) => {
+    if (!perSqInchPrice) {
+        toast({ variant: 'destructive', title: 'Action Required', description: "Please set a 'Price Per Square Inch' in Dynamic Pricing first." });
+        setActiveTab('Dynamic');
+        return;
+    }
     if (sheet) {
       setEditingSheet(sheet);
       setSheetFormData({
@@ -360,7 +368,7 @@ export default function PricingAdminPage() {
             )}
         </div>
 
-        <Tabs defaultValue="Builder" onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="Builder"><Box className="mr-2 h-4 w-4"/>Builder Sheets</TabsTrigger>
                 <TabsTrigger value="Dynamic"><DollarSign className="mr-2 h-4 w-4"/>Dynamic Pricing</TabsTrigger>
