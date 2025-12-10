@@ -50,8 +50,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save to localStorage whenever items change
   useEffect(() => {
     try {
-      // Don't save image data to local storage. It can exceed limits.
-      const storableItems = items.map(({ previewUrl, printReadyUrl, ...rest }) => rest);
+      // Don't save image data or the large artworks array to local storage. It can exceed limits.
+      const storableItems = items.map(({ previewUrl, printReadyUrl, artworks, ...rest }) => rest);
       localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
     } catch (error) {
       console.error('Failed to save cart to localStorage', error);
