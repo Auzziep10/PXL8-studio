@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, ArtworkOnCanvas } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { fetchShippingRates } from '@/services/easyPostService';
@@ -187,6 +187,20 @@ export default function CartPage() {
 
         const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
         const orderId = `ORD-${Date.now()}`;
+
+        // Definitive fix: Manually construct a plain array of plain objects.
+        const finalOrderItems: OrderItem[] = cartItems.map(item => {
+            const plainItem: OrderItem = {
+                id: item.id,
+                quantity: item.quantity,
+                compositeImageUrl: item.compositeImageUrl,
+                sheetSizeName: item.sheetSize.name,
+                sheetWidth: item.sheetSize.width,
+                sheetHeight: item.sheetSize.height,
+                sheetPrice: item.sheetSize.price
+            };
+            return plainItem;
+        });
         
         const newOrderData: Omit<Order, 'id'> = {
             orderId: orderId,
@@ -194,20 +208,7 @@ export default function CartPage() {
             customerName: `${formData.firstName} ${formData.lastName}`,
             orderDate: new Date().toISOString(),
             status: OrderStatus.PENDING,
-            items: cartItems.map((item: CartItem) => {
-                // FORCE a plain object by reconstructing it field by field.
-                // This is the definitive fix for "invalid nested entity".
-                const plainItem = {
-                    id: item.id,
-                    quantity: item.quantity,
-                    compositeImageUrl: item.compositeImageUrl,
-                    sheetSizeName: item.sheetSize.name,
-                    sheetWidth: item.sheetSize.width,
-                    sheetHeight: item.sheetSize.height,
-                    sheetPrice: item.sheetSize.price,
-                };
-                return plainItem;
-            }),
+            items: finalOrderItems, // Use the guaranteed plain array
             total: total,
             shippingAddress: {
                 street: formData.street,
