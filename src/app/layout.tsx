@@ -2,10 +2,11 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
-import Header from '@/components/header';
 import { CartProvider } from '@/hooks/use-cart.tsx';
 import { FirebaseClientProvider } from '@/firebase';
+import { LayoutProvider } from '@/components/layout-provider';
 
+// This is now a Server Component, so metadata export is allowed.
 export const metadata: Metadata = {
   title: 'PXL8 DTF Platform',
   description: 'Direct-to-Film (DTF) Gang Sheet Builder & Fulfillment Platform',
@@ -26,8 +27,7 @@ export default function RootLayout({
       <body className={cn('font-body antialiased min-h-screen bg-background flex flex-col')}>
         <FirebaseClientProvider>
           <CartProvider>
-            <Header />
-            <main className="flex-grow">{children}</main>
+            <LayoutProvider>{children}</LayoutProvider>
             <Toaster />
           </CartProvider>
         </FirebaseClientProvider>
