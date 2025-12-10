@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -212,7 +213,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   const calculateFinalPrice = useCallback((config: SheetType): number => {
     if (pricePerSqInch === null) return 0;
     const basePrice = config.width * config.height * pricePerSqInch;
-    const discountAmount = basePrice * (config.discount / 100);
+    const discountAmount = basePrice * ((config.discount || 0) / 100);
     return basePrice - discountAmount;
   }, [pricePerSqInch]);
 
