@@ -24,6 +24,7 @@ import {
   DialogFooter,
   DialogClose,
 } from '@/components/ui/dialog';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PlusCircle, Edit, Trash2, DollarSign, Ruler, Settings, Box, Sparkles, Upload as UploadIcon, Wand2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -40,14 +41,12 @@ const defaultSheetSizes: Omit<SheetSize, 'id'>[] = [
     { name: 'Large', width: 22, height: 60, price: 55.00, usage: 'Builder' },
     { name: 'X-Large', width: 22, height: 120, price: 100.00, usage: 'Builder' },
     { name: 'XX-Large', width: 22, height: 240, price: 180.00, usage: 'Builder' },
-    { name: 'Standard Upload', width: 22, height: 36, price: 36.00, usage: 'Upload' },
-    { name: 'Large Upload', width: 22, height: 60, price: 55.00, usage: 'Upload' },
 ];
 
 const defaultAddOns: Omit<ServiceAddOn, 'id'>[] = [
-    { name: 'AI Design Creation', description: 'Fee for generating one design using the AI studio.', price: 5.00 },
-    { name: 'Rush Order', description: 'Priority processing and shipping.', price: 25.00 },
-    { name: 'Pantone Color Match', description: 'Precise color matching for brand consistency.', price: 50.00 }
+    { name: 'AI Design Creation', description: 'Fee for generating one design using the AI studio.', price: 5.00, type: 'one_time_fee' },
+    { name: 'Rush Order', description: 'Priority processing and shipping.', price: 25.00, type: 'one_time_fee' },
+    { name: 'Price Per Square Inch', description: 'Dynamic price for uploaded custom-sized sheets.', price: 0.12, type: 'per_sq_inch' }
 ];
 
 
@@ -55,14 +54,16 @@ export default function PricingAdminPage() {
   const firestore = useFirestore();
   const { toast } = useToast();
 
-  // Queries for different pricing types
   const builderSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Builder')) : null, [firestore]);
-  const uploadSizesQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', 'Upload')) : null, [firestore]);
   const addOnsQuery = useMemoFirebase(() => firestore ? query(collection(firestore, 'serviceAddOns')) : null, [firestore]);
 
   const { data: builderSizes, isLoading: isLoadingBuilder } = useCollection<SheetSizeWithId>(builderSizesQuery as Query<SheetSizeWithId> | null);
-  const { data: uploadSizes, isLoading: isLoadingUpload } = useCollection<SheetSizeWithId>(uploadSizesQuery as Query<SheetSizeWithId> | null);
   const { data: serviceAddOns, isLoading: isLoadingAddOns } = useCollection<ServiceAddOnWithId>(addOnsQuery as Query<ServiceAddOnWithId> | null);
+  
+  const [perSqInchPrice, setPerSqInchPrice] = useState<ServiceAddOnWithId | null>(null);
+  const [otherAddOns, setOtherAddOns] = useState<ServiceAddOnWithId[]>([]);
+  const [newSqInchPrice, setNewSqInchPrice] = useState('');
+
 
   const [isSheetDialogOpen, setIsSheetDialogOpen] = useState(false);
   const [isAddOnDialogOpen, setIsAddOnDialogOpen] = useState(false);
@@ -74,9 +75,21 @@ export default function PricingAdminPage() {
   const [addOnFormData, setAddOnFormData] = useState({ name: '', description: '', price: '' });
 
   const [isSeeding, setIsSeeding] = useState(false);
-  const [activeTab, setActiveTab] = useState<'Builder' | 'Upload' | 'Add-on'>('Builder');
+  const [activeTab, setActiveTab] = useState<'Builder' | 'Dynamic' | 'Add-on'>('Builder');
 
-  // Effect to seed database if it's empty
+  useEffect(() => {
+    if (serviceAddOns) {
+        const sqInchItem = serviceAddOns.find(item => item.type === 'per_sq_inch') || null;
+        const regularAddOns = serviceAddOns.filter(item => item.type !== 'per_sq_inch');
+        setPerSqInchPrice(sqInchItem);
+        setOtherAddOns(regularAddOns);
+        if (sqInchItem) {
+            setNewSqInchPrice(String(sqInchItem.price));
+        }
+    }
+  }, [serviceAddOns]);
+
+
   useEffect(() => {
     const seedDatabase = async () => {
       if (firestore && !isLoadingBuilder && builderSizes?.length === 0 && !isLoadingAddOns && serviceAddOns?.length === 0 && !isSeeding) {
@@ -110,8 +123,7 @@ export default function PricingAdminPage() {
 
 
   const sortedBuilderSizes = useMemo(() => builderSizes ? [...builderSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [builderSizes]);
-  const sortedUploadSizes = useMemo(() => uploadSizes ? [...uploadSizes].sort((a, b) => a.width * a.height - b.width * b.height) : [], [uploadSizes]);
-  const sortedAddOns = useMemo(() => serviceAddOns ? [...serviceAddOns].sort((a, b) => a.price - b.price) : [], [serviceAddOns]);
+  const sortedAddOns = useMemo(() => otherAddOns ? [...otherAddOns].sort((a, b) => a.price - b.price) : [], [otherAddOns]);
 
 
   const handleOpenSheetDialog = (sheet?: SheetSizeWithId) => {
@@ -122,11 +134,11 @@ export default function PricingAdminPage() {
         width: String(sheet.width),
         height: String(sheet.height),
         price: String(sheet.price),
-        usage: sheet.usage || activeTab,
+        usage: sheet.usage || 'Builder',
       });
     } else {
       setEditingSheet(null);
-      setSheetFormData({ name: '', width: '', height: '', price: '', usage: activeTab });
+      setSheetFormData({ name: '', width: '', height: '', price: '', usage: 'Builder' });
     }
     setIsSheetDialogOpen(true);
   };
@@ -162,7 +174,7 @@ export default function PricingAdminPage() {
       width: parseFloat(sheetFormData.width),
       height: parseFloat(sheetFormData.height),
       price: parseFloat(sheetFormData.price),
-      usage: sheetFormData.usage as 'Builder' | 'Upload',
+      usage: 'Builder',
     };
 
     if (Object.values(sheetData).some(v => v === '' || (typeof v === 'number' && isNaN(v)))) {
@@ -192,7 +204,8 @@ export default function PricingAdminPage() {
       const addOnData: Omit<ServiceAddOn, 'id'> = {
           name: addOnFormData.name,
           description: addOnFormData.description,
-          price: parseFloat(addOnFormData.price)
+          price: parseFloat(addOnFormData.price),
+          type: 'one_time_fee',
       };
       
       if (!addOnData.name || !addOnData.description || isNaN(addOnData.price)) {
@@ -214,6 +227,23 @@ export default function PricingAdminPage() {
           toast({ variant: 'destructive', title: 'Error', description: error.message });
       }
   };
+  
+    const handleUpdateSqInchPrice = async () => {
+        if (!firestore || !perSqInchPrice) return;
+        const newPrice = parseFloat(newSqInchPrice);
+        if (isNaN(newPrice) || newPrice < 0) {
+            toast({ variant: 'destructive', title: 'Invalid Price', description: 'Please enter a valid positive number.' });
+            return;
+        }
+
+        try {
+            const docRef = doc(firestore, 'serviceAddOns', perSqInchPrice.id);
+            await updateDoc(docRef, { price: newPrice, updatedAt: serverTimestamp() });
+            toast({ title: 'Success', description: 'Price per square inch has been updated.' });
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: 'Update Failed', description: error.message });
+        }
+    };
 
 
   const handleDelete = async (id: string, type: 'sheet' | 'addOn') => {
@@ -302,19 +332,55 @@ export default function PricingAdminPage() {
                 <h1 className="text-3xl font-bold text-white">Pricing Manager</h1>
                 <p className="text-zinc-400 text-sm mt-1">Manage pricing for sheets and service add-ons.</p>
             </div>
-            <Button onClick={() => activeTab === 'Add-on' ? handleOpenAddOnDialog() : handleOpenSheetDialog()}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Add New
-            </Button>
+            {activeTab !== 'Dynamic' && (
+                <Button onClick={() => activeTab === 'Add-on' ? handleOpenAddOnDialog() : handleOpenSheetDialog()}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add New
+                </Button>
+            )}
         </div>
 
         <Tabs defaultValue="Builder" onValueChange={(v) => setActiveTab(v as any)} className="w-full">
             <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="Builder"><Box className="mr-2 h-4 w-4"/>Builder Sheets</TabsTrigger>
-                <TabsTrigger value="Upload"><UploadIcon className="mr-2 h-4 w-4"/>Upload Sheets</TabsTrigger>
+                <TabsTrigger value="Dynamic"><DollarSign className="mr-2 h-4 w-4"/>Dynamic Pricing</TabsTrigger>
                 <TabsTrigger value="Add-on"><Sparkles className="mr-2 h-4 w-4"/>Service Add-ons</TabsTrigger>
             </TabsList>
             <TabsContent value="Builder" className="mt-6">{renderSheetTable(sortedBuilderSizes, isLoadingBuilder)}</TabsContent>
-            <TabsContent value="Upload" className="mt-6">{renderSheetTable(sortedUploadSizes, isLoadingUpload)}</TabsContent>
+            
+            <TabsContent value="Dynamic" className="mt-6">
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Price Per Square Inch</CardTitle>
+                        <CardDescription>
+                            Set the price for dynamically sized, user-uploaded gang sheets. 
+                            The final price will be calculated as (Width x Height) x this value.
+                        </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {isLoadingAddOns || isSeeding ? (
+                            <p>Loading setting...</p>
+                        ) : perSqInchPrice ? (
+                            <div className="flex items-center space-x-4">
+                                <div className="relative flex-grow">
+                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                                    <Input 
+                                        type="number" 
+                                        value={newSqInchPrice}
+                                        onChange={e => setNewSqInchPrice(e.target.value)}
+                                        step="0.01"
+                                        min="0"
+                                        className="pl-9"
+                                    />
+                                </div>
+                                <Button onClick={handleUpdateSqInchPrice}>Save Change</Button>
+                            </div>
+                        ) : (
+                            <p className="text-red-500">Pricing setting not found. Please re-seed the database or add it manually.</p>
+                        )}
+                    </CardContent>
+                </Card>
+            </TabsContent>
+
             <TabsContent value="Add-on" className="mt-6">{renderAddOnTable(sortedAddOns, isLoadingAddOns)}</TabsContent>
         </Tabs>
         
@@ -331,13 +397,6 @@ export default function PricingAdminPage() {
                 <Input name="height" type="number" value={sheetFormData.height} onChange={(e) => setSheetFormData({...sheetFormData, height: e.target.value})} placeholder="Height (in)" required />
               </div>
               <Input name="price" type="number" value={sheetFormData.price} onChange={(e) => setSheetFormData({...sheetFormData, price: e.target.value})} placeholder="Price (USD)" required />
-              <Select value={sheetFormData.usage} onValueChange={(v) => setSheetFormData({...sheetFormData, usage: v})}>
-                  <SelectTrigger><SelectValue/></SelectTrigger>
-                  <SelectContent>
-                      <SelectItem value="Builder">Builder</SelectItem>
-                      <SelectItem value="Upload">Upload</SelectItem>
-                  </SelectContent>
-              </Select>
               <DialogFooter>
                 <DialogClose asChild><Button type="button" variant="secondary">Cancel</Button></DialogClose>
                 <Button type="submit">Save</Button>

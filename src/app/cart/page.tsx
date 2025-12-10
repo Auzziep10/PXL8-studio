@@ -6,7 +6,7 @@ import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, U
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas, SheetCartItem, ServiceCartItem } from '@/lib/types';
+import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas, SheetCartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { getShippingRates } from '@/app/actions';
@@ -34,7 +34,7 @@ interface CheckoutFormData {
 
 interface PreviewState {
     url: string | null;
-    size: SheetSizeType | null;
+    size: { width: number, height: number } | null;
 }
 
 // This function is now responsible for generating the FINAL print-ready image with customer data
@@ -221,6 +221,9 @@ export default function CartPage() {
         if (item.type === 'service') {
             return acc + (item.price * item.quantity);
         }
+        if (item.type === 'dynamic_sheet') {
+            return acc + (item.price * item.quantity);
+        }
         return acc;
     }, 0);
     const tax = subtotal * 0.08; // 8% tax mock
@@ -247,8 +250,9 @@ export default function CartPage() {
         setIsLoadingRates(true);
         setAvailableRates([]);
         
-        const totalSheets = cartItems.filter(item => item.type === 'sheet').reduce((acc, item) => acc + item.quantity, 0);
-        const weightOz = totalSheets * 3; // Only physical items contribute to weight
+        const physicalItems = cartItems.filter(item => item.type === 'sheet' || item.type === 'dynamic_sheet');
+        const totalPhysicalItems = physicalItems.reduce((acc, item) => acc + item.quantity, 0);
+        const weightOz = totalPhysicalItems * 3; // Only physical items contribute to weight
 
         if (weightOz === 0) {
             setIsLoadingRates(false);
@@ -321,8 +325,8 @@ export default function CartPage() {
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
             return;
         }
-
-        if (cartItems.some(i => i.type === 'sheet') && !selectedRateId && !isTestMode) {
+        const hasPhysicalItems = cartItems.some(i => i.type === 'sheet' || i.type === 'dynamic_sheet');
+        if (hasPhysicalItems && !selectedRateId && !isTestMode) {
             toast({ variant: 'destructive', title: 'Shipping method required', description: 'Please select a shipping method.' });
             return;
         }
@@ -359,57 +363,86 @@ export default function CartPage() {
 
             const finalOrderItems: OrderItem[] = [];
             for (const item of cartItems) {
+                let finalPrintReadyDataUrl: string;
+                let sheetWidth: number;
+                let sheetHeight: number;
+                let previewUrl: string;
+                let artworks: ArtworkOnCanvas[] | undefined;
+                let itemName: string;
+                let itemPrice: number;
+
                 if (item.type === 'sheet') {
-                    // Generate the final print-ready image with the QR code and all info
-                    const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
-                        item.artworks, 
-                        item.sheetSize, 
-                        orderId,
-                        customerName,
-                        shippingAddress
-                    );
-
-                    // Upload preview and the NEW print-ready images to Firebase Storage
-                    const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
-                    const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
-                    
-                    // Upload preview from cart, and new print-ready image
-                    const [previewSnapshot, printReadySnapshot] = await Promise.all([
-                        uploadString(previewStorageRef, item.previewUrl, 'data_url'),
-                        uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
-                    ]);
-                    
-                    const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
-                        getDownloadURL(previewSnapshot.ref),
-                        getDownloadURL(printReadySnapshot.ref)
-                    ]);
-
-                    // Create a completely plain object for Firestore
-                    const plainItem: OrderItem = {
-                        id: item.id,
-                        quantity: item.quantity,
-                        previewUrl: previewDownloadURL,
-                        printReadyUrl: printReadyDownloadURL,
-                        sheetSizeName: item.sheetSize.name,
-                        sheetWidth: item.sheetSize.width,
-                        sheetHeight: item.sheetSize.height,
-                        sheetPrice: item.sheetSize.price,
-                    };
-                    finalOrderItems.push(plainItem);
-                } else if (item.type === 'service') {
-                    // Handle service items like AI fees
+                    sheetWidth = item.sheetSize.width;
+                    sheetHeight = item.sheetSize.height;
+                    previewUrl = item.previewUrl;
+                    artworks = item.artworks;
+                    itemName = item.sheetSize.name;
+                    itemPrice = item.sheetSize.price;
+                } else if (item.type === 'dynamic_sheet') {
+                    sheetWidth = item.width;
+                    sheetHeight = item.height;
+                    previewUrl = item.previewUrl;
+                    artworks = [{
+                        id: `art-${item.id}`,
+                        imageUrl: item.previewUrl,
+                        name: item.name,
+                        width: item.width,
+                        height: item.height,
+                        dpi: 300,
+                        x: 0, y: 0,
+                        rotation: 0,
+                        canvasWidth: item.width * 300,
+                        canvasHeight: item.height * 300,
+                        quantity: 1,
+                    }];
+                    itemName = `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
+                    itemPrice = item.price;
+                } else { // Service item
                      const plainItem: OrderItem = {
                         id: item.id,
                         quantity: item.quantity,
                         previewUrl: '', // No image for a service
                         printReadyUrl: '',
                         sheetSizeName: item.name,
-                        sheetWidth: 0,
-                        sheetHeight: 0,
+                        sheetWidth: 0, sheetHeight: 0,
                         sheetPrice: item.price,
                     };
                     finalOrderItems.push(plainItem);
+                    continue; // Go to next item
                 }
+                
+                finalPrintReadyDataUrl = await generateFinalSheetForPrint(
+                    artworks, 
+                    { width: sheetWidth, height: sheetHeight },
+                    orderId,
+                    customerName,
+                    shippingAddress
+                );
+
+                const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
+                const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
+                
+                const [previewSnapshot, printReadySnapshot] = await Promise.all([
+                    uploadString(previewStorageRef, previewUrl, 'data_url'),
+                    uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
+                ]);
+                
+                const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
+                    getDownloadURL(previewSnapshot.ref),
+                    getDownloadURL(printReadySnapshot.ref)
+                ]);
+
+                const plainItem: OrderItem = {
+                    id: item.id,
+                    quantity: item.quantity,
+                    previewUrl: previewDownloadURL,
+                    printReadyUrl: printReadyDownloadURL,
+                    sheetSizeName: itemName,
+                    sheetWidth: sheetWidth,
+                    sheetHeight: sheetHeight,
+                    sheetPrice: itemPrice,
+                };
+                finalOrderItems.push(plainItem);
             }
             
             const newOrderData = {
@@ -452,12 +485,11 @@ export default function CartPage() {
         }
     };
     
-    const handlePreview = (item: SheetCartItem) => {
-        // Use the session-specific previewUrl from the cart item
+    const handlePreview = (item: SheetCartItem | DynamicSheetCartItem) => {
         if (item.previewUrl) {
-            setPreviewState({ url: item.previewUrl, size: item.sheetSize });
+            const size = item.type === 'sheet' ? item.sheetSize : { width: item.width, height: item.height };
+            setPreviewState({ url: item.previewUrl, size: size });
         } else {
-            // As a fallback, you could try to generate it again, or show an error
             toast({
                 variant: 'destructive',
                 title: 'Preview Unavailable',
@@ -486,6 +518,46 @@ export default function CartPage() {
                                 <p className="text-xs text-zinc-500">{item.sheetSize.width}" x {item.sheetSize.height}"</p>
                             </div>
                             <p className="font-bold text-white">{formatCurrency(item.sheetSize.price * item.quantity)}</p>
+                        </div>
+                        <div className="flex items-center justify-between mt-2">
+                            <div className="flex items-center space-x-2">
+                                <Label htmlFor={`quantity-${item.id}`} className="text-xs text-zinc-500">Qty:</Label>
+                                <select 
+                                    id={`quantity-${item.id}`}
+                                    value={item.quantity}
+                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
+                                    className="bg-zinc-900 border border-white/10 rounded text-white text-xs py-1 px-2"
+                                >
+                                    {[1, 2, 3, 4, 5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
+                                </select>
+                            </div>
+                            <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-zinc-500 hover:text-red-400 text-xs">
+                                <Trash2 className="w-3 h-3 mr-1" /> Remove
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            );
+        }
+        if (item.type === 'dynamic_sheet') {
+             return (
+                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
+                    <div 
+                        className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
+                        onClick={() => handlePreview(item)}
+                    >
+                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={item.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                            <ZoomIn className="w-5 h-5 text-white" />
+                        </div>
+                    </div>
+                    <div className="flex-1 w-full">
+                        <div className="flex justify-between">
+                            <div>
+                                <h3 className="font-bold text-white">Custom Uploaded Sheet</h3>
+                                <p className="text-xs text-zinc-500">{item.width.toFixed(1)}" x {item.height.toFixed(1)}"</p>
+                            </div>
+                            <p className="font-bold text-white">{formatCurrency(item.price * item.quantity)}</p>
                         </div>
                         <div className="flex items-center justify-between mt-2">
                             <div className="flex items-center space-x-2">
@@ -724,7 +796,7 @@ export default function CartPage() {
                                             </Label>
                                         ))}
                                      </div>
-                                 ) : cartItems.some(i => i.type === 'sheet') ? (
+                                 ) : hasPhysicalItems ? (
                                      <div className="text-center py-4 text-sm text-zinc-500 bg-zinc-900/50 rounded-lg border border-white/5">
                                          Enter a valid shipping address to see rates.
                                      </div>
@@ -754,7 +826,7 @@ export default function CartPage() {
                             </div>
                             <div className="flex justify-between text-zinc-400">
                                 <span>Shipping</span>
-                                <span className="text-white">{shippingCost === 0 && !isTestMode && cartItems.some(i => i.type === 'sheet') ? 'Calculated' : formatCurrency(shippingCost)}</span>
+                                <span className="text-white">{shippingCost === 0 && !isTestMode && hasPhysicalItems ? 'Calculated' : formatCurrency(shippingCost)}</span>
                             </div>
                             {isTestMode && (
                                 <div className="flex justify-between text-accent font-bold">
@@ -802,7 +874,7 @@ export default function CartPage() {
                         <Button 
                             type="submit"
                             form="checkout-form"
-                            disabled={isCheckingOut || (cartItems.some(i => i.type === 'sheet') && !selectedRateId && !isTestMode)}
+                            disabled={isCheckingOut || (hasPhysicalItems && !selectedRateId && !isTestMode)}
                             size="lg"
                             className="w-full text-lg"
                         >

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
-import type { CartItem, ServiceCartItem } from '@/lib/types';
+import type { CartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 
 interface CartContextType {
   items: CartItem[];
@@ -21,8 +21,6 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       const storedItems = localStorage.getItem('pxl8-cart');
       if (storedItems) {
-        // Since we don't store image data, this should be safe to parse.
-        // We only persist the non-volatile parts of the cart.
         setItems(JSON.parse(storedItems));
       }
     } catch (error) {
@@ -36,9 +34,9 @@ export function CartProvider({ children }: { children: ReactNode }) {
     try {
       // Don't save large, session-specific data to localStorage.
       const storableItems = items.map(item => {
-        if (item.type === 'sheet') {
+        if (item.type === 'sheet' || item.type === 'dynamic_sheet') {
           // For sheets, remove the large, session-specific data
-          const { artworks, previewUrl, ...rest } = item;
+          const { artworks, previewUrl, ...rest } = item as any; // Use 'any' to handle union type properties
           return rest;
         }
         // For services, the whole item is storable

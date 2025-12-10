@@ -90,6 +90,8 @@ export interface ServiceAddOn {
     name: string;
     description: string;
     price: number;
+    // Adding a 'type' to distinguish different kinds of add-ons, like the new sq/in pricing
+    type?: 'per_sq_inch' | 'one_time_fee';
 }
 
 // Represents a physical gang sheet in the cart
@@ -111,8 +113,21 @@ export interface ServiceCartItem {
   quantity: number;
 }
 
+// Represents a dynamically priced, uploaded sheet.
+export interface DynamicSheetCartItem {
+    id: string;
+    type: 'dynamic_sheet';
+    name: string;
+    previewUrl: string;
+    width: number; // inches
+    height: number; // inches
+    price: number; // This is the calculated total price for this one item
+    quantity: number;
+}
+
+
 // The CartItem is a union of all possible item types in the cart.
-export type CartItem = SheetCartItem | ServiceCartItem;
+export type CartItem = SheetCartItem | ServiceCartItem | DynamicSheetCartItem;
 
 
 export enum SheetSizeEnum {
