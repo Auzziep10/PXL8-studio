@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -6,9 +7,9 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
+import { generateDesign, addTextToImage, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { removeBackground } from '@/ai/flows/remove-background';
 import { useCart } from '@/hooks/use-cart';
@@ -34,6 +35,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         colors: '',
         mood: '',
     });
+    const [textToAdd, setTextToAdd] = useState('');
+    const [isApplyingText, setIsApplyingText] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
@@ -89,7 +92,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 setView('edit');
                 toast({
                     title: 'Design Generated!',
-                    description: 'Your new design is ready.',
+                    description: 'Your new design is ready for edits.',
                 });
             } else {
                 throw new Error(result.error || 'Failed to generate design.');
@@ -106,6 +109,35 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         }
     };
     
+    const handleApplyText = async () => {
+        if (!generatedImage || !textToAdd) return;
+
+        setIsApplyingText(true);
+        toast({ title: 'Applying Text...', description: 'AI is adding your text to the image.' });
+
+        try {
+            const result = await addTextToImage({
+                imageDataUri: generatedImage,
+                text: textToAdd,
+            });
+            if (result.success && result.data?.imageDataUri) {
+                setGeneratedImage(result.data.imageDataUri);
+                toast({ title: 'Text Applied!', description: 'Your design has been updated.' });
+            } else {
+                throw new Error(result.error || 'Failed to apply text.');
+            }
+        } catch (error) {
+            console.error('Error applying text:', error);
+            toast({
+                variant: 'destructive',
+                title: 'Text Application Failed',
+                description: (error as Error).message,
+            });
+        } finally {
+            setIsApplyingText(false);
+        }
+    };
+
     const handleRemoveBackground = async () => {
         if (!generatedImage) return;
 
@@ -165,8 +197,10 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             description: `The design is ready on the ${target} page, and a ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)} fee is in your cart.`,
         });
 
+        // Reset state
         setView('generate');
         setGeneratedImage(null);
+        setTextToAdd('');
         setFormData({ subject: '', style: '', colors: '', mood: '' });
     };
 
@@ -241,10 +275,37 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             </Button>
                         </div>
                     ) : (
-                        <div className="space-y-6 text-center">
+                        <div className="space-y-6">
                             <div className="bg-checkerboard-dark rounded-xl border border-white/10 p-4 aspect-square max-w-lg mx-auto">
                                 <img src={generatedImage!} alt="AI Generated Design" className="w-full h-full object-contain" />
                             </div>
+                             
+                             {/* Editing Controls */}
+                             <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
+                                <div className="flex flex-col sm:flex-row gap-4">
+                                     <div className="flex-grow space-y-2">
+                                        <Label className="flex items-center gap-2 text-zinc-300"><CaseSensitive className="w-4 h-4"/> Add Text</Label>
+                                        <div className="flex gap-2">
+                                            <Input 
+                                                placeholder="e.g., 'Happy Camper'" 
+                                                value={textToAdd}
+                                                onChange={(e) => setTextToAdd(e.target.value)}
+                                                disabled={isApplyingText}
+                                            />
+                                            <Button onClick={handleApplyText} disabled={isApplyingText || !textToAdd}>
+                                                {isApplyingText ? <RefreshCw className="animate-spin" /> : 'Apply'}
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <Label className="flex items-center gap-2 text-zinc-300"><Scissors className="w-4 h-4"/> Edit Image</Label>
+                                        <Button onClick={handleRemoveBackground} variant="outline" className="w-full" disabled={isRemovingBg}>
+                                            {isRemovingBg ? 'Removing...' : 'Remove Background'}
+                                        </Button>
+                                    </div>
+                                </div>
+                             </div>
+
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
                                 <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
                                     <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
@@ -253,11 +314,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
                                 </Button>
                             </div>
-                            <div className="flex justify-center gap-4">
-                                <Button onClick={handleRemoveBackground} variant="outline" className="text-base" disabled={isRemovingBg}>
-                                    <Scissors className="w-5 h-5 mr-2" />
-                                    {isRemovingBg ? 'Removing...' : 'Remove Background'}
-                                </Button>
+                            <div className="flex justify-center">
                                 <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
                                     <Wand2 className="w-5 h-5 mr-2" /> Generate Another
                                 </Button>

@@ -1,7 +1,9 @@
+
 'use server';
 
 import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from '@/ai/flows/improve-artwork-printability';
 import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
+import { addTextToImage, AddTextToImageInput } from '@/ai/flows/add-text-to-image';
 import type { ShippingAddress, ShippingRate } from '@/lib/types';
 
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
@@ -23,6 +25,17 @@ export async function generateDesign(input: GenerateDesignFromPromptInput) {
         return { success: false, error: 'Failed to generate design.' };
     }
 }
+
+export async function addTextToImage(input: AddTextToImageInput) {
+    try {
+        const result = await addTextToImage(input);
+        return { success: true, data: result };
+    } catch (error) {
+        console.error('Error adding text to image:', error);
+        return { success: false, error: 'Failed to add text to image.' };
+    }
+}
+
 
 // --- EasyPost Logic Moved Here and Refactored ---
 
