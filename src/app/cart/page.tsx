@@ -245,11 +245,11 @@ export default function CartPage() {
 
     // Effect: Trigger rate fetch when Zip code is valid (5 digits)
     useEffect(() => {
-        if (formData.zip.length >= 5 && formData.state && formData.city) {
+        if (formData.zip.length >= 5 && formData.state && formData.city && hasPhysicalItems) {
             fetchRates();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [formData.zip, formData.city, formData.state, cartItems]);
+    }, [formData.zip, formData.city, formData.state, cartItems, hasPhysicalItems]);
 
     const fetchRates = async () => {
         setIsLoadingRates(true);
@@ -385,19 +385,23 @@ export default function CartPage() {
                     const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
                     const previewUrl = item.previewUrl;
-                    const artworks = item.type === 'sheet' ? item.artworks : [{
-                        id: `art-${item.id}`,
-                        imageUrl: item.previewUrl,
-                        name: item.name,
-                        width: item.width,
-                        height: item.height,
-                        dpi: 300,
-                        x: 0, y: 0,
-                        rotation: 0,
-                        canvasWidth: item.width * 300,
-                        canvasHeight: item.height * 300,
-                        quantity: 1,
-                    }];
+                    
+                    const artworks: ArtworkOnCanvas[] = item.type === 'sheet' 
+                        ? item.artworks 
+                        : [{
+                            id: `art-${item.id}`,
+                            imageUrl: item.previewUrl,
+                            name: item.name,
+                            width: item.width,
+                            height: item.height,
+                            dpi: 300,
+                            x: 0, y: 0,
+                            rotation: 0,
+                            canvasWidth: item.width * 300,
+                            canvasHeight: item.height * 300,
+                            quantity: 1,
+                        }];
+
                     const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
                     const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
                     
