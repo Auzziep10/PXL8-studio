@@ -12,7 +12,7 @@
 import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
-export const AddTextToImageInputSchema = z.object({
+const AddTextToImageInputSchema = z.object({
   imageDataUri: z
     .string()
     .describe(
@@ -20,16 +20,16 @@ export const AddTextToImageInputSchema = z.object({
     ),
   text: z.string().describe('The text to be added to the image.'),
 });
-export type AddTextToImageInput = z.infer<typeof AddTextToImageInputSchema>;
+type AddTextToImageInput = z.infer<typeof AddTextToImageInputSchema>;
 
-export const AddTextToImageOutputSchema = z.object({
+const AddTextToImageOutputSchema = z.object({
   imageDataUri: z
     .string()
     .describe(
       "A data URI containing the new image with the text applied, that must include a MIME type and use Base64 encoding."
     ),
 });
-export type AddTextToImageOutput = z.infer<typeof AddTextToImageOutputSchema>;
+type AddTextToImageOutput = z.infer<typeof AddTextToImageOutputSchema>;
 
 export async function addTextToImage(input: AddTextToImageInput): Promise<AddTextToImageOutput> {
   return addTextToImageFlow(input);
