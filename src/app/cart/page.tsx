@@ -303,7 +303,7 @@ export default function CartPage() {
         try {
             // STEP 1: Ensure all images are permanent cloud URLs
             if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:'))) {
-                 if (!currentUser) {
+                if (!currentUser) {
                     toast({
                         variant: 'destructive',
                         title: 'Login Required',
@@ -313,9 +313,9 @@ export default function CartPage() {
                     setIsCheckingOut(false);
                     return;
                 }
-
+            
                 toast({ title: 'Saving Your Designs...', description: 'Please wait while we secure your artwork...' });
-                
+            
                 const updatedCartItems = await Promise.all(cartItems.map(async item => {
                     if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
                         const blob = await (await fetch(item.previewUrl)).blob();
@@ -326,6 +326,9 @@ export default function CartPage() {
                     return item;
                 }));
                 setCartItems(updatedCartItems); // Update the cart state with permanent URLs
+                // Re-assign cartItems to the updated version for the rest of this function's scope
+                // This is a bit of a hack, the better way is to refactor this into multiple steps.
+                (e.target as any).__cartItems = updatedCartItems;
             }
 
 
@@ -347,9 +350,10 @@ export default function CartPage() {
             // --- End Order ID Generation ---
 
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
+            const currentCartItems = (e.target as any).__cartItems || cartItems;
 
             const finalOrderItems: OrderItem[] = await Promise.all(
-                cartItems.map(async (item): Promise<OrderItem> => {
+                currentCartItems.map(async (item: CartItem): Promise<OrderItem> => {
                     if (item.type === 'service') {
                         return {
                             id: item.id,
@@ -447,14 +451,19 @@ export default function CartPage() {
     };
 
     const renderCartItem = (item: CartItem) => {
-        if (item.type === 'sheet') {
+        if (item.type === 'sheet' || item.type === 'dynamic_sheet') {
+            const name = item.type === 'sheet' ? item.sheetSize.name : item.name;
+            const width = item.type === 'sheet' ? item.sheetSize.width : item.width;
+            const height = item.type === 'sheet' ? item.sheetSize.height : item.height;
+            const price = item.type === 'sheet' ? item.sheetSize.price : item.price;
+            
             return (
                  <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
                     <div 
                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                         onClick={() => handlePreview(item)}
                     >
-                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={item.sheetSize.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
+                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="w-5 h-5 text-white" />
                         </div>
@@ -462,50 +471,10 @@ export default function CartPage() {
                     <div className="flex-1 w-full">
                         <div className="flex justify-between">
                             <div>
-                                <h3 className="font-bold text-white">{item.sheetSize.name} Gang Sheet</h3>
-                                <p className="text-xs text-zinc-500">{item.sheetSize.width}" x {item.sheetSize.height}"</p>
+                                <h3 className="font-bold text-white">{name}</h3>
+                                <p className="text-xs text-zinc-500">{width}" x {height}"</p>
                             </div>
-                            <p className="font-bold text-white">{formatCurrency(item.sheetSize.price * item.quantity)}</p>
-                        </div>
-                        <div className="flex items-center justify-between mt-2">
-                            <div className="flex items-center space-x-2">
-                                <Label htmlFor={`quantity-${item.id}`} className="text-xs text-zinc-500">Qty:</Label>
-                                <select 
-                                    id={`quantity-${item.id}`}
-                                    value={item.quantity}
-                                    onChange={(e) => updateItemQuantity(item.id, parseInt(e.target.value))}
-                                    className="bg-zinc-900 border border-white/10 rounded text-white text-xs py-1 px-2"
-                                >
-                                    {[1, 2, 3, 4, 5, 10, 20, 50, 100].map(n => <option key={n} value={n}>{n}</option>)}
-                                </select>
-                            </div>
-                            <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-zinc-500 hover:text-red-400 text-xs">
-                                <Trash2 className="w-3 h-3 mr-1" /> Remove
-                            </Button>
-                        </div>
-                    </div>
-                </div>
-            );
-        }
-        if (item.type === 'dynamic_sheet') {
-             return (
-                 <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-white/5 last:border-0 last:pb-0">
-                    <div 
-                        className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
-                        onClick={() => handlePreview(item)}
-                    >
-                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={item.name} layout='fill' objectFit='contain' className="group-hover:scale-110 transition-transform" />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <ZoomIn className="w-5 h-5 text-white" />
-                        </div>
-                    </div>
-                    <div className="flex-1 w-full">
-                        <div className="flex justify-between">
-                            <div>
-                                <h3 className="font-bold text-white">Custom Uploaded Sheet</h3>
-                                <p className="text-xs text-zinc-500">{item.width.toFixed(1)}" x {item.height.toFixed(1)}"</p>
-                            </div>
-                            <p className="font-bold text-white">{formatCurrency(item.price * item.quantity)}</p>
+                            <p className="font-bold text-white">{formatCurrency(price * item.quantity)}</p>
                         </div>
                         <div className="flex items-center justify-between mt-2">
                             <div className="flex items-center space-x-2">

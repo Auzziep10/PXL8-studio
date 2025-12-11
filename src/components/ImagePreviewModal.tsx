@@ -1,7 +1,7 @@
 
 'use client';
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { X } from "lucide-react";
 import NextImage from 'next/image';
 
@@ -22,6 +22,7 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, title, sheetWidth
       <DialogContent className="max-w-4xl h-[90vh] flex flex-col p-0">
         <DialogHeader className="p-4 border-b">
           <DialogTitle>{title}</DialogTitle>
+          <DialogDescription className="sr-only">A preview of the selected image: {title}</DialogDescription>
         </DialogHeader>
         <div className="flex-1 flex items-center justify-center bg-zinc-900 p-4 overflow-auto">
           <div 
@@ -38,8 +39,8 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, title, sheetWidth
               <NextImage 
                   src={imageUrl} 
                   alt={title} 
-                  layout="fill"
-                  objectFit="contain"
+                  fill
+                  className="object-contain"
               />
             )}
           </div>
