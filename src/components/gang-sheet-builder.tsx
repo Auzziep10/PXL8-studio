@@ -61,7 +61,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   
   const sortedSheetSizes = useMemo(() => {
     if (!sheetSizes) return [];
-    return [...sheetSizes].sort((a, b) => (a.width * a.height) - (b.width * a.height));
+    return [...sheetSizes].sort((a, b) => (a.width * a.height) - (b.width * b.height));
   }, [sheetSizes]);
 
 
