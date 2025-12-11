@@ -281,86 +281,96 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     return { x: 0, y: 0 };
   };
 
-  const handleImageLoad = useCallback((imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Omit<Artwork, 'id'>) => {
+  const handleImageLoad = useCallback((imageUrl: string, fileName: string, isFromUpload: boolean, existingArtwork?: Omit<Artwork, 'id'>) => {
     const img = new window.Image();
-    if (isPermanent) img.crossOrigin = "Anonymous";
-
+    const isPermanent = !imageUrl.startsWith('data:');
+    if (isPermanent) {
+      img.crossOrigin = 'Anonymous';
+    }
+  
     img.onload = () => {
-        let w, h, dpi;
-        if (existingArtwork) {
-            w = existingArtwork.width;
-            h = existingArtwork.height;
-            dpi = existingArtwork.dpi;
-        } else {
-            dpi = 300; // Assume 300 DPI for new uploads
-            w = parseFloat((img.width / dpi).toFixed(2));
-            h = parseFloat((img.height / dpi).toFixed(2));
-        }
-
-        const pos = findOpenPosition(w, h, items);
-
-        const newItem: ArtworkOnCanvas = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-          name: fileName,
-          imageUrl: imageUrl,
-          width: w,
-          height: h,
-          quantity: 1,
-          dpi: dpi,
-          x: pos.x,
-          y: pos.y,
-          rotation: 0,
-          canvasWidth: w * PPI,
-          canvasHeight: h * PPI
-        };
-
-        setItems(prev => [...prev, newItem]);
-        setSelectedItemId(newItem.id);
-        setDuplicateCount(1);
-
-        if (existingArtwork && onArtworkHandled) {
-            onArtworkHandled(existingArtwork.name);
-        } else {
-            toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
-        }
+      let w, h, dpi;
+      if (existingArtwork) {
+        w = existingArtwork.width;
+        h = existingArtwork.height;
+        dpi = existingArtwork.dpi;
+      } else {
+        dpi = 300;
+        w = parseFloat((img.width / dpi).toFixed(2));
+        h = parseFloat((img.height / dpi).toFixed(2));
+      }
+  
+      const pos = findOpenPosition(w, h, items);
+  
+      const newItem: ArtworkOnCanvas = {
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        name: fileName,
+        imageUrl: imageUrl,
+        width: w,
+        height: h,
+        quantity: 1,
+        dpi: dpi,
+        x: pos.x,
+        y: pos.y,
+        rotation: 0,
+        canvasWidth: w * PPI,
+        canvasHeight: h * PPI,
+      };
+  
+      setItems(prev => [...prev, newItem]);
+      setSelectedItemId(newItem.id);
+      setDuplicateCount(1);
+  
+      if (onArtworkHandled && existingArtwork) {
+        onArtworkHandled(existingArtwork.name);
+      }
+  
+      if (isFromUpload) {
+        toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+      }
+  
+      // If user is logged in and it's a data URL, start background upload
+      if (user && !isPermanent) {
+        toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage in the background.' });
+        fetch(imageUrl)
+          .then(res => res.blob())
+          .then(blob => {
+            const file = new File([blob], fileName, { type: 'image/png' });
+            return uploadFileAndGetURL(file, user.uid);
+          })
+          .then(permanentUrl => {
+            // Silently update the item with the permanent URL
+            setItems(prev =>
+              prev.map(item =>
+                item.id === newItem.id ? { ...item, imageUrl: permanentUrl } : item
+              )
+            );
+          })
+          .catch(err => {
+            toast({
+              variant: 'destructive',
+              title: 'Save Failed',
+              description: 'Could not save AI design. It will remain on your sheet temporarily.',
+            });
+          });
+      }
     };
+  
     img.onerror = () => {
-        toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
+      toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
     };
     img.src = imageUrl;
-  }, [items, sheetConfig, toast, onArtworkHandled]);
+  }, [items, sheetConfig, toast, onArtworkHandled, user]);
 
 
   useEffect(() => {
     if (newArtworks && newArtworks.length > 0 && onArtworkHandled) {
         newArtworks.forEach(art => {
-            // For guest users, the image URL is a data URL.
-            // For logged-in users, it should be uploaded to get a permanent URL.
-            const isDataUrl = art.imageUrl.startsWith('data:');
-            
-            if (user && isDataUrl) {
-                // If the user is logged in, upload the AI image to get a permanent URL
-                toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage.' });
-                fetch(art.imageUrl)
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const file = new File([blob], art.name, { type: 'image/png' });
-                        return uploadFileAndGetURL(file, user.uid);
-                    })
-                    .then(permanentUrl => {
-                        handleImageLoad(permanentUrl, true, art.name, art);
-                    })
-                    .catch(err => {
-                         toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save AI design.' });
-                    });
-            } else {
-                // For guests, or if the URL is already permanent, just load it
-                handleImageLoad(art.imageUrl, !isDataUrl, art.name, art);
-            }
+            handleImageLoad(art.imageUrl, art.name, false, art);
         });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newArtworks, user]); // Only react when newArtworks changes
+  }, [newArtworks]); // Only react when newArtworks changes
 
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -373,7 +383,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         toast({ title: 'Uploading...', description: 'Your image is being uploaded to secure storage.' });
         try {
             const permanentUrl = await uploadFileAndGetURL(file, user.uid);
-            handleImageLoad(permanentUrl, true, file.name);
+            handleImageLoad(permanentUrl, file.name, true);
         } catch (error) {
             console.error("File upload failed:", error);
             toast({ variant: 'destructive', title: 'Upload Failed', description: 'Could not upload your image. Please try again.' });
@@ -383,7 +393,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         const reader = new FileReader();
         reader.onload = (e) => {
             const localUrl = e.target?.result as string;
-            handleImageLoad(localUrl, false, file.name);
+            handleImageLoad(localUrl, file.name, true);
         };
         reader.onerror = () => {
              toast({ variant: 'destructive', title: 'File Read Failed', description: 'Could not read the selected file.' });
@@ -1273,4 +1283,5 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
 
     
+
 
