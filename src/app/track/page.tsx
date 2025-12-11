@@ -249,7 +249,7 @@ export default function SingleTransferUploadPage() {
                                 <Upload className="w-10 h-10 text-zinc-400 group-hover:text-accent transition-colors" />
                             </div>
                             <h3 className="text-xl font-medium text-white mb-2">Click to upload your design</h3>
-                            <p className="text-zinc-500 text-sm">PNG, JPG, or PDF. 300 DPI recommended.</p>
+                            <p className="text-zinc-500 text-sm">PNG, JPG, or SVG. 300 DPI recommended.</p>
                         </div>
                     ) : (
                         <div className="w-full h-full flex flex-col">
@@ -345,7 +345,7 @@ export default function SingleTransferUploadPage() {
                             </div>
                         </div>
                     )}
-                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg" />
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg,.svg" />
                 </div>
             </div>
         </div>

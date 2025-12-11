@@ -1046,7 +1046,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                   </button>
               </div>
               
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*" onChange={handleFileUpload} />
+              <input ref={fileInputRef} type="file" className="hidden" accept="image/*,image/svg+xml" onChange={handleFileUpload} />
 
               {items.length === 0 ? (
                 <div 
@@ -1057,7 +1057,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                      <Upload className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
                   </div>
                   <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
-                  <p className="text-xs text-zinc-500">PNG, AI, PDF (300 DPI)</p>
+                  <p className="text-xs text-zinc-500">PNG, JPG, SVG (300 DPI)</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
