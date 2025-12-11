@@ -364,28 +364,26 @@ export default function CartPage() {
                 country: 'US',
             };
 
-            const finalOrderItems: OrderItem[] = [];
-            for (const item of cartItems) {
-                let finalPrintReadyDataUrl: string;
-                let sheetWidth: number;
-                let sheetHeight: number;
-                let previewUrl: string;
-                let artworks: ArtworkOnCanvas[] | undefined;
-                let itemName: string;
-                let itemPrice: number;
+            const finalOrderItems: OrderItem[] = await Promise.all(
+                cartItems.map(async (item): Promise<OrderItem> => {
+                    if (item.type === 'service') {
+                        return {
+                            id: item.id,
+                            quantity: item.quantity,
+                            previewUrl: '',
+                            printReadyUrl: '',
+                            sheetSizeName: item.name,
+                            sheetWidth: 0,
+                            sheetHeight: 0,
+                            sheetPrice: item.price,
+                        };
+                    }
 
-                if (item.type === 'sheet') {
-                    sheetWidth = item.sheetSize.width;
-                    sheetHeight = item.sheetSize.height;
-                    previewUrl = item.previewUrl;
-                    artworks = item.artworks;
-                    itemName = item.sheetSize.name;
-                    itemPrice = item.sheetSize.price;
-                } else if (item.type === 'dynamic_sheet') {
-                    sheetWidth = item.width;
-                    sheetHeight = item.height;
-                    previewUrl = item.previewUrl;
-                    artworks = [{
+                    // This logic is for 'sheet' and 'dynamic_sheet' types
+                    const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
+                    const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
+                    const previewUrl = item.previewUrl;
+                    const artworks = item.type === 'sheet' ? item.artworks : [{
                         id: `art-${item.id}`,
                         imageUrl: item.previewUrl,
                         name: item.name,
@@ -398,55 +396,42 @@ export default function CartPage() {
                         canvasHeight: item.height * 300,
                         quantity: 1,
                     }];
-                    itemName = `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
-                    itemPrice = item.price;
-                } else { // Service item
-                     const plainItem: OrderItem = {
+                    const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
+                    const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
+                    
+                    const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
+                        artworks,
+                        { width: sheetWidth, height: sheetHeight },
+                        orderId,
+                        customerName,
+                        shippingAddress
+                    );
+                    
+                    const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
+                    const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
+
+                    const [previewSnapshot, printReadySnapshot] = await Promise.all([
+                        uploadString(previewStorageRef, previewUrl, 'data_url'),
+                        uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
+                    ]);
+
+                    const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
+                        getDownloadURL(previewSnapshot.ref),
+                        getDownloadURL(printReadySnapshot.ref)
+                    ]);
+                    
+                    return {
                         id: item.id,
                         quantity: item.quantity,
-                        previewUrl: '', // No image for a service
-                        printReadyUrl: '',
-                        sheetSizeName: item.name,
-                        sheetWidth: 0, sheetHeight: 0,
-                        sheetPrice: item.price,
+                        previewUrl: previewDownloadURL,
+                        printReadyUrl: printReadyDownloadURL,
+                        sheetSizeName: itemName,
+                        sheetWidth,
+                        sheetHeight,
+                        sheetPrice: itemPrice,
                     };
-                    finalOrderItems.push(plainItem);
-                    continue; // Go to next item
-                }
-                
-                finalPrintReadyDataUrl = await generateFinalSheetForPrint(
-                    artworks, 
-                    { width: sheetWidth, height: sheetHeight },
-                    orderId,
-                    customerName,
-                    shippingAddress
-                );
-
-                const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
-                const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
-                
-                const [previewSnapshot, printReadySnapshot] = await Promise.all([
-                    uploadString(previewStorageRef, previewUrl, 'data_url'),
-                    uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
-                ]);
-                
-                const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
-                    getDownloadURL(previewSnapshot.ref),
-                    getDownloadURL(printReadySnapshot.ref)
-                ]);
-
-                const plainItem: OrderItem = {
-                    id: item.id,
-                    quantity: item.quantity,
-                    previewUrl: previewDownloadURL,
-                    printReadyUrl: printReadyDownloadURL,
-                    sheetSizeName: itemName,
-                    sheetWidth: sheetWidth,
-                    sheetHeight: sheetHeight,
-                    sheetPrice: itemPrice,
-                };
-                finalOrderItems.push(plainItem);
-            }
+                })
+            );
             
             const newOrderData = {
                 orderId: orderId,
@@ -904,5 +889,7 @@ export default function CartPage() {
         </div>
     );
 }
+
+    
 
     
