@@ -2,32 +2,44 @@
 
 import { useState, useMemo } from 'react';
 import { Button } from './ui/button';
-import { Textarea } from './ui/textarea';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { generateDesign } from '@/app/actions';
+import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight } from 'lucide-react';
-import { Artwork, ServiceCartItem, ServiceAddOn } from '@/lib/types';
-import GangSheetBuilder from './gang-sheet-builder';
+import { Artwork, ServiceAddOn } from '@/lib/types';
 import { removeBackground } from '@/ai/flows/remove-background';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { sanitizeFilename } from '@/lib/utils';
 
+// --- Dropdown Options ---
+const subjectOptions = ["Animals", "Nature", "Space", "Technology", "Fantasy", "Abstract", "Sports", "Food & Drink", "Mythology", "Skulls"];
+const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco"];
+const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients"];
+const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro"];
 
+// --- Component ---
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
     const { addItem: addToCart } = useCart();
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [prompt, setPrompt] = useState('');
+    const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({
+        subject: '',
+        style: '',
+        colors: '',
+        mood: '',
+        text: '',
+    });
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
     const [view, setView] = useState<'generate' | 'edit'>('generate');
     
-    // Fetch service add-ons to find the AI design fee
     const addOnsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'serviceAddOns'), where('name', '==', 'AI Design Creation'));
@@ -49,11 +61,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     }, [aiDesignService]);
 
     const handleGenerate = async () => {
-        if (!prompt) {
+        const { subject, style, colors, mood } = formData;
+        if (!subject || !style || !colors || !mood) {
             toast({
                 variant: 'destructive',
-                title: 'Prompt is required',
-                description: 'Please enter a description for the design you want to create.',
+                title: 'All fields are required',
+                description: 'Please select an option from each dropdown to generate a design.',
             });
             return;
         }
@@ -71,7 +84,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setGeneratedImage(null);
 
         try {
-            const result = await generateDesign({ prompt });
+            const result = await generateDesign(formData);
             if (result.success && result.data?.imageDataUri) {
                 setGeneratedImage(result.data.imageDataUri);
                 setView('edit');
@@ -130,9 +143,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             });
             return;
         };
+        
+        const promptSummary = `${formData.subject} ${formData.style}`;
 
         const newArtwork: Omit<Artwork, 'id'> = {
-            name: sanitizeFilename(prompt) || 'ai-design',
+            name: sanitizeFilename(promptSummary) || 'ai-design',
             imageUrl: generatedImage,
             width: 5, // Default size
             height: 5,
@@ -153,7 +168,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         setView('generate');
         setGeneratedImage(null);
-        setPrompt('');
+        setFormData({ subject: '', style: '', colors: '', mood: '', text: '' });
     };
 
 
@@ -177,14 +192,49 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {view === 'generate' ? (
-                         <div>
-                            <Textarea
-                                value={prompt}
-                                onChange={(e) => setPrompt(e.target.value)}
-                                placeholder="e.g., A fierce eagle with a crown, vintage comic book style"
-                                className="min-h-[100px] text-base"
-                                disabled={isLoading}
-                            />
+                         <div className="space-y-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Subject</Label>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, subject: value }))} disabled={isLoading}>
+                                        <SelectTrigger><SelectValue placeholder="e.g., Animals" /></SelectTrigger>
+                                        <SelectContent>{subjectOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Style</Label>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading}>
+                                        <SelectTrigger><SelectValue placeholder="e.g., Minimalist" /></SelectTrigger>
+                                        <SelectContent>{styleOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <Label>Color Palette</Label>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading}>
+                                        <SelectTrigger><SelectValue placeholder="e.g., Black & White" /></SelectTrigger>
+                                        <SelectContent>{colorOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                                <div>
+                                    <Label>Mood</Label>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, mood: value }))} disabled={isLoading}>
+                                        <SelectTrigger><SelectValue placeholder="e.g., Playful" /></SelectTrigger>
+                                        <SelectContent>{moodOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                    </Select>
+                                </div>
+                            </div>
+                            <div>
+                                <Label>Optional Text</Label>
+                                <Input 
+                                    value={formData.text}
+                                    onChange={(e) => setFormData(p => ({ ...p, text: e.target.value }))}
+                                    placeholder="e.g., 'PXL8 Summer Fest'"
+                                    disabled={isLoading}
+                                />
+                            </div>
+
                             <Button
                                 onClick={handleGenerate}
                                 disabled={isLoading || isLoadingService || !aiDesignFeeProduct}
