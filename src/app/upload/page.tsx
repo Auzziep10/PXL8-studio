@@ -204,7 +204,7 @@ export default function PrebuiltUploadPage() {
                             </div>
                             <h3 className="text-xl font-medium text-white mb-2">Click to upload or drag and drop</h3>
                             <p className="text-zinc-500 text-sm max-w-xs mx-auto mb-6">
-                                Max width {maxWidth}". Length is unlimited. PNG recommended with transparent background.
+                                Max width ${maxWidth}". Length is unlimited. PNG recommended with transparent background.
                             </p>
                             <Button variant="secondary" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                                 Select File

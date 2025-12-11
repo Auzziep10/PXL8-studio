@@ -1,3 +1,4 @@
+
 'use client';
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
@@ -23,7 +24,7 @@ export default function BuildPage() {
         <Tabs defaultValue="builder" className="h-full flex flex-col">
             <div className="flex justify-center py-2">
                 <TabsList>
-                    <TabsTrigger value="builder"><Upload className="w-4 h-4 mr-2" /> Gang Sheet Builder</TabsTrigger>
+                    <TabsTrigger value="builder"><Wand2 className="w-4 h-4 mr-2" /> Gang Sheet Builder</TabsTrigger>
                     <TabsTrigger value="ai"><Wand2 className="w-4 h-4 mr-2" /> AI Designer</TabsTrigger>
                 </TabsList>
             </div>

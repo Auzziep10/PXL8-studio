@@ -1,9 +1,10 @@
+
 'use client';
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PXL8Logo } from '@/components/icons';
-import { LayoutGrid, LogOut, ShoppingCart, User } from 'lucide-react';
+import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
@@ -15,9 +16,9 @@ import type { User as AppUser } from '@/lib/types';
 
 
 const navLinks = [
-  { href: '/build', label: 'Builder' },
-  { href: '/upload', label: 'Upload' },
-  { href: '/track', label: 'Track Order' },
+  { href: '/build', label: 'Builder', icon: Wand2 },
+  { href: '/upload', label: 'Upload', icon: Upload },
+  { href: '/track', label: 'Track Order', icon: SearchIcon },
 ];
 
 export default function Header() {
@@ -61,14 +62,14 @@ export default function Header() {
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <PXL8Logo className="h-8 w-auto" />
         </Link>
-        <nav className="flex items-center gap-4 text-sm lg:gap-6">
+        <nav className="hidden md:flex items-center gap-2 text-sm">
           {navLinks.map((link) => (
             <Link
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-foreground/80',
-                pathname === link.href ? 'text-foreground' : 'text-foreground/60'
+                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
+                pathname === link.href ? 'text-foreground bg-secondary' : 'text-foreground/60'
               )}
             >
               {link.label}
@@ -78,8 +79,8 @@ export default function Header() {
             <Link
                 href="/dashboard"
                 className={cn(
-                    'transition-colors hover:text-foreground/80',
-                    pathname.startsWith('/dashboard') || pathname.startsWith('/admin') ? 'text-foreground' : 'text-foreground/60'
+                    'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
+                    pathname.startsWith('/dashboard') || pathname.startsWith('/admin') ? 'text-foreground bg-secondary' : 'text-foreground/60'
                 )}
             >
                 Dashboard
