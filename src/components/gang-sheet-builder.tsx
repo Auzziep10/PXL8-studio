@@ -31,7 +31,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?: Artwork[], usage: 'Builder' }) {
+export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -87,12 +87,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   }, [sortedSheetSizes, selectedSizeId]);
 
 
-  useEffect(() => {
-    if (newArtworks && newArtworks.length > 0) {
-        newArtworks.forEach(artwork => handleImageLoad(artwork.imageUrl, false, artwork.name, artwork));
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newArtworks]);
 
    // Effect to load data from localStorage or Firestore
   useEffect(() => {
@@ -287,7 +281,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     return { x: 0, y: 0 };
   };
 
-  const handleImageLoad = (imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Artwork) => {
+  const handleImageLoad = useCallback((imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Artwork) => {
     const img = new window.Image();
     if (isPermanent) img.crossOrigin = "Anonymous";
 
@@ -329,7 +323,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
     };
     img.src = imageUrl;
-  };
+  }, [items, sheetConfig, toast]);
 
 
   // --- File Upload ---
@@ -1074,7 +1068,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
-                  {items.map((item, index) => (
+                  {items.map((item) => (
                       <div 
                         key={item.id} 
                         onClick={() => setSelectedItemId(item.id)}

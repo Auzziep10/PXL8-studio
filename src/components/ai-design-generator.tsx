@@ -27,7 +27,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<string | null>(null);
-    const [view, setView] = useState<'generate' | 'edit' | 'sheet'>('generate');
+    const [view, setView] = useState<'generate' | 'edit'>('generate');
     
     // Fetch service add-ons to find the AI design fee
     const addOnsQuery = useMemoFirebase(() => {
@@ -162,9 +162,6 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         document.querySelector<HTMLButtonElement>('button[data-radix-collection-item][value="builder"]')?.click();
     };
 
-    if (view === 'sheet') {
-        return <GangSheetBuilder usage="Builder" />;
-    }
 
     const generationFeeText = isLoadingService
         ? 'Loading pricing...'

@@ -24,7 +24,7 @@ export default function BuildPage() {
                 </TabsList>
             </div>
             <TabsContent value="builder" className="flex-grow">
-                <GangSheetBuilder newArtworks={artworks} usage="Builder" />
+                <GangSheetBuilder usage="Builder" />
             </TabsContent>
             <TabsContent value="ai" className="flex-grow">
                 <AiDesignGenerator onDesignGenerated={addArtworkToSheet} />
