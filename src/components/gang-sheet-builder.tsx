@@ -13,7 +13,7 @@ import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase
 import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
 import QRCode from 'qrcode';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, sanitizeFilename } from '@/lib/utils';
 
 
 // Debounce function to limit how often we save to Firestore
@@ -340,7 +340,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         fetch(imageUrl)
           .then(res => res.blob())
           .then(blob => {
-            const file = new File([blob], fileName, { type: blob.type || 'image/png' });
+            const file = new File([blob], sanitizeFilename(fileName), { type: blob.type || 'image/png' });
             return uploadFileAndGetURL(file, user.uid);
           })
           .then(permanentUrl => {
@@ -851,7 +851,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                 toast({ title: 'Saving Artwork', description: 'Uploading AI-generated designs to your account...' });
                 const uploadPromises = itemsToUpload.map(async item => {
                     const blob = await (await fetch(item.imageUrl)).blob();
-                    const file = new File([blob], item.name, { type: 'image/png' });
+                    const file = new File([blob], sanitizeFilename(item.name), { type: 'image/png' });
                     const permanentUrl = await uploadFileAndGetURL(file, user.uid);
                     return { itemId: item.id, newUrl: permanentUrl };
                 });

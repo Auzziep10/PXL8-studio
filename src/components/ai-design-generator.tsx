@@ -13,19 +13,7 @@ import { removeBackground } from '@/ai/flows/remove-background';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-
-const sanitizeFilename = (name: string): string => {
-  if (!name) return 'ai-design';
-  return name
-    .replace(/(\r\n|\n|\r)/gm, " ") // Replace newlines with a space first
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, '-') // Replace all whitespace sequences with a single hyphen
-    .replace(/[^a-z0-9-]/g, '') // Remove all characters that are not lowercase letters, numbers, or hyphens
-    .substring(0, 50) // Truncate to 50 chars
-    .replace(/-+/g, '-') // Collapse multiple hyphens into one
-    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
-};
+import { sanitizeFilename } from '@/lib/utils';
 
 
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
@@ -245,4 +233,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             </Card>
         </div>
     );
+}
+
+interface AiDesignGeneratorProps {
+  onDesignGenerated: (artwork: Omit<Artwork, 'id'>) => void;
 }
