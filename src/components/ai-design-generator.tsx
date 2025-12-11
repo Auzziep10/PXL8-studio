@@ -28,12 +28,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({
+    const [formData, setFormData] = useState<Omit<GenerateDesignFromPromptInput, 'text'>>({
         subject: '',
         style: '',
         colors: '',
         mood: '',
-        text: '',
     });
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
@@ -168,7 +167,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         setView('generate');
         setGeneratedImage(null);
-        setFormData({ subject: '', style: '', colors: '', mood: '', text: '' });
+        setFormData({ subject: '', style: '', colors: '', mood: '' });
     };
 
 
@@ -225,16 +224,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Select>
                                 </div>
                             </div>
-                            <div>
-                                <Label>Optional Text</Label>
-                                <Input 
-                                    value={formData.text}
-                                    onChange={(e) => setFormData(p => ({ ...p, text: e.target.value }))}
-                                    placeholder="e.g., 'PXL8 Summer Fest'"
-                                    disabled={isLoading}
-                                />
-                            </div>
-
+                            
                             <Button
                                 onClick={handleGenerate}
                                 disabled={isLoading || isLoadingService || !aiDesignFeeProduct}

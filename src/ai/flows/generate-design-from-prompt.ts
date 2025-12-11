@@ -17,7 +17,6 @@ const GenerateDesignFromPromptInputSchema = z.object({
   style: z.string().describe('The artistic style of the graphic.'),
   colors: z.string().describe('The desired color palette.'),
   mood: z.string().describe('The overall mood or feeling.'),
-  text: z.string().optional().describe('Optional text to include in the graphic.'),
 });
 export type GenerateDesignFromPromptInput = z.infer<typeof GenerateDesignFromPromptInputSchema>;
 
@@ -43,16 +42,16 @@ const generateDesignFromPromptFlow = ai.defineFlow(
   async input => {
     // Manually construct the prompt string for simplicity and reliability.
     const promptText = `
-      Create a high-quality logo-style graphic with a transparent background.
+      Create a high-quality logo-style graphic on a solid lime green background.
       Subject: ${input.subject}
       Style: ${input.style}
       Color Palette: ${input.colors}
       Mood: ${input.mood}
-      ${input.text ? `Optional Text: ${input.text}` : ''}
 
       Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
-      The final image MUST have a transparent background for easy layering.
+      The final image MUST have a solid, pure green screen background (#00FF00) for easy removal.
       Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
+      Do NOT include any text in the image.
       Maintain strong silhouettes, smooth edges, and a balanced composition.
     `.trim();
 
