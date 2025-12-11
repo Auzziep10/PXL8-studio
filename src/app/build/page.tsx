@@ -1,3 +1,4 @@
+
 'use client';
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
@@ -9,14 +10,14 @@ import type { Artwork } from '@/lib/types';
 
 
 export default function BuildPage() {
-    const [newArtworks, setNewArtworks] = useState<Artwork[]>([]);
+    const [newArtworks, setNewArtworks] = useState<Omit<Artwork, 'id'>[]>([]);
 
-    const addArtworkToSheet = (artwork: Artwork) => {
+    const addArtworkToSheet = (artwork: Omit<Artwork, 'id'>) => {
         setNewArtworks(prev => [...prev, artwork]);
     };
 
-    const onArtworkHandled = (artworkId: string) => {
-        setNewArtworks(prev => prev.filter(art => art.id !== artworkId));
+    const onArtworkHandled = (artworkName: string) => {
+        setNewArtworks(prev => prev.filter(art => art.name !== artworkName));
     };
 
     return (

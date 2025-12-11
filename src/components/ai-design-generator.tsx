@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -15,7 +16,7 @@ import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 
 interface AiDesignGeneratorProps {
-    onDesignGenerated: (artwork: Artwork) => void;
+    onDesignGenerated: (artwork: Omit<Artwork, 'id'>) => void;
 }
 
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
@@ -134,8 +135,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         };
 
         // 1. Create the visual artwork to be added to the builder
-        const newArtwork: Artwork = {
-            id: `ai-${Date.now()}`,
+        const newArtwork: Omit<Artwork, 'id'> = {
             name: prompt.substring(0, 30) || 'AI Design',
             imageUrl: generatedImage,
             width: 5, // Default size, can be adjusted by user

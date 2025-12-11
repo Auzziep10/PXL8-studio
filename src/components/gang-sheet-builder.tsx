@@ -31,7 +31,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Artwork[], onArtworkHandled?: (artworkId: string) => void }) {
+export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Omit<Artwork, 'id'>[], onArtworkHandled?: (artworkName: string) => void }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -281,7 +281,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     return { x: 0, y: 0 };
   };
 
-  const handleImageLoad = useCallback((imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Artwork) => {
+  const handleImageLoad = useCallback((imageUrl: string, isPermanent: boolean, fileName: string, existingArtwork?: Omit<Artwork, 'id'>) => {
     const img = new window.Image();
     if (isPermanent) img.crossOrigin = "Anonymous";
 
@@ -300,7 +300,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         const pos = findOpenPosition(w, h, items);
 
         const newItem: ArtworkOnCanvas = {
-          id: existingArtwork?.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: fileName,
           imageUrl: imageUrl,
           width: w,
@@ -319,7 +319,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         setDuplicateCount(1);
 
         if (existingArtwork && onArtworkHandled) {
-            onArtworkHandled(existingArtwork.id);
+            onArtworkHandled(existingArtwork.name);
         } else {
             toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
         }
@@ -1273,3 +1273,4 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
 
     
+
