@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas, SheetCartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, sanitizeFilename } from '@/lib/utils';
 import { getShippingRates } from '@/app/actions';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -19,8 +19,7 @@ import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/fi
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
-import { useRouter } from 'next/navigation';
-
+import { uploadFileAndGetURL } from '@/firebase/storage';
 
 interface CheckoutFormData {
     firstName: string;
@@ -42,8 +41,7 @@ interface PreviewState {
 
 // This function is now responsible for generating the FINAL print-ready image with customer data
 export const generateFinalSheetForPrint = async (
-    originalSheetUrl: string,
-    sheetConfig: { width: number; height: number },
+    orderItem: OrderItem,
     orderId: string,
     customerName: string,
     shippingAddress: ShippingAddress,
@@ -52,48 +50,99 @@ export const generateFinalSheetForPrint = async (
     const HEADER_HEIGHT_INCHES = 1;
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
-    // Fetch the image as a blob, then create an object URL
-    const response = await fetch(originalSheetUrl);
-    if (!response.ok) {
-        throw new Error(`Failed to fetch original sheet image: ${response.statusText}`);
-    }
-    const blob = await response.blob();
-    const objectUrl = URL.createObjectURL(blob);
-
-
-    // Load the original sheet image
-    const sheetImg = await new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new window.Image();
-        img.onload = () => {
-            URL.revokeObjectURL(objectUrl); // Clean up the object URL
-            resolve(img);
-        };
-        img.onerror = (e) => {
-            URL.revokeObjectURL(objectUrl); // Clean up on error too
-            console.error("Failed to load original sheet image for print generation", e);
-            reject(new Error("Could not load original sheet image."));
-        };
-        img.src = objectUrl;
-    });
+    let sourceImageUrl = orderItem.originalSheetUrl;
+    let finalCanvasWidth = orderItem.sheetWidth * BASE_DPI;
+    let finalCanvasHeight = (orderItem.sheetHeight * BASE_DPI) + HEADER_HEIGHT_PX;
+    let isSingleTransferLayout = orderItem.sheetSizeName === 'Single Design Transfer';
 
     const finalCanvas = document.createElement('canvas');
     const finalCtx = finalCanvas.getContext('2d');
     if (!finalCtx) throw new Error('No final context');
-    finalCanvas.width = sheetConfig.width * BASE_DPI;
-    finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
     
-    // Draw the white header
+    // --- Load the primary image resource ---
+    const sourceImage = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new window.Image();
+        img.crossOrigin = 'Anonymous';
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+             console.error("Failed to load source image for print generation", e);
+             reject(new Error("Could not load source image."));
+        };
+        // Fetch as blob to avoid cross-origin issues with canvas
+        fetch(sourceImageUrl).then(res => res.blob()).then(blob => {
+            const objectUrl = URL.createObjectURL(blob);
+            img.src = objectUrl;
+            img.onload = () => {
+                URL.revokeObjectURL(objectUrl);
+                resolve(img);
+            };
+            img.onerror = (err) => {
+                URL.revokeObjectURL(objectUrl);
+                reject(err);
+            }
+        });
+    });
+
+    if (isSingleTransferLayout) {
+        // --- Automatic Gang Sheet Layout for Single Transfers ---
+        const SHEET_WIDTH_INCHES = 22;
+        const SPACING_INCHES = 0.25;
+
+        const itemWidthInches = orderItem.sheetWidth;
+        const itemHeightInches = orderItem.sheetHeight;
+
+        const itemsPerRow = Math.floor((SHEET_WIDTH_INCHES + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
+        const numRows = Math.ceil(orderItem.quantity / itemsPerRow);
+
+        const sheetHeightInches = (itemHeightInches * numRows) + (SPACING_INCHES * (numRows + 1));
+        
+        finalCanvasWidth = SHEET_WIDTH_INCHES * BASE_DPI;
+        finalCanvasHeight = (sheetHeightInches * BASE_DPI) + HEADER_HEIGHT_PX;
+
+        finalCanvas.width = finalCanvasWidth;
+        finalCanvas.height = finalCanvasHeight;
+
+        let currentX = SPACING_INCHES * BASE_DPI;
+        let currentY = HEADER_HEIGHT_PX + (SPACING_INCHES * BASE_DPI);
+        let placedItems = 0;
+
+        for (let i = 0; i < orderItem.quantity; i++) {
+            if (placedItems > 0 && placedItems % itemsPerRow === 0) {
+                currentX = SPACING_INCHES * BASE_DPI;
+                currentY += (itemHeightInches + SPACING_INCHES) * BASE_DPI;
+            }
+
+            finalCtx.drawImage(
+                sourceImage,
+                currentX,
+                currentY,
+                itemWidthInches * BASE_DPI,
+                itemHeightInches * BASE_DPI
+            );
+
+            currentX += (itemWidthInches + SPACING_INCHES) * BASE_DPI;
+            placedItems++;
+        }
+    } else {
+        // --- Standard Gang Sheet (already laid out) ---
+        finalCanvas.width = finalCanvasWidth;
+        finalCanvas.height = finalCanvasHeight;
+        finalCtx.drawImage(sourceImage, 0, HEADER_HEIGHT_PX, finalCanvas.width, orderItem.sheetHeight * BASE_DPI);
+    }
+    
+    // Draw the white header over the top
     finalCtx.fillStyle = 'white';
-    finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
+    finalCtx.fillRect(0, 0, finalCanvasWidth, HEADER_HEIGHT_PX);
 
     // Generate and draw QR Code
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const qrUrl = `${origin}/admin?orderId=${orderId}`;
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
-    const qrImg = new window.Image();
-    await new Promise<void>(resolve => {
-        qrImg.onload = () => resolve();
-        qrImg.src = qrCodeDataUrl;
+    const qrImg = await new Promise<HTMLImageElement>((resolve, reject) => {
+        const img = new window.Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = qrCodeDataUrl;
     });
     finalCtx.drawImage(qrImg, 10, 10);
 
@@ -105,24 +154,24 @@ export const generateFinalSheetForPrint = async (
     const FONT_SIZE_MEDIUM = BASE_DPI / 6; // approx 50pt
     const FONT_SIZE_SMALL = BASE_DPI / 8; // approx 37.5pt
 
-    let currentY = 15;
+    let textY = 15;
     finalCtx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
-    finalCtx.fillText(`Order: ${orderId}`, HEADER_HEIGHT_PX, currentY);
-    currentY += FONT_SIZE_LARGE + 15;
+    finalCtx.fillText(`Order: ${orderId}`, HEADER_HEIGHT_PX, textY);
+    textY += FONT_SIZE_LARGE + 15;
     
     finalCtx.font = `bold ${FONT_SIZE_MEDIUM}px Arial`;
-    finalCtx.fillText(`To: ${customerName}`, HEADER_HEIGHT_PX, currentY);
-    currentY += FONT_SIZE_MEDIUM + 10;
+    finalCtx.fillText(`To: ${customerName}`, HEADER_HEIGHT_PX, textY);
+    textY += FONT_SIZE_MEDIUM + 10;
     
     finalCtx.font = `${FONT_SIZE_SMALL}px Arial`;
     const fullAddress = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}`;
-    finalCtx.fillText(`Ship To: ${fullAddress}`, HEADER_HEIGHT_PX, currentY);
-    currentY += FONT_SIZE_SMALL + 15;
+    finalCtx.fillText(`Ship To: ${fullAddress}`, HEADER_HEIGHT_PX, textY);
+    textY += FONT_SIZE_SMALL + 15;
     
-    finalCtx.fillText(`Sheet Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, currentY);
-
-    // Draw the original sheet image below the header
-    finalCtx.drawImage(sheetImg, 0, HEADER_HEIGHT_PX, finalCanvas.width, sheetConfig.height * BASE_DPI);
+    const sheetDescription = isSingleTransferLayout
+        ? `${orderItem.quantity} x (${orderItem.sheetWidth}" x ${orderItem.sheetHeight}")`
+        : `${orderItem.sheetWidth}" x ${orderItem.sheetHeight}" Sheet`;
+    finalCtx.fillText(`Sheet: ${sheetDescription}`, HEADER_HEIGHT_PX, textY);
 
     return finalCanvas.toDataURL('image/png');
 };
@@ -303,6 +352,14 @@ export default function CartPage() {
              return;
         }
 
+        // --- PRE-CHECKOUT UPLOAD & VALIDATION ---
+        if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) && !currentUser) {
+            console.error("Validation failed: Guest user with temporary images.");
+            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to save and check out your AI-generated or temporary designs.' });
+            return;
+        }
+        // --- END PRE-CHECKOUT ---
+
         if (formData.createAccount && !currentUser && !formData.password) {
             console.error("Validation failed: Password required for new account.");
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
@@ -360,24 +417,26 @@ export default function CartPage() {
                     
                     // Handle both SheetCartItem and DynamicSheetCartItem
                     const isDynamic = item.type === 'dynamic_sheet';
-                    const sheetWidth = isDynamic ? item.width : item.sheetSize.width;
-                    const sheetHeight = isDynamic ? item.height : item.sheetSize.height;
+                    const sheetWidth = isDynamic ? item.width : (item.artworks[0]?.width || item.sheetSize.width);
+                    const sheetHeight = isDynamic ? item.height : (item.artworks[0]?.height || item.sheetSize.height);
                     const itemName = isDynamic ? item.name : item.sheetSize.name;
                     const itemPrice = isDynamic ? item.price : item.sheetSize.price;
 
                     console.log(` -> Physical item: ${itemName}`);
             
-                    // Upload the original layout and get its URL.
-                    console.log(` -> Uploading original sheet for item ${item.id}`);
-                    const originalSheetStorageRef = ref(storage, `original-sheets/${orderId}/${item.id}-original.png`);
-                    await uploadString(originalSheetStorageRef, item.previewUrl, 'data_url');
-                    const originalSheetDownloadURL = await getDownloadURL(originalSheetStorageRef);
-                    console.log(` -> Upload complete: ${originalSheetDownloadURL}`);
+                    let finalPreviewUrl = item.previewUrl;
+                    if (item.previewUrl.startsWith('data:') && currentUser) {
+                        console.log(` -> Uploading temporary data URL for item ${item.id}`);
+                        const blob = await (await fetch(item.previewUrl)).blob();
+                        const file = new File([blob], sanitizeFilename(itemName), { type: 'image/png' });
+                        finalPreviewUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                        console.log(` -> Upload complete: ${finalPreviewUrl}`);
+                    }
             
                     return {
                         id: item.id,
                         quantity: item.quantity,
-                        originalSheetUrl: originalSheetDownloadURL,
+                        originalSheetUrl: finalPreviewUrl,
                         printReadyUrl: '', // This will be generated later by admin.
                         sheetSizeName: itemName,
                         sheetWidth,
@@ -401,15 +460,13 @@ export default function CartPage() {
             };
             console.log("Step 3: Preparing to save order to Firestore.", newOrderData);
 
-            const centralOrderDoc = await addDoc(collection(firestore, 'orders'), {
-                ...newOrderData,
-                createdAt: serverTimestamp()
-            });
-            console.log(`Step 3a Complete. Saved to central orders collection: ${centralOrderDoc.id}`);
+            const centralOrderDocRef = doc(collection(firestore, 'orders'));
+            await setDoc(centralOrderDocRef, { ...newOrderData, createdAt: serverTimestamp() });
+            console.log(`Step 3a Complete. Saved to central orders collection: ${centralOrderDocRef.id}`);
 
             if (currentUser) {
                 console.log("Step 3b: Saving order to user subcollection...");
-                await setDoc(doc(firestore, 'users', currentUser.uid, 'orders', centralOrderDoc.id), {
+                await setDoc(doc(firestore, 'users', currentUser.uid, 'orders', centralOrderDocRef.id), {
                     ...newOrderData,
                     createdAt: serverTimestamp()
                 });
@@ -521,7 +578,7 @@ export default function CartPage() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                             <p className="text-xs text-zinc-500">Qty: {item.quantity}</p>
-                            <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-zinc-500 hover:text-red-400 text-xs">
+                            <Button variant="ghost" size-="sm" onClick={() => removeItem(item.id)} className="text-zinc-500 hover:text-red-400 text-xs">
                                 <Trash2 className="w-3 h-3 mr-1" /> Remove
                             </Button>
                         </div>

@@ -218,8 +218,7 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
 
         try {
             const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
-                item.originalSheetUrl,
-                { width: item.sheetWidth, height: item.sheetHeight },
+                item, // Pass the full OrderItem
                 selectedOrder.orderId,
                 selectedOrder.customerName,
                 selectedOrder.shippingAddress
