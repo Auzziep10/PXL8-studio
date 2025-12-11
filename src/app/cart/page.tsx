@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -475,8 +474,10 @@ export default function CartPage() {
                 await createCheckoutSession(stripeCartItems, total);
             }
             
+            // This logic now runs for both test and real orders
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
             clearCart();
+            
         } catch (error) {
             console.error("Checkout failed", error);
             toast({ variant: 'destructive', title: 'Checkout Failed', description: 'There was an issue processing your order. See console for details.' });
@@ -901,5 +902,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    
