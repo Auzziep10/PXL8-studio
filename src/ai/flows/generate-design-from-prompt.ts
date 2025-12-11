@@ -60,8 +60,12 @@ const generateDesignFromPromptFlow = ai.defineFlow(
     outputSchema: GenerateDesignFromPromptOutputSchema,
   },
   async input => {
+    // Correctly render the prompt to a string first
+    const renderedPrompt = (await generateDesignPrompt.render({input})).prompt;
+
+    // Pass the simple string to the ai.generate function
     const {media} = await ai.generate({
-      prompt: (await generateDesignPrompt.render({input})).prompt,
+      prompt: renderedPrompt,
       model: 'googleai/imagen-4.0-fast-generate-001',
     });
 
