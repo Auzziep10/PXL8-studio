@@ -1,5 +1,3 @@
-
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -31,7 +29,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
+export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Omit<Artwork, 'id'>[], onArtworkHandled?: (name: string) => void }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -366,6 +364,16 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
     }
   }, [items, sheetConfig, toast, user]);
 
+
+   // Effect to handle new artworks passed as props
+    useEffect(() => {
+        if (newArtworks && newArtworks.length > 0 && onArtworkHandled) {
+            newArtworks.forEach(art => {
+                handleImageLoad(art.imageUrl, art.name, false, art);
+                onArtworkHandled(art.name); // Notify parent that this artwork has been processed
+            });
+        }
+    }, [newArtworks, onArtworkHandled, handleImageLoad]);
 
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1273,13 +1281,3 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
     </div>
   );
 }
-
-
-
-
-    
-
-
-
-
-
