@@ -31,7 +31,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Omit<Artwork, 'id'>[], onArtworkHandled?: (artworkName: string) => void }) {
+export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -282,67 +282,76 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   };
 
   const sanitizeFilename = (filename: string): string => {
-    return filename
-      .toLowerCase()
+    const cleaned = filename
+      .replace(/\n/g, ' ') // Replace newlines with spaces
+      .replace(/[^a-zA-Z0-9.\- ]/g, '') // Allow spaces, remove other special chars
+      .trim()
       .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/[^a-z0-9-.]/g, '') // Remove special characters except hyphens and dots
-      .substring(0, 50); // Truncate to a reasonable length
+      .replace(/-{2,}/g, '-') // Replace multiple hyphens with a single one
+      .substring(0, 50); // Truncate
+
+    // Ensure it doesn't start or end with a hyphen
+    return cleaned.replace(/^-+|-+$/g, '');
   };
   
   const handleImageLoad = useCallback((imageUrl: string, fileName: string, isFromUpload: boolean, existingArtwork?: Omit<Artwork, 'id'>) => {
-    const img = new window.Image();
     const isPermanent = !imageUrl.startsWith('data:');
-    if (isPermanent) {
-      img.crossOrigin = 'Anonymous';
-    }
-  
-    img.onload = () => {
-      let w, h, dpi;
-      if (existingArtwork) {
-        w = existingArtwork.width;
-        h = existingArtwork.height;
-        dpi = existingArtwork.dpi;
-      } else {
-        dpi = 300;
-        w = parseFloat((img.width / dpi).toFixed(2));
-        h = parseFloat((img.height / dpi).toFixed(2));
-      }
-  
-      const pos = findOpenPosition(w, h, items);
-  
-      const newItem: ArtworkOnCanvas = {
-        id: `art-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
-        name: fileName,
-        imageUrl: imageUrl,
-        width: w,
-        height: h,
-        quantity: 1,
-        dpi: dpi,
-        x: pos.x,
-        y: pos.y,
-        rotation: 0,
-        canvasWidth: w * PPI,
-        canvasHeight: h * PPI,
-      };
-  
-      setItems(prev => [...prev, newItem]);
-      setSelectedItemId(newItem.id);
-      setDuplicateCount(1);
-  
-      if (onArtworkHandled && existingArtwork) {
-        onArtworkHandled(existingArtwork.name);
-      }
-  
-      if (isFromUpload) {
-        toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
-      }
-  
-      // For logged-in users, data URLs are temporary. Upload to get a permanent URL.
-      if (user && !isPermanent) {
-        // Place item on canvas immediately for good UX
-        setItems(prev => [...prev.filter(i => i.id !== newItem.id), newItem]);
+    
+    const placeImageOnCanvas = (url: string) => {
+        const img = new window.Image();
+        if (!url.startsWith('data:')) {
+            img.crossOrigin = 'Anonymous';
+        }
+
+        img.onload = () => {
+            let w, h, dpi;
+            if (existingArtwork) {
+                w = existingArtwork.width;
+                h = existingArtwork.height;
+                dpi = existingArtwork.dpi;
+            } else {
+                dpi = 300;
+                w = parseFloat((img.width / dpi).toFixed(2));
+                h = parseFloat((img.height / dpi).toFixed(2));
+            }
+
+            const pos = findOpenPosition(w, h, items);
+
+            const newItem: ArtworkOnCanvas = {
+                id: `art-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+                name: fileName,
+                imageUrl: url,
+                width: w,
+                height: h,
+                quantity: 1,
+                dpi: dpi,
+                x: pos.x,
+                y: pos.y,
+                rotation: 0,
+                canvasWidth: w * PPI,
+                canvasHeight: h * PPI,
+            };
+
+            setItems(prev => [...prev, newItem]);
+            setSelectedItemId(newItem.id);
+            setDuplicateCount(1);
+            
+            if (isFromUpload) {
+                toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+            }
+        };
+
+        img.onerror = () => {
+            toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
+        };
+        img.src = url;
+    };
+
+    if (user && !isPermanent) {
+        // Logged-in user with a temporary data URL
         toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage in the background.' });
-        
+        placeImageOnCanvas(imageUrl); // Place immediately for UX
+
         fetch(imageUrl)
           .then(res => res.blob())
           .then(blob => {
@@ -354,7 +363,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             // Silently update the item with the permanent URL
             setItems(prev =>
               prev.map(item =>
-                item.id === newItem.id ? { ...item, imageUrl: permanentUrl } : item
+                item.imageUrl === imageUrl ? { ...item, imageUrl: permanentUrl } : item
               )
             );
           })
@@ -365,24 +374,12 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
               description: 'Could not save AI design. It will remain on your sheet temporarily.',
             });
           });
-      }
-    };
-  
-    img.onerror = () => {
-      toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
-    };
-    img.src = imageUrl;
-  }, [items, sheetConfig, toast, onArtworkHandled, user]);
-
-
-  useEffect(() => {
-    if (newArtworks && newArtworks.length > 0 && onArtworkHandled) {
-        newArtworks.forEach(art => {
-            handleImageLoad(art.imageUrl, art.name, false, art);
-        });
+    } else {
+        // Guest user, or already have a permanent URL
+        placeImageOnCanvas(imageUrl);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [newArtworks]); // Only react when newArtworks changes
+  }, [items, sheetConfig, toast, user]);
+
 
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1295,6 +1292,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
 
     
+
 
 
 

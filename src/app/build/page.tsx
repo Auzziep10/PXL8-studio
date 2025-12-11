@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
@@ -29,7 +30,7 @@ export default function BuildPage() {
                 </TabsList>
             </div>
             <TabsContent value="builder" className="flex-grow">
-                <GangSheetBuilder usage="Builder" newArtworks={newArtworks} onArtworkHandled={onArtworkHandled} />
+                <GangSheetBuilder usage="Builder" />
             </TabsContent>
             <TabsContent value="ai" className="flex-grow">
                 <AiDesignGenerator onDesignGenerated={addArtworkToSheet} />
@@ -37,3 +38,4 @@ export default function BuildPage() {
         </Tabs>
     );
 }
+
