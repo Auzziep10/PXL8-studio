@@ -60,8 +60,6 @@ const generateFinalSheetForPrint = async (
     await Promise.all(artworks.map(item => new Promise<void>((resolve, reject) => {
         if (imageCache[item.imageUrl]) return resolve();
         const img = new window.Image();
-        // *** THIS IS THE FIX ***
-        // Add crossOrigin attribute to prevent canvas tainting when loading from Firebase Storage
         img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
         img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); reject(new Error(`Failed to load image for sheet generation: ${item.imageUrl}`)); };
@@ -389,23 +387,20 @@ export default function CartPage() {
                     let artworks: ArtworkOnCanvas[];
                     if (item.type === 'sheet') {
                         artworks = item.artworks;
-                    } else if (item.type === 'dynamic_sheet') {
+                    } else { // This is the corrected part for dynamic_sheet
                         artworks = [{
                             id: `art-${item.id}`,
                             imageUrl: item.previewUrl,
                             name: item.name,
                             width: item.width,
                             height: item.height,
-                            dpi: 300,
+                            dpi: 300, // Assume 300 DPI for uploads
                             x: 0, y: 0,
                             rotation: 0,
                             canvasWidth: item.width * 300,
                             canvasHeight: item.height * 300,
                             quantity: 1,
                         }];
-                    } else {
-                        // Should not happen, but good for type safety
-                        throw new Error('Unsupported item type for processing');
                     }
 
                     const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
@@ -901,3 +896,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    
