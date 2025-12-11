@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas, SheetCartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
-import { formatCurrency, sanitizeFilename } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { getShippingRates } from '@/app/actions';
 import NextImage from 'next/image';
 import Link from 'next/link';
@@ -40,8 +41,8 @@ interface PreviewState {
 }
 
 // This function is now responsible for generating the FINAL print-ready image with customer data
-const generateFinalSheetForPrint = async (
-    artworks: ArtworkOnCanvas[],
+export const generateFinalSheetForPrint = async (
+    originalSheetUrl: string, // Now takes the URL of the already saved original layout
     sheetConfig: { width: number; height: number },
     orderId: string,
     customerName: string,
@@ -51,55 +52,16 @@ const generateFinalSheetForPrint = async (
     const HEADER_HEIGHT_INCHES = 1;
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
-    const sheetCanvas = document.createElement('canvas');
-    const sheetCtx = sheetCanvas.getContext('2d');
-    if (!sheetCtx) throw new Error('No sheet context');
-    sheetCanvas.width = sheetConfig.width * BASE_DPI;
-    sheetCanvas.height = sheetConfig.height * BASE_DPI;
-
-    const imageCache: Record<string, HTMLImageElement> = {};
-    await Promise.all(artworks.map(item => new Promise<void>((resolve, reject) => {
-        if (imageCache[item.imageUrl]) return resolve();
+    // Load the original sheet image
+    const sheetImg = await new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new window.Image();
         img.crossOrigin = "Anonymous";
-        img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
-        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); reject(new Error(`Failed to load image for sheet generation: ${item.imageUrl}`)); };
-        img.src = item.imageUrl;
-    })));
-
-    artworks.forEach(item => {
-        const img = imageCache[item.imageUrl];
-        if (img) {
-            // For pre-built sheets, the artwork itself is the sheet.
-            if (artworks.length === 1 && item.x === 0 && item.y === 0) {
-                // Preserve aspect ratio
-                const canvasAspect = sheetCanvas.width / sheetCanvas.height;
-                const imgAspect = img.width / img.height;
-                let drawWidth, drawHeight, drawX, drawY;
-
-                if (imgAspect > canvasAspect) { // Image is wider than canvas
-                    drawWidth = sheetCanvas.width;
-                    drawHeight = drawWidth / imgAspect;
-                    drawX = 0;
-                    drawY = (sheetCanvas.height - drawHeight) / 2;
-                } else { // Image is taller than or equal to canvas aspect
-                    drawHeight = sheetCanvas.height;
-                    drawWidth = drawHeight * imgAspect;
-                    drawY = 0;
-                    drawX = (sheetCanvas.width - drawWidth) / 2;
-                }
-                sheetCtx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
-            } else {
-                // For builder items, draw at specified coordinates
-                sheetCtx.drawImage(
-                    img,
-                    item.x * BASE_DPI,
-                    item.y * BASE_DPI,
-                    item.width * BASE_DPI,
-                    item.height * BASE_DPI
-                );
-            }
-        }
+        img.onload = () => resolve(img);
+        img.onerror = (e) => {
+            console.error("Failed to load original sheet image for print generation", e);
+            reject(new Error("Could not load original sheet image."));
+        };
+        img.src = originalSheetUrl;
     });
 
     const finalCanvas = document.createElement('canvas');
@@ -108,13 +70,13 @@ const generateFinalSheetForPrint = async (
     finalCanvas.width = sheetConfig.width * BASE_DPI;
     finalCanvas.height = (sheetConfig.height * BASE_DPI) + HEADER_HEIGHT_PX;
     
+    // Draw the white header
     finalCtx.fillStyle = 'white';
     finalCtx.fillRect(0, 0, finalCanvas.width, HEADER_HEIGHT_PX);
 
-    // Generate a URL for the QR code to link to
+    // Generate and draw QR Code
     const origin = typeof window !== 'undefined' ? window.location.origin : '';
     const qrUrl = `${origin}/admin?orderId=${orderId}`;
-
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
     const qrImg = new window.Image();
     await new Promise<void>(resolve => {
@@ -123,6 +85,7 @@ const generateFinalSheetForPrint = async (
     });
     finalCtx.drawImage(qrImg, 10, 10);
 
+    // Draw Header Text
     finalCtx.fillStyle = 'black';
     finalCtx.textAlign = 'left';
     finalCtx.textBaseline = 'top';
@@ -146,8 +109,8 @@ const generateFinalSheetForPrint = async (
     
     finalCtx.fillText(`Sheet Size: ${sheetConfig.width}" x ${sheetConfig.height}"`, HEADER_HEIGHT_PX, currentY);
 
-
-    finalCtx.drawImage(sheetCanvas, 0, HEADER_HEIGHT_PX);
+    // Draw the original sheet image below the header
+    finalCtx.drawImage(sheetImg, 0, HEADER_HEIGHT_PX, finalCanvas.width, sheetConfig.height * BASE_DPI);
 
     return finalCanvas.toDataURL('image/png');
 };
@@ -338,61 +301,31 @@ export default function CartPage() {
         setIsCheckingOut(true);
 
         try {
-            let finalCartItems = [...cartItems];
-
-            const itemsWithTempImages = cartItems.filter(item => 
-                (item.type === 'sheet' && item.artworks.some(art => art.imageUrl.startsWith('data:'))) ||
-                (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:'))
-            );
-
-            if (itemsWithTempImages.length > 0) {
-                if (!currentUser) {
+            // STEP 1: Ensure all images are permanent cloud URLs
+            if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:'))) {
+                 if (!currentUser) {
                     toast({
                         variant: 'destructive',
                         title: 'Login Required',
-                        description: 'Please log in or create an account to save your AI-generated designs before checking out.',
-                        duration: 5000,
+                        description: 'Please log in or create an account to save your designs before checking out.',
+                        duration: 7000,
                     });
                     setIsCheckingOut(false);
                     return;
                 }
-                
-                toast({ title: 'Saving Your Designs...', description: 'Uploading temporary images to your account. Please wait...' });
 
-                const updatedItems = await Promise.all(finalCartItems.map(async (item) => {
-                    if (item.type === 'sheet') {
-                        const updatedArtworks = await Promise.all(item.artworks.map(async (art) => {
-                            if (art.imageUrl.startsWith('data:')) {
-                                try {
-                                    const blob = await (await fetch(art.imageUrl)).blob();
-                                    const file = new File([blob], sanitizeFilename(art.name) || 'ai-design.png', { type: blob.type });
-                                    const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
-                                    return { ...art, imageUrl: permanentUrl };
-                                } catch (uploadError) {
-                                    console.error("Error uploading a temporary image:", uploadError);
-                                    throw new Error(`Failed to save design "${art.name}". Please try again.`);
-                                }
-                            }
-                            return art;
-                        }));
-                        return { ...item, artworks: updatedArtworks };
-                    }
-                    if (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:')) {
-                        try {
-                            const blob = await (await fetch(item.previewUrl)).blob();
-                            const file = new File([blob], sanitizeFilename(item.name) || 'uploaded-sheet.png', { type: blob.type });
-                            const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
-                            return { ...item, previewUrl: permanentUrl };
-                        } catch (uploadError) {
-                             console.error("Error uploading a temporary image:", uploadError);
-                             throw new Error(`Failed to save design "${item.name}". Please try again.`);
-                        }
+                toast({ title: 'Saving Your Designs...', description: 'Please wait while we secure your artwork...' });
+                
+                const updatedCartItems = await Promise.all(cartItems.map(async item => {
+                    if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
+                        const blob = await (await fetch(item.previewUrl)).blob();
+                        const file = new File([blob], `${item.id}.png`, { type: 'image/png' });
+                        const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                        return { ...item, previewUrl: permanentUrl };
                     }
                     return item;
                 }));
-
-                finalCartItems = updatedItems;
-                setCartItems(updatedItems); 
+                setCartItems(updatedCartItems); // Update the cart state with permanent URLs
             }
 
 
@@ -414,22 +347,14 @@ export default function CartPage() {
             // --- End Order ID Generation ---
 
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
-            const customerName = `${formData.firstName} ${formData.lastName}`;
-            const shippingAddress: ShippingAddress = {
-                street: formData.street,
-                city: formData.city,
-                state: formData.state,
-                zip: formData.zip,
-                country: 'US',
-            };
 
             const finalOrderItems: OrderItem[] = await Promise.all(
-                finalCartItems.map(async (item): Promise<OrderItem> => {
+                cartItems.map(async (item): Promise<OrderItem> => {
                     if (item.type === 'service') {
                         return {
                             id: item.id,
                             quantity: item.quantity,
-                            previewUrl: '',
+                            originalSheetUrl: '', // No image for services
                             printReadyUrl: '',
                             sheetSizeName: item.name,
                             sheetWidth: 0,
@@ -440,47 +365,19 @@ export default function CartPage() {
             
                     const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
-            
-                    let artworks: ArtworkOnCanvas[];
-                    if (item.type === 'sheet') {
-                        artworks = item.artworks;
-                    } else { // This is a dynamic_sheet
-                        artworks = [{
-                            id: `art-${item.id}`,
-                            imageUrl: item.previewUrl,
-                            name: item.name,
-                            width: item.width,
-                            height: item.height,
-                            dpi: 300,
-                            x: 0, y: 0,
-                            rotation: 0,
-                            canvasWidth: item.width * 300,
-                            canvasHeight: item.height * 300,
-                            quantity: 1,
-                        }];
-                    }
-            
                     const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
                     const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
                     
-                    const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
-                        artworks,
-                        { width: sheetWidth, height: sheetHeight },
-                        orderId,
-                        customerName,
-                        shippingAddress
-                    );
-                    
-                    const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${sanitizeFilename(item.id)}-print.png`);
-                    
-                    const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
-                    const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+                    // Upload the original layout and get its URL.
+                    const originalSheetStorageRef = ref(storage, `original-sheets/${orderId}/${item.id}-original.png`);
+                    await uploadString(originalSheetStorageRef, item.previewUrl, 'data_url');
+                    const originalSheetDownloadURL = await getDownloadURL(originalSheetStorageRef);
             
                     return {
                         id: item.id,
                         quantity: item.quantity,
-                        previewUrl: artworks[0]?.imageUrl || '',
-                        printReadyUrl: printReadyDownloadURL,
+                        originalSheetUrl: originalSheetDownloadURL,
+                        printReadyUrl: '', // This will be generated later by admin.
                         sheetSizeName: itemName,
                         sheetWidth,
                         sheetHeight,
@@ -492,38 +389,37 @@ export default function CartPage() {
             const newOrderData = {
                 orderId: orderId,
                 customerId: customerId,
-                customerName: customerName,
+                customerName: `${formData.firstName} ${formData.lastName}`,
                 orderDate: new Date().toISOString(),
                 status: OrderStatus.PENDING,
                 items: finalOrderItems,
                 total: total,
-                shippingAddress: shippingAddress,
+                shippingAddress: { street: formData.street, city: formData.city, state: formData.state, zip: formData.zip, country: 'US' },
                 trackingId: '',
             };
 
-            const centralOrdersRef = collection(firestore, 'orders');
-            const centralOrderDoc = await addDoc(centralOrdersRef, {
+            const centralOrderDoc = await addDoc(collection(firestore, 'orders'), {
                 ...newOrderData,
                 createdAt: serverTimestamp()
             });
 
             if (currentUser) {
-                const userOrdersRef = collection(firestore, 'users', currentUser.uid, 'orders');
-                await setDoc(doc(userOrdersRef, centralOrderDoc.id), {
+                await setDoc(doc(firestore, 'users', currentUser.uid, 'orders', centralOrderDoc.id), {
                     ...newOrderData,
                     createdAt: serverTimestamp()
                 });
             }
 
             if (!isTestMode) {
-                const stripeCartItems = finalOrderItems.map(item => {
-                    return {
-                        name: item.sheetSizeName,
-                        quantity: item.quantity,
-                        price: item.sheetPrice,
-                    };
-                });
-                await createCheckoutSession(stripeCartItems, total);
+                 const lightweightItems = finalOrderItems.map(item => ({
+                    id: item.id,
+                    type: item.originalSheetUrl ? 'sheet' : 'service',
+                    name: item.sheetSizeName,
+                    price: item.sheetPrice,
+                    quantity: item.quantity,
+                } as CartItem));
+
+                await createCheckoutSession(lightweightItems, total);
             }
             
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });

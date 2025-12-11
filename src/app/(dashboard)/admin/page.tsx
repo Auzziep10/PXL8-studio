@@ -1,6 +1,6 @@
 
 'use client';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Order, User as AppUser, OrderItem } from '@/lib/types';
 import {
   Printer,
@@ -19,6 +19,7 @@ import {
   FileText,
   Database,
   Cloud,
+  Wand2,
 } from 'lucide-react';
 import JSZip from 'jszip';
 import FileSaver from 'file-saver';
@@ -29,19 +30,24 @@ import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@
 import { collection, query, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OrderStatus } from '@/lib/types';
+import { generateFinalSheetForPrint } from '@/app/cart/page';
+import { useToast } from '@/hooks/use-toast';
+import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 
 type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 // --- AssetCard Component ---
 const AssetCard: React.FC<{
-  item: OrderItem; // Use the simpler OrderItem type
+  item: OrderItem;
   index: number;
+  order: Order;
   onPreview: (url: string) => void;
-}> = ({ item, index, onPreview }) => {
-  
-  // The production-ready URL is now item.printReadyUrl
-  const displayUrl = item.printReadyUrl;
+  onRegenerate: (item: OrderItem, index: number) => void;
+  isGenerating: boolean;
+}> = ({ item, index, order, onPreview, onRegenerate, isGenerating }) => {
+  const displayUrl = item.printReadyUrl || item.originalSheetUrl;
+  const isPrintReady = !!item.printReadyUrl;
 
   return (
     <div className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden shadow-sm hover:border-white/20 transition-colors">
@@ -59,7 +65,7 @@ const AssetCard: React.FC<{
             </span>
             <span>•</span>
             <span>Qty: {item.quantity}</span>
-            {item.id && ( // Use item.id which is the tracking ID
+            {item.id && (
               <>
                 <span>•</span>
                 <span className="flex items-center text-accent font-mono bg-accent/5 px-1 rounded">
@@ -72,18 +78,28 @@ const AssetCard: React.FC<{
         </div>
 
         <div className="flex items-center gap-2">
-          {/* Download button now directly links to the print-ready URL */}
-          <a
-            href={displayUrl}
-            download={`sheet-${index + 1}-${item.id}.png`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <Download className="w-3 h-3 mr-1.5" />
-            Download
-          </a>
+            {!isPrintReady ? (
+                <button
+                    onClick={() => onRegenerate(item, index)}
+                    disabled={isGenerating}
+                    className="flex items-center px-3 py-1.5 bg-accent text-black text-xs font-bold rounded-lg hover:bg-white transition-colors cursor-pointer"
+                >
+                    <Wand2 className={`w-3 h-3 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                    {isGenerating ? 'Generating...' : 'Generate Print File'}
+                </button>
+            ) : (
+                <a
+                    href={displayUrl}
+                    download={`sheet-${order.orderId}-${index + 1}.png`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    <Download className="w-3 h-3 mr-1.5" />
+                    Download
+                </a>
+            )}
         </div>
       </div>
 
@@ -111,11 +127,15 @@ const AssetCard: React.FC<{
         )}
 
         <div className="absolute top-4 left-4 flex gap-2">
-          <span
-            className={`px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black`}
-          >
-            Print Ready (QR)
-          </span>
+          {isPrintReady ? (
+            <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black">
+                Print Ready (QR)
+            </span>
+          ) : (
+            <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-yellow-500/80 text-black">
+                Customer Layout
+            </span>
+          )}
         </div>
       </div>
     </div>
@@ -126,8 +146,12 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     const firestore = useFirestore();
     const router = useRouter();
     const searchParams = useSearchParams();
+    const { toast } = useToast();
+    const storage = getStorage();
 
-    // Firestore Queries - Gated by isAdmin prop
+    const [isGeneratingPrintFile, setIsGeneratingPrintFile] = useState(false);
+
+    // Firestore Queries
     const ordersQuery = useMemoFirebase(() => {
         if (!firestore || !isAdmin) return null;
         return query(collection(firestore, 'orders'));
@@ -173,11 +197,9 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     useEffect(() => {
         const orderIdFromUrl = searchParams.get('orderId');
         if (orderIdFromUrl && allOrders) {
-        // Find order by the new numeric ID format
         const foundOrder = allOrders.find(o => o.orderId === orderIdFromUrl);
         if (foundOrder) {
             setSelectedOrderId(foundOrder.id);
-            // Clean the URL
             router.replace('/admin', { scroll: false });
         }
         }
@@ -189,10 +211,59 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
         [allOrders, selectedOrderId]
     );
 
+    const handleGeneratePrintFile = useCallback(async (item: OrderItem, itemIndex: number) => {
+        if (!selectedOrder) return;
+        setIsGeneratingPrintFile(true);
+        toast({ title: "Generating Print File...", description: "Please wait, this may take a moment." });
+
+        try {
+            const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
+                item.originalSheetUrl,
+                { width: item.sheetWidth, height: item.sheetHeight },
+                selectedOrder.orderId,
+                selectedOrder.customerName,
+                selectedOrder.shippingAddress
+            );
+            
+            const printReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-print.png`);
+            const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
+            const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+
+            // Update the specific item in the order's items array
+            const updatedItems = [...selectedOrder.items];
+            updatedItems[itemIndex] = { ...item, printReadyUrl: printReadyDownloadURL };
+            
+            const orderDocRef = doc(firestore, 'orders', selectedOrder.id);
+            await updateDoc(orderDocRef, { items: updatedItems });
+
+            // Also update the user-specific order doc if it exists
+             const userOrderDocRef = doc(firestore, 'users', selectedOrder.customerId, 'orders', selectedOrder.id);
+             const userOrderDoc = await getDoc(userOrderDocRef);
+             if(userOrderDoc.exists()){
+                await updateDoc(userOrderDocRef, { items: updatedItems });
+             }
+
+            toast({ title: "Success!", description: "Print-ready file has been generated and saved." });
+
+        } catch (error) {
+            console.error("Failed to generate print file:", error);
+            toast({ variant: "destructive", title: "Generation Failed", description: (error as Error).message });
+        } finally {
+            setIsGeneratingPrintFile(false);
+        }
+    }, [selectedOrder, storage, firestore, toast]);
+
     const updateStatus = async (id: string, status: OrderStatus) => {
         if (!firestore || !selectedOrder) return;
         const orderDocRef = doc(firestore, 'orders', id);
         await updateDoc(orderDocRef, { status });
+
+        const userOrderDocRef = doc(firestore, 'users', selectedOrder.customerId, 'orders', id);
+        const userOrderDoc = await getDoc(userOrderDocRef);
+        if(userOrderDoc.exists()){
+           await updateDoc(userOrderDocRef, { status });
+        }
+        
         setSelectedOrderId(null);
     };
 
@@ -334,26 +405,31 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
 
     const handleDownloadAllZip = async (targetOrder: Order) => {
         if (!targetOrder) return;
+        
+        const itemsToDownload = targetOrder.items.filter(item => item.printReadyUrl);
+        if(itemsToDownload.length === 0){
+            toast({variant: 'destructive', title: "No Files Ready", description: "Please generate print-ready files before downloading."})
+            return;
+        }
+
         setIsZipping(true);
         try {
         const zip = new JSZip();
         const folder = zip.folder(`Order-${targetOrder.orderId}`);
 
-        for (let i = 0; i < targetOrder.items.length; i++) {
-            const item = targetOrder.items[i];
+        for (let i = 0; i < itemsToDownload.length; i++) {
+            const item = itemsToDownload[i];
 
-            const urlToUse = item.printReadyUrl;
-
-            if (urlToUse) {
+            if (item.printReadyUrl) {
                 try {
-                const response = await fetch(urlToUse);
+                const response = await fetch(item.printReadyUrl);
                 const blob = await response.blob();
                 const fileName = `Sheet-${i + 1}-${
                     targetOrder.orderId || 'NoID'
                 }.png`;
                 folder?.file(fileName, blob);
                 } catch (e) {
-                console.warn('Could not fetch asset for zipping', urlToUse);
+                console.warn('Could not fetch asset for zipping', item.printReadyUrl);
                 }
             }
         }
@@ -821,11 +897,11 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                                 key={idx}
                                 className="relative aspect-square bg-checkerboard-dark rounded-lg border border-white/5 overflow-hidden group cursor-zoom-in"
                                 onClick={() =>
-                                  setPreviewImage(item.printReadyUrl)
+                                  setPreviewImage(item.printReadyUrl || item.originalSheetUrl)
                                 }
                               >
                                 <img
-                                  src={item.printReadyUrl}
+                                  src={item.printReadyUrl || item.originalSheetUrl}
                                   className="w-full h-full object-contain"
                                   alt=""
                                 />
@@ -941,7 +1017,10 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                           key={idx}
                           item={item}
                           index={idx}
+                          order={selectedOrder}
                           onPreview={setPreviewImage}
+                          onRegenerate={handleGeneratePrintFile}
+                          isGenerating={isGeneratingPrintFile}
                         />
                       );
                     })}
