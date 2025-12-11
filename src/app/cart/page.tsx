@@ -467,7 +467,12 @@ export default function CartPage() {
             }
 
             if (!isTestMode) {
-                await createCheckoutSession(cartItems, total);
+                // Create a lightweight version of cart items for Stripe, removing large data URLs
+                const stripeCartItems = cartItems.map(item => {
+                    const { artworks, previewUrl, ...rest } = item as any;
+                    return rest;
+                });
+                await createCheckoutSession(stripeCartItems, total);
             }
             
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
