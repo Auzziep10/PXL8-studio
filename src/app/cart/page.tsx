@@ -437,14 +437,14 @@ export default function CartPage() {
                             sheetPrice: item.price,
                         };
                     }
-
+            
                     const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
-                    
+            
                     let artworks: ArtworkOnCanvas[];
                     if (item.type === 'sheet') {
                         artworks = item.artworks;
-                    } else { 
+                    } else { // This is a dynamic_sheet
                         artworks = [{
                             id: `art-${item.id}`,
                             imageUrl: item.previewUrl,
@@ -459,7 +459,7 @@ export default function CartPage() {
                             quantity: 1,
                         }];
                     }
-
+            
                     const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
                     const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
                     
@@ -475,7 +475,7 @@ export default function CartPage() {
                     
                     const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
                     const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
-
+            
                     return {
                         id: item.id,
                         quantity: item.quantity,
