@@ -14,7 +14,7 @@ export async function uploadFileAndGetURL(
   userId: string
 ): Promise<string> {
   const storage = getStorage();
-  // Create a storage reference with a user-specific path and a unique filename
+  // Create a storage reference with a user-specific path that matches storage.rules
   const storageRef = ref(storage, `users/${userId}/images/${Date.now()}-${file.name}`);
 
   // Upload the file
