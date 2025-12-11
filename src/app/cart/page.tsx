@@ -338,51 +338,61 @@ export default function CartPage() {
         setIsCheckingOut(true);
 
         try {
-             // --- Pre-checkout Step: Handle temporary images ---
+            let finalCartItems = [...cartItems];
+
             const itemsWithTempImages = cartItems.filter(item => 
                 (item.type === 'sheet' && item.artworks.some(art => art.imageUrl.startsWith('data:'))) ||
                 (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:'))
             );
 
-            if (itemsWithTempImages.length > 0 && !currentUser) {
-                toast({
-                    variant: 'destructive',
-                    title: 'Login Required',
-                    description: 'Please log in or create an account to save your AI-generated designs before checking out.',
-                });
-                setIsCheckingOut(false);
-                return;
-            }
-
-            let finalCartItems = [...cartItems];
-
-            if (itemsWithTempImages.length > 0 && currentUser) {
-                toast({ title: 'Saving Your Designs...', description: 'Uploading temporary images to your account.' });
+            if (itemsWithTempImages.length > 0) {
+                if (!currentUser) {
+                    toast({
+                        variant: 'destructive',
+                        title: 'Login Required',
+                        description: 'Please log in or create an account to save your AI-generated designs before checking out.',
+                        duration: 5000,
+                    });
+                    setIsCheckingOut(false);
+                    return;
+                }
+                
+                toast({ title: 'Saving Your Designs...', description: 'Uploading temporary images to your account. Please wait...' });
 
                 const updatedItems = await Promise.all(finalCartItems.map(async (item) => {
                     if (item.type === 'sheet') {
                         const updatedArtworks = await Promise.all(item.artworks.map(async (art) => {
                             if (art.imageUrl.startsWith('data:')) {
-                                const blob = await (await fetch(art.imageUrl)).blob();
-                                const file = new File([blob], sanitizeFilename(art.name) || 'ai-design.png', { type: blob.type });
-                                const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
-                                return { ...art, imageUrl: permanentUrl };
+                                try {
+                                    const blob = await (await fetch(art.imageUrl)).blob();
+                                    const file = new File([blob], sanitizeFilename(art.name) || 'ai-design.png', { type: blob.type });
+                                    const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                                    return { ...art, imageUrl: permanentUrl };
+                                } catch (uploadError) {
+                                    console.error("Error uploading a temporary image:", uploadError);
+                                    throw new Error(`Failed to save design "${art.name}". Please try again.`);
+                                }
                             }
                             return art;
                         }));
                         return { ...item, artworks: updatedArtworks };
                     }
                     if (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:')) {
-                         const blob = await (await fetch(item.previewUrl)).blob();
-                         const file = new File([blob], sanitizeFilename(item.name) || 'uploaded-sheet.png', { type: blob.type });
-                         const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
-                         return { ...item, previewUrl: permanentUrl };
+                        try {
+                            const blob = await (await fetch(item.previewUrl)).blob();
+                            const file = new File([blob], sanitizeFilename(item.name) || 'uploaded-sheet.png', { type: blob.type });
+                            const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                            return { ...item, previewUrl: permanentUrl };
+                        } catch (uploadError) {
+                             console.error("Error uploading a temporary image:", uploadError);
+                             throw new Error(`Failed to save design "${item.name}". Please try again.`);
+                        }
                     }
                     return item;
                 }));
 
                 finalCartItems = updatedItems;
-                setCartItems(updatedItems); // Update the cart state with permanent URLs
+                setCartItems(updatedItems); 
             }
 
 
@@ -428,21 +438,20 @@ export default function CartPage() {
                         };
                     }
 
-                    // This logic is for 'sheet' and 'dynamic_sheet' types
                     const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
                     
                     let artworks: ArtworkOnCanvas[];
                     if (item.type === 'sheet') {
                         artworks = item.artworks;
-                    } else { // This is the corrected part for dynamic_sheet
+                    } else { 
                         artworks = [{
                             id: `art-${item.id}`,
                             imageUrl: item.previewUrl,
                             name: item.name,
                             width: item.width,
                             height: item.height,
-                            dpi: 300, // Assume 300 DPI for uploads
+                            dpi: 300,
                             x: 0, y: 0,
                             rotation: 0,
                             canvasWidth: item.width * 300,
@@ -462,10 +471,7 @@ export default function CartPage() {
                         shippingAddress
                     );
                     
-                    const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
-                    const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
-
-                    await uploadString(previewStorageRef, artworks[0].imageUrl, 'data_url').catch(err => console.error("Preview upload failed", err));
+                    const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${sanitizeFilename(item.id)}-print.png`);
                     
                     const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
                     const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
@@ -473,7 +479,7 @@ export default function CartPage() {
                     return {
                         id: item.id,
                         quantity: item.quantity,
-                        previewUrl: artworks[0].imageUrl,
+                        previewUrl: artworks[0]?.imageUrl || '',
                         printReadyUrl: printReadyDownloadURL,
                         sheetSizeName: itemName,
                         sheetWidth,
@@ -510,7 +516,7 @@ export default function CartPage() {
             }
 
             if (!isTestMode) {
-                const stripeCartItems = finalCartItems.map(item => {
+                const stripeCartItems = finalOrderItems.map(item => {
                     return {
                         name: item.sheetSizeName,
                         quantity: item.quantity,
@@ -776,7 +782,7 @@ export default function CartPage() {
                                 </div>
                                 <div>
                                     <Label className="block text-xs font-medium text-zinc-400 mb-1">Phone</Label>
-                                    <div className">
+                                    <div className="relative">
                                         <Phone className="absolute left-3 top-3 w-4 h-4 text-zinc-500" />
                                         <Input required name="phone" value={formData.phone} onChange={handleInputChange} type="tel" className="pl-10" />
                                     </div>
@@ -947,5 +953,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    
