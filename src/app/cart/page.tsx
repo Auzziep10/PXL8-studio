@@ -18,7 +18,7 @@ import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/fi
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
-import { uploadFileAndGetURL } from '@/firebase/storage';
+import { useRouter } from 'next/navigation';
 
 
 interface CheckoutFormData {
@@ -41,7 +41,7 @@ interface PreviewState {
 
 // This function is now responsible for generating the FINAL print-ready image with customer data
 export const generateFinalSheetForPrint = async (
-    originalSheetUrl: string, // Now takes the URL of the already saved original layout
+    originalSheetUrl: string,
     sheetConfig: { width: number; height: number },
     orderId: string,
     customerName: string,
@@ -130,6 +130,7 @@ export const generateFinalSheetForPrint = async (
 export default function CartPage() {
     const { items: cartItems, removeItem, updateItemQuantity, clearCart, setItems: setCartItems } = useCart();
     const { toast } = useToast();
+    const router = useRouter();
     
     const [isCheckingOut, setIsCheckingOut] = useState(false);
     const [previewState, setPreviewState] = useState<PreviewState>({ url: null, size: null });
@@ -431,8 +432,8 @@ export default function CartPage() {
             }
             
             console.log("Step 5: Finalizing UI...");
-            toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
             clearCart();
+            router.push(`/order-success?orderId=${orderId}`);
             console.log("--- CHECKOUT PROCESS SUCCEEDED ---");
             
         } catch (error) {
