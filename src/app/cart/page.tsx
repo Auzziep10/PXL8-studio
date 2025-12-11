@@ -386,9 +386,11 @@ export default function CartPage() {
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
                     const previewUrl = item.previewUrl;
                     
-                    const artworks: ArtworkOnCanvas[] = item.type === 'sheet' 
-                        ? item.artworks 
-                        : [{
+                    let artworks: ArtworkOnCanvas[];
+                    if (item.type === 'sheet') {
+                        artworks = item.artworks;
+                    } else if (item.type === 'dynamic_sheet') {
+                        artworks = [{
                             id: `art-${item.id}`,
                             imageUrl: item.previewUrl,
                             name: item.name,
@@ -401,6 +403,10 @@ export default function CartPage() {
                             canvasHeight: item.height * 300,
                             quantity: 1,
                         }];
+                    } else {
+                        // Should not happen, but good for type safety
+                        throw new Error('Unsupported item type for processing');
+                    }
 
                     const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
                     const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
