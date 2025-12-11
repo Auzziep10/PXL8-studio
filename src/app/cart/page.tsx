@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -11,7 +10,7 @@ import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSi
 import { createCheckoutSession } from '@/services/stripeService';
 import { formatCurrency } from '@/lib/utils';
 import { getShippingRates } from '@/app/actions';
-import NextImage from 'next/image';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePreviewModal } from '@/components/ImagePreviewModal';
@@ -282,18 +281,22 @@ export default function CartPage() {
 
     const handleCheckoutProcess = async (e: React.FormEvent) => {
         e.preventDefault();
+        console.log("--- CHECKOUT PROCESS STARTED ---");
         
         if (!firestore || !storage) {
+             console.error("Firestore or Storage not available");
              toast({ variant: 'destructive', title: 'Database not available', description: 'Please try again later.' });
              return;
         }
 
         if (formData.createAccount && !currentUser && !formData.password) {
+            console.error("Validation failed: Password required for new account.");
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
             return;
         }
         
         if (hasPhysicalItems && !selectedRateId && !isTestMode) {
+            console.error("Validation failed: Shipping method required.");
             toast({ variant: 'destructive', title: 'Shipping method required', description: 'Please select a shipping method.' });
             return;
         }
@@ -303,6 +306,7 @@ export default function CartPage() {
         try {
             
             // --- Generate New Order ID ---
+            console.log("Step 1: Generating Order ID...");
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
             const endOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
@@ -317,13 +321,17 @@ export default function CartPage() {
             const day = now.getDate().toString().padStart(2, '0');
             const newOrderCount = (dailyOrderCount + 1).toString().padStart(2, '0');
             const orderId = `${year}${month}${day}${newOrderCount}`;
+            console.log(`Step 1 Complete. New Order ID: ${orderId}`);
             // --- End Order ID Generation ---
 
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
             
+            console.log("Step 2: Processing cart items...");
             const finalOrderItems: OrderItem[] = await Promise.all(
                 cartItems.map(async (item: CartItem): Promise<OrderItem> => {
+                    console.log(`Processing item ${item.id} of type ${item.type}`);
                     if (item.type === 'service') {
+                        console.log(` -> Service item found: ${item.name}`);
                         return {
                             id: item.id,
                             quantity: item.quantity,
@@ -335,16 +343,22 @@ export default function CartPage() {
                             sheetPrice: item.price,
                         };
                     }
-            
-                    const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
-                    const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
-                    const itemName = item.type === 'sheet' ? item.sheetSize.name : `Custom ${item.width.toFixed(1)}"x${item.height.toFixed(1)}"`;
-                    const itemPrice = item.type === 'sheet' ? item.sheetSize.price : item.price;
                     
+                    // Handle both SheetCartItem and DynamicSheetCartItem
+                    const isDynamic = item.type === 'dynamic_sheet';
+                    const sheetWidth = isDynamic ? item.width : item.sheetSize.width;
+                    const sheetHeight = isDynamic ? item.height : item.sheetSize.height;
+                    const itemName = isDynamic ? item.name : item.sheetSize.name;
+                    const itemPrice = isDynamic ? item.price : item.sheetSize.price;
+
+                    console.log(` -> Physical item: ${itemName}`);
+            
                     // Upload the original layout and get its URL.
+                    console.log(` -> Uploading original sheet for item ${item.id}`);
                     const originalSheetStorageRef = ref(storage, `original-sheets/${orderId}/${item.id}-original.png`);
                     await uploadString(originalSheetStorageRef, item.previewUrl, 'data_url');
                     const originalSheetDownloadURL = await getDownloadURL(originalSheetStorageRef);
+                    console.log(` -> Upload complete: ${originalSheetDownloadURL}`);
             
                     return {
                         id: item.id,
@@ -358,6 +372,7 @@ export default function CartPage() {
                     };
                 })
             );
+            console.log("Step 2 Complete. All items processed.", finalOrderItems);
             
             const newOrderData = {
                 orderId: orderId,
@@ -370,38 +385,49 @@ export default function CartPage() {
                 shippingAddress: { street: formData.street, city: formData.city, state: formData.state, zip: formData.zip, country: 'US' },
                 trackingId: '',
             };
+            console.log("Step 3: Preparing to save order to Firestore.", newOrderData);
 
             const centralOrderDoc = await addDoc(collection(firestore, 'orders'), {
                 ...newOrderData,
                 createdAt: serverTimestamp()
             });
+            console.log(`Step 3a Complete. Saved to central orders collection: ${centralOrderDoc.id}`);
 
             if (currentUser) {
+                console.log("Step 3b: Saving order to user subcollection...");
                 await setDoc(doc(firestore, 'users', currentUser.uid, 'orders', centralOrderDoc.id), {
                     ...newOrderData,
                     createdAt: serverTimestamp()
                 });
+                console.log("Step 3b Complete.");
             }
 
+            console.log("Step 4: Handling payment/finalization...");
             if (!isTestMode) {
+                console.log(" -> Real order, creating Stripe session.");
                  const lightweightItems = finalOrderItems.map(item => ({
                     id: item.id,
-                    type: item.originalSheetUrl ? 'sheet' : 'service',
+                    type: item.originalSheetUrl ? (item.sheetWidth > 0 ? 'dynamic_sheet' : 'sheet') : 'service',
                     name: item.sheetSizeName,
                     price: item.sheetPrice,
                     quantity: item.quantity,
                 } as CartItem));
 
                 await createCheckoutSession(lightweightItems, total);
+            } else {
+                console.log(" -> Test order, skipping payment.");
             }
             
+            console.log("Step 5: Finalizing UI...");
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
             clearCart();
+            console.log("--- CHECKOUT PROCESS SUCCEEDED ---");
             
         } catch (error) {
-            console.error("Checkout failed", error);
+            console.error("--- CHECKOUT PROCESS FAILED ---", error);
             toast({ variant: 'destructive', title: 'Checkout Failed', description: (error as Error).message || 'There was an issue processing your order.' });
         } finally {
+            console.log("--- CHECKOUT FINALLY BLOCK ---");
             setIsCheckingOut(false);
         }
     };
@@ -432,7 +458,7 @@ export default function CartPage() {
                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-white/10 flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                         onClick={() => handlePreview(item)}
                     >
-                        <NextImage src={item.previewUrl || '/placeholder.png'} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
+                        <Image src={item.previewUrl || '/placeholder.png'} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="w-5 h-5 text-white" />
                         </div>
