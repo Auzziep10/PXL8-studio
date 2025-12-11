@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DynamicSheetCartItem, ServiceAddOn, Artwork } from '@/lib/types';
-import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle } from 'lucide-react';
+import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -41,6 +41,8 @@ export default function SingleTransferUploadPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const imageAspectRatio = useRef<number | null>(null);
+
+    const [isColorPickerActive, setIsColorPickerActive] = useState(false);
     
     // Effect to handle temporary artwork from AI generator
     useEffect(() => {
@@ -128,6 +130,90 @@ export default function SingleTransferUploadPage() {
             setDimensions(prev => ({...prev, [name]: value}));
         }
     };
+
+    const removeColor = (imageUrl: string, colorToRemove: {r: number, g: number, b: number}) => {
+        return new Promise<string>((resolve, reject) => {
+            const img = new Image();
+            if (!imageUrl.startsWith('data:')) {
+                img.crossOrigin = 'Anonymous';
+            }
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                if (!ctx) return reject('Could not get canvas context');
+                
+                ctx.drawImage(img, 0, 0);
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                const data = imageData.data;
+                const tolerance = 20;
+
+                for (let i = 0; i < data.length; i += 4) {
+                    const r = data[i];
+                    const g = data[i + 1];
+                    const b = data[i + 2];
+                    
+                    if (Math.abs(r - colorToRemove.r) < tolerance && 
+                        Math.abs(g - colorToRemove.g) < tolerance && 
+                        Math.abs(b - colorToRemove.b) < tolerance) {
+                        data[i + 3] = 0; // Make transparent
+                    }
+                }
+                ctx.putImageData(imageData, 0, 0);
+                resolve(canvas.toDataURL());
+            };
+            img.onerror = () => reject('Failed to load image for color removal.');
+            img.src = imageUrl;
+        });
+    };
+
+    const handleRemoveColor = async (color: {r: number, g: number, b: number}) => {
+        if (!previewUrl) return;
+        toast({title: 'Processing...', description: 'Removing selected color from the image.'});
+        try {
+            const newImageUrl = await removeColor(previewUrl, color);
+            setPreviewUrl(newImageUrl);
+            toast({title: 'Color Removed!', description: 'The background color has been made transparent.'});
+        } catch (error) {
+            console.error("Color removal failed:", error);
+            toast({variant: 'destructive', title: 'Error', description: 'Could not remove color from image.'});
+        } finally {
+            setIsColorPickerActive(false);
+        }
+    };
+    
+    const handlePreviewClick = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isColorPickerActive || !previewUrl) return;
+
+        const rect = e.currentTarget.getBoundingClientRect();
+        const imgElement = e.currentTarget.querySelector('img');
+        if (!imgElement) return;
+
+        const imgRect = imgElement.getBoundingClientRect();
+        
+        // Calculate click position relative to the image element
+        const clickX = e.clientX - imgRect.left;
+        const clickY = e.clientY - imgRect.top;
+
+        // Calculate the scale of the displayed image vs its natural size
+        const scaleX = imgRect.width / imgElement.naturalWidth;
+        const scaleY = imgRect.height / imgElement.naturalHeight;
+
+        // Get pixel coordinates on the original image
+        const originalX = clickX / scaleX;
+        const originalY = clickY / scaleY;
+
+        const canvas = document.createElement('canvas');
+        canvas.width = imgElement.naturalWidth;
+        canvas.height = imgElement.naturalHeight;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        if (!ctx) return;
+
+        ctx.drawImage(imgElement, 0, 0);
+        const pixelData = ctx.getImageData(originalX, originalY, 1, 1).data;
+        handleRemoveColor({ r: pixelData[0], g: pixelData[1], b: pixelData[2] });
+    };
     
     const resetState = () => {
         setFile(null);
@@ -136,6 +222,7 @@ export default function SingleTransferUploadPage() {
         setQuantity(1);
         setDimensions({ width: '', height: '' });
         imageAspectRatio.current = null;
+        setIsColorPickerActive(false);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -232,7 +319,13 @@ export default function SingleTransferUploadPage() {
                         <div className="w-full h-full flex flex-col">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                 {/* Preview Area */}
-                                <div className="flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                                <div 
+                                    className={cn(
+                                        "flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
+                                        isColorPickerActive && "cursor-eyedropper"
+                                    )}
+                                    onClick={handlePreviewClick}
+                                >
                                     {previewUrl && (
                                         <img src={previewUrl} alt="Preview" className="max-w-full max-h-[300px] object-contain shadow-2xl" />
                                     )}
@@ -277,6 +370,17 @@ export default function SingleTransferUploadPage() {
                                                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                                              />
                                         </div>
+                                    </div>
+
+                                    <div>
+                                        <Button 
+                                            variant="outline"
+                                            onClick={() => setIsColorPickerActive(prev => !prev)}
+                                            className={cn("w-full", isColorPickerActive && 'bg-blue-500/20 border-blue-500')}
+                                        >
+                                            <Droplet className="w-4 h-4 mr-2" />
+                                            {isColorPickerActive ? 'Picker Active - Click on Image' : 'Remove Color'}
+                                        </Button>
                                     </div>
                                     
                                     {(isLoadingPrice || pricePerSqInch === null) ? (
