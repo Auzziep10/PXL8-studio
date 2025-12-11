@@ -1,3 +1,4 @@
+
 'use server';
 
 /**
@@ -37,7 +38,7 @@ export async function generateDesignFromPrompt(input: GenerateDesignFromPromptIn
 const generateDesignPrompt = ai.definePrompt({
   name: 'generateDesignFromStructuredPrompt',
   input: { schema: GenerateDesignFromPromptInputSchema },
-  prompt: `Create a high-quality logo-style graphic with a transparent background.
+  prompt: `Create a high-quality logo-style graphic with a solid, vibrant green screen background.
 Subject: {{{subject}}}
 Style: {{{style}}}
 Color Palette: {{{colors}}}
@@ -47,7 +48,7 @@ Optional Text: {{{text}}}
 {{/if}}
 
 Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
-The final image MUST have a transparent background.
+The final image MUST have a solid green screen background (#00FF00).
 Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
 Maintain strong silhouettes, smooth edges, and a balanced composition.
 `,
@@ -63,7 +64,7 @@ const generateDesignFromPromptFlow = ai.defineFlow(
   async input => {
     // Manually construct the prompt string for simplicity and reliability.
     const promptText = `
-      Create a high-quality logo-style graphic with a transparent background.
+      Create a high-quality logo-style graphic on a solid, vibrant green screen background.
       Subject: ${input.subject}
       Style: ${input.style}
       Color Palette: ${input.colors}
@@ -71,7 +72,7 @@ const generateDesignFromPromptFlow = ai.defineFlow(
       ${input.text ? `Optional Text: ${input.text}` : ''}
 
       Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
-      The final image MUST have a transparent background.
+      The final image MUST have a solid green screen background (#00FF00) for easy removal.
       Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
       Maintain strong silhouettes, smooth edges, and a balanced composition.
     `.trim();
