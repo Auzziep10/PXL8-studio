@@ -61,9 +61,9 @@ export default function DashboardLayout({
   }, [userProfile]);
 
   const siteNavItems = [
+    { href: '/track', label: 'Transfers', icon: SearchIcon },
     { href: '/build', label: 'Builder', icon: Wand2 },
     { href: '/upload', label: 'Upload', icon: Upload },
-    { href: '/track', label: 'Track Order', icon: SearchIcon },
   ];
 
   const adminNavItems = [
