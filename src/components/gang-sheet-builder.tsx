@@ -1,4 +1,5 @@
 
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -9,7 +10,7 @@ import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import AiAnalysisPanel from './ai-analysis-panel';
-import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection } from '@/firebase';
+import { useUser, useFirestore, useMemoFirebase, useDoc, useCollection, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { doc, setDoc, serverTimestamp, collection, query, where } from 'firebase/firestore';
 import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
@@ -149,7 +150,13 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         
         setDoc(gangSheetDocRef, storableSheetData, { merge: true }).catch((err) => {
             console.error("Failed to save sheet:", err);
-            // Handle specific errors as before
+            // Create and emit a detailed error for better debugging
+            const permissionError = new FirestorePermissionError({
+                path: gangSheetDocRef.path,
+                operation: 'write',
+                requestResourceData: storableSheetData,
+            });
+            errorEmitter.emit('permission-error', permissionError);
         });
       }
     }, 1500),
@@ -1199,3 +1206,6 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 }
 
 
+
+
+    
