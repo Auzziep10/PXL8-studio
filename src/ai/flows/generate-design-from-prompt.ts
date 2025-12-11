@@ -33,6 +33,7 @@ export async function generateDesignFromPrompt(input: GenerateDesignFromPromptIn
   return generateDesignFromPromptFlow(input);
 }
 
+// This prompt is now used for documentation and schema validation, but not for direct rendering in the flow.
 const generateDesignPrompt = ai.definePrompt({
   name: 'generateDesignFromStructuredPrompt',
   input: { schema: GenerateDesignFromPromptInputSchema },
@@ -60,17 +61,31 @@ const generateDesignFromPromptFlow = ai.defineFlow(
     outputSchema: GenerateDesignFromPromptOutputSchema,
   },
   async input => {
-    // Correctly render the prompt to a string first
-    const renderedPrompt = (await generateDesignPrompt.render({input})).prompt;
+    // Manually construct the prompt string for simplicity and reliability.
+    const promptText = `
+      Create a high-quality logo-style graphic with a transparent background.
+      Subject: ${input.subject}
+      Style: ${input.style}
+      Color Palette: ${input.colors}
+      Mood: ${input.mood}
+      ${input.text ? `Optional Text: ${input.text}` : ''}
 
-    // Pass the simple string to the ai.generate function
+      Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
+      The final image MUST have a transparent background.
+      Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
+      Maintain strong silhouettes, smooth edges, and a balanced composition.
+    `.trim();
+
     const {media} = await ai.generate({
-      prompt: renderedPrompt,
+      prompt: promptText,
       model: 'googleai/imagen-4.0-fast-generate-001',
+      config: {
+        numberOfImages: 1, // Explicitly request a single image
+      },
     });
 
     if (!media?.url) {
-      throw new Error('Failed to generate image from prompt.');
+      throw new Error('Failed to generate image from prompt. The model did not return an image.');
     }
 
     return {imageDataUri: media.url};
