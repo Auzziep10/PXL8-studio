@@ -2,6 +2,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useCart } from '@/hooks/use-cart';
 import { Trash2, ShoppingBag, ArrowRight, Lock, RefreshCw, ZoomIn, Tag, Truck, User as UserIcon, MapPin, Mail, Phone, Wand2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
