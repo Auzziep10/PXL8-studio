@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -876,7 +877,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             return;
         }
 
-        const previewUrl = await generatePreviewSheet();
+        const previewDataUrl = await generatePreviewSheet();
         
         const config = sheetConfig as SheetType & { id: string };
         const cartItem: SheetCartItem = {
@@ -889,7 +890,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             price: selectedSheetPrice,
             discount: config.discount,
           },
-          previewUrl: previewUrl,
+          previewUrl: previewDataUrl,
           artworks: finalItems, 
           quantity: 1,
         };

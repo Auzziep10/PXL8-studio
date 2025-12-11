@@ -301,37 +301,7 @@ export default function CartPage() {
         setIsCheckingOut(true);
 
         try {
-            // STEP 1: Ensure all images are permanent cloud URLs
-            if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:'))) {
-                if (!currentUser) {
-                    toast({
-                        variant: 'destructive',
-                        title: 'Login Required',
-                        description: 'Please log in or create an account to save your designs before checking out.',
-                        duration: 7000,
-                    });
-                    setIsCheckingOut(false);
-                    return;
-                }
             
-                toast({ title: 'Saving Your Designs...', description: 'Please wait while we secure your artwork...' });
-            
-                const updatedCartItems = await Promise.all(cartItems.map(async item => {
-                    if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
-                        const blob = await (await fetch(item.previewUrl)).blob();
-                        const file = new File([blob], `${item.id}.png`, { type: 'image/png' });
-                        const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
-                        return { ...item, previewUrl: permanentUrl };
-                    }
-                    return item;
-                }));
-                setCartItems(updatedCartItems); // Update the cart state with permanent URLs
-                // Re-assign cartItems to the updated version for the rest of this function's scope
-                // This is a bit of a hack, the better way is to refactor this into multiple steps.
-                (e.target as any).__cartItems = updatedCartItems;
-            }
-
-
             // --- Generate New Order ID ---
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -350,10 +320,9 @@ export default function CartPage() {
             // --- End Order ID Generation ---
 
             const customerId = currentUser?.uid || `GUEST-${Date.now()}`;
-            const currentCartItems = (e.target as any).__cartItems || cartItems;
-
+            
             const finalOrderItems: OrderItem[] = await Promise.all(
-                currentCartItems.map(async (item: CartItem): Promise<OrderItem> => {
+                cartItems.map(async (item: CartItem): Promise<OrderItem> => {
                     if (item.type === 'service') {
                         return {
                             id: item.id,
