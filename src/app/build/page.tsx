@@ -2,7 +2,7 @@
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
 import AiDesignGenerator from '@/components/ai-design-generator';
-import { useState }.tsx";
+import { useState } from 'react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Upload, Wand2 } from 'lucide-react';
 import type { Artwork } from '@/lib/types';
