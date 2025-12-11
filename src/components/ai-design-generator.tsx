@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo } from 'react';
@@ -18,6 +17,15 @@ import { collection, query, where } from 'firebase/firestore';
 interface AiDesignGeneratorProps {
     onDesignGenerated: (artwork: Omit<Artwork, 'id'>) => void;
 }
+
+const sanitizeFilename = (name: string): string => {
+  return name
+    .replace(/\s+/g, '-') // Replace spaces with hyphens
+    .replace(/[^a-zA-Z0-9-]/g, '') // Remove all non-alphanumeric characters except hyphens
+    .substring(0, 50) // Truncate to 50 chars
+    .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
+};
+
 
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
     const { addItem: addToCart } = useCart();
@@ -136,7 +144,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         // 1. Create the visual artwork to be added to the builder
         const newArtwork: Omit<Artwork, 'id'> = {
-            name: prompt.substring(0, 30) || 'AI Design',
+            name: sanitizeFilename(prompt) || 'ai-design',
             imageUrl: generatedImage,
             width: 5, // Default size, can be adjusted by user
             height: 5,

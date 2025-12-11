@@ -62,7 +62,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
   
   const sortedSheetSizes = useMemo(() => {
     if (!sheetSizes) return [];
-    return [...sheetSizes].sort((a, b) => (a.width * a.height) - (b.width * b.height));
+    return [...sheetSizes].sort((a, b) => (a.width * a.height) - (b.width * a.height));
   }, [sheetSizes]);
 
 
@@ -281,19 +281,6 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
     return { x: 0, y: 0 };
   };
 
-  const sanitizeFilename = (filename: string): string => {
-    const cleaned = filename
-      .replace(/\n/g, ' ') // Replace newlines with spaces
-      .replace(/[^a-zA-Z0-9.\- ]/g, '') // Allow spaces, remove other special chars
-      .trim()
-      .replace(/\s+/g, '-') // Replace spaces with hyphens
-      .replace(/-{2,}/g, '-') // Replace multiple hyphens with a single one
-      .substring(0, 50); // Truncate
-
-    // Ensure it doesn't start or end with a hyphen
-    return cleaned.replace(/^-+|-+$/g, '');
-  };
-  
   const handleImageLoad = useCallback((imageUrl: string, fileName: string, isFromUpload: boolean, existingArtwork?: Omit<Artwork, 'id'>) => {
     const isPermanent = !imageUrl.startsWith('data:');
     
@@ -355,8 +342,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
         fetch(imageUrl)
           .then(res => res.blob())
           .then(blob => {
-            const sanitizedName = sanitizeFilename(fileName);
-            const file = new File([blob], sanitizedName, { type: blob.type || 'image/png' });
+            const file = new File([blob], fileName, { type: blob.type || 'image/png' });
             return uploadFileAndGetURL(file, user.uid);
           })
           .then(permanentUrl => {
@@ -1292,6 +1278,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder'}) {
 
 
     
+
 
 
 
