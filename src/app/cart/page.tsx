@@ -57,12 +57,14 @@ const generateFinalSheetForPrint = async (
     sheetCanvas.height = sheetConfig.height * BASE_DPI;
 
     const imageCache: Record<string, HTMLImageElement> = {};
-    await Promise.all(artworks.map(item => new Promise<void>((resolve) => {
+    await Promise.all(artworks.map(item => new Promise<void>((resolve, reject) => {
         if (imageCache[item.imageUrl]) return resolve();
         const img = new window.Image();
-        if (!item.imageUrl.startsWith('data:')) img.crossOrigin = "Anonymous";
+        // *** THIS IS THE FIX ***
+        // Add crossOrigin attribute to prevent canvas tainting when loading from Firebase Storage
+        img.crossOrigin = "Anonymous";
         img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
-        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
+        img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); reject(new Error(`Failed to load image for sheet generation: ${item.imageUrl}`)); };
         img.src = item.imageUrl;
     })));
 
@@ -889,7 +891,3 @@ export default function CartPage() {
         </div>
     );
 }
-
-    
-
-    
