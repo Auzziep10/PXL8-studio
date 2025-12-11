@@ -2,18 +2,22 @@
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
 import AiDesignGenerator from '@/components/ai-design-generator';
-import { useState } from 'react';
+import { useState }.tsx";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Upload, Wand2 } from 'lucide-react';
 import type { Artwork } from '@/lib/types';
 
 
 export default function BuildPage() {
-    const [artworks, setArtworks] = useState<Artwork[]>([]);
+    const [newArtworks, setNewArtworks] = useState<Artwork[]>([]);
 
     const addArtworkToSheet = (artwork: Artwork) => {
-        setArtworks(prev => [...prev, artwork]);
-    }
+        setNewArtworks(prev => [...prev, artwork]);
+    };
+
+    const onArtworkHandled = (artworkId: string) => {
+        setNewArtworks(prev => prev.filter(art => art.id !== artworkId));
+    };
 
     return (
         <Tabs defaultValue="builder" className="h-full flex flex-col">
@@ -24,7 +28,7 @@ export default function BuildPage() {
                 </TabsList>
             </div>
             <TabsContent value="builder" className="flex-grow">
-                <GangSheetBuilder usage="Builder" />
+                <GangSheetBuilder usage="Builder" newArtworks={newArtworks} onArtworkHandled={onArtworkHandled} />
             </TabsContent>
             <TabsContent value="ai" className="flex-grow">
                 <AiDesignGenerator onDesignGenerated={addArtworkToSheet} />

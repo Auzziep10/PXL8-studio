@@ -31,7 +31,7 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
+export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Artwork[], onArtworkHandled?: (artworkId: string) => void }) {
   const { addItem: addToCart } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
@@ -300,7 +300,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
         const pos = findOpenPosition(w, h, items);
 
         const newItem: ArtworkOnCanvas = {
-          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          id: existingArtwork?.id || `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: fileName,
           imageUrl: imageUrl,
           width: w,
@@ -317,14 +317,50 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
         setItems(prev => [...prev, newItem]);
         setSelectedItemId(newItem.id);
         setDuplicateCount(1);
-        toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+
+        if (existingArtwork && onArtworkHandled) {
+            onArtworkHandled(existingArtwork.id);
+        } else {
+            toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
+        }
     };
     img.onerror = () => {
         toast({ variant: 'destructive', title: 'Image Load Failed', description: 'Could not load the image to place it on the canvas.' });
     };
     img.src = imageUrl;
-  }, [items, sheetConfig, toast]);
+  }, [items, sheetConfig, toast, onArtworkHandled]);
 
+
+  useEffect(() => {
+    if (newArtworks && newArtworks.length > 0 && onArtworkHandled) {
+        newArtworks.forEach(art => {
+            // For guest users, the image URL is a data URL.
+            // For logged-in users, it should be uploaded to get a permanent URL.
+            const isDataUrl = art.imageUrl.startsWith('data:');
+            
+            if (user && isDataUrl) {
+                // If the user is logged in, upload the AI image to get a permanent URL
+                toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage.' });
+                fetch(art.imageUrl)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], art.name, { type: 'image/png' });
+                        return uploadFileAndGetURL(file, user.uid);
+                    })
+                    .then(permanentUrl => {
+                        handleImageLoad(permanentUrl, true, art.name, art);
+                    })
+                    .catch(err => {
+                         toast({ variant: 'destructive', title: 'Save Failed', description: 'Could not save AI design.' });
+                    });
+            } else {
+                // For guests, or if the URL is already permanent, just load it
+                handleImageLoad(art.imageUrl, !isDataUrl, art.name, art);
+            }
+        });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [newArtworks, user]); // Only react when newArtworks changes
 
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
