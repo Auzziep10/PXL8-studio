@@ -1,84 +1,290 @@
 
 'use client';
 
+import React, { useState, useRef, useEffect, useMemo } from 'react';
+import { DynamicSheetCartItem, ServiceAddOn } from '@/lib/types';
+import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle } from 'lucide-react';
+import { useCart } from '@/hooks/use-cart';
+import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
+import { formatCurrency } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-import { CheckCircle, Package, Loader, Truck, Home, Search } from 'lucide-react';
 
-const timeline = [
-    { status: 'Order Placed', date: 'July 30, 2024, 11:00 AM', icon: CheckCircle, completed: true },
-    { status: 'Processing', date: 'July 30, 2024, 11:05 AM', icon: Loader, completed: true },
-    { status: 'Printed', date: 'July 31, 2024, 02:30 PM', icon: Package, completed: true },
-    { status: 'Shipped', date: 'July 31, 2024, 05:00 PM', icon: Truck, completed: true },
-    { status: 'Delivered', date: null, icon: Home, completed: false },
-]
+export default function SingleTransferUploadPage() {
+    const { addItem: onAddToCart } = useCart();
+    const { toast } = useToast();
+    const firestore = useFirestore();
 
-export default function TrackOrderPage() {
-  const showResults = false; // Set to true to show hardcoded results
+    const addOnsQuery = useMemoFirebase(
+        () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
+        [firestore]
+    );
+    const { data: addOns, isLoading: isLoadingPrice } = useCollection<ServiceAddOn & {id: string}>(addOnsQuery);
+    
+    const pricePerSqInch = useMemo(() => {
+        if (addOns && addOns.length > 0) {
+            return addOns[0].price || null;
+        }
+        return null;
+    }, [addOns]);
 
-  return (
-    <div className="container mx-auto max-w-2xl py-12">
-      <Card>
-        <CardHeader>
-          <CardTitle>Track Your Order</CardTitle>
-          <p className="text-muted-foreground">Enter your Order ID (e.g., 24073101).</p>
-        </CardHeader>
-        <CardContent>
-          <div className="flex w-full items-center space-x-2">
-            <div className="grid flex-1 gap-2">
-              <Label htmlFor="tracking-id" className="sr-only">
-                Tracking ID
-              </Label>
-              <Input
-                id="tracking-id"
-                defaultValue=""
-                placeholder="Enter your ID..."
-              />
-            </div>
-            <Button type="submit" className="px-6">
-              Track
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+    const [file, setFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+    const [quantity, setQuantity] = useState(1);
+    const [isProcessing, setIsProcessing] = useState(false);
+    const [calculatedPrice, setCalculatedPrice] = useState<number | null>(null);
+    const [dimensions, setDimensions] = useState<{width: string, height: string}>({width: '', height: ''});
+    const fileInputRef = useRef<HTMLInputElement>(null);
+    
+    const imageAspectRatio = useRef<number | null>(null);
 
-      {showResults ? (
-        <Card className="mt-8">
-            <CardHeader>
-                <CardTitle>Order 24073101 Status</CardTitle>
-                <p className="text-muted-foreground">Current status: <span className="text-primary font-semibold">Shipped</span></p>
-            </CardHeader>
-            <CardContent>
-                <div className="relative pl-6">
-                    {timeline.map((event, index) => (
-                        <div key={index} className="flex items-start">
-                            <div className="absolute left-0 top-0 flex flex-col items-center">
-                                <div className={`flex h-6 w-6 items-center justify-center rounded-full ${event.completed ? 'bg-primary' : 'bg-secondary'}`}>
-                                    <event.icon className={`h-4 w-4 ${event.completed ? 'text-primary-foreground' : 'text-muted-foreground'}`} />
-                                </div>
-                                {index < timeline.length - 1 && (
-                                    <div className={`w-0.5 grow ${timeline[index + 1].completed ? 'bg-primary' : 'bg-secondary'}`} style={{minHeight: '4rem'}}></div>
-                                )}
+    useEffect(() => {
+        const width = parseFloat(dimensions.width);
+        const height = parseFloat(dimensions.height);
+
+        if (width > 0 && height > 0 && pricePerSqInch !== null) {
+            const area = width * height;
+            const price = area * pricePerSqInch * quantity;
+            setCalculatedPrice(price);
+        } else {
+            setCalculatedPrice(null);
+        }
+    }, [dimensions, quantity, pricePerSqInch]);
+
+
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.files && e.target.files[0]) {
+            const uploadedFile = e.target.files[0];
+            
+            if (!uploadedFile.type.startsWith('image/')) {
+                 toast({ variant: 'destructive', title: 'Invalid File Type', description: 'Please upload a valid image file (PNG, JPG, etc.).' });
+                 return;
+            }
+
+            setFile(uploadedFile);
+            
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const result = e.target?.result as string;
+                setPreviewUrl(result);
+
+                const img = new Image();
+                img.onload = () => {
+                    imageAspectRatio.current = img.naturalWidth / img.naturalHeight;
+                    // Auto-populate width to a default of 5 inches, height adjusts automatically
+                    const defaultWidth = 5;
+                    const correspondingHeight = defaultWidth / imageAspectRatio.current;
+                    setDimensions({ width: String(defaultWidth), height: correspondingHeight.toFixed(2) });
+                };
+                img.src = result;
+            };
+            reader.readAsDataURL(uploadedFile);
+        }
+    };
+
+    const handleDimensionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        const numValue = parseFloat(value);
+
+        if (imageAspectRatio.current) {
+            if (name === 'width' && numValue > 0) {
+                const newHeight = numValue / imageAspectRatio.current;
+                setDimensions({ width: value, height: newHeight.toFixed(2) });
+            } else if (name === 'height' && numValue > 0) {
+                const newWidth = numValue * imageAspectRatio.current;
+                setDimensions({ width: newWidth.toFixed(2), height: value });
+            } else {
+                 setDimensions(prev => ({...prev, [name]: value}));
+            }
+        } else {
+            setDimensions(prev => ({...prev, [name]: value}));
+        }
+    };
+    
+    const resetState = () => {
+        setFile(null);
+        setPreviewUrl(null);
+        setCalculatedPrice(null);
+        setQuantity(1);
+        setDimensions({ width: '', height: '' });
+        imageAspectRatio.current = null;
+        if (fileInputRef.current) {
+            fileInputRef.current.value = '';
+        }
+    };
+
+    const handleAddToCart = async () => {
+        const width = parseFloat(dimensions.width);
+        const height = parseFloat(dimensions.height);
+
+        if (!file || !previewUrl || !(width > 0) || !(height > 0) || calculatedPrice === null) {
+            toast({
+                variant: 'destructive',
+                title: 'Cannot Add to Cart',
+                description: 'Please upload an image and specify valid dimensions.',
+            });
+            return;
+        }
+
+        setIsProcessing(true);
+        try {
+            // For a single design upload, the preview of the item *is* the gang sheet.
+            // We create a canvas that represents the final print size.
+            const dpi = 300;
+            const canvas = document.createElement('canvas');
+            canvas.width = width * dpi;
+            canvas.height = height * dpi;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) throw new Error("Could not create canvas context");
+            
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = previewUrl;
+            });
+
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const finalSheetPreviewUrl = canvas.toDataURL('image/png');
+
+            const item: DynamicSheetCartItem = {
+                id: `sng-${Date.now()}`,
+                type: 'dynamic_sheet',
+                name: `Single Design Transfer`,
+                previewUrl: finalSheetPreviewUrl, // The "sheet" is just this one scaled image
+                width: width,
+                height: height,
+                price: calculatedPrice / quantity, // Price per single item
+                quantity: quantity,
+            };
+
+            onAddToCart(item);
+            toast({
+                title: 'Added to Cart',
+                description: `${quantity} x ${width}" x ${height}" transfers added.`,
+            });
+            
+            resetState();
+
+        } catch (err) {
+            console.error("Error processing item", err);
+            toast({
+                variant: "destructive",
+                title: "Error processing item",
+                description: "There was an issue adding the item to your cart. Please try again."
+            });
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+    
+    return (
+        <div className="min-h-screen pb-12">
+            <div className="max-w-4xl mx-auto px-4 py-8">
+                <div className="mb-12 text-center">
+                    <h1 className="text-4xl font-bold text-white mb-4">Order Single Transfers</h1>
+                    <p className="text-zinc-400 max-w-2xl mx-auto">
+                        Upload your design, tell us the size and quantity, and we'll handle the rest. Perfect for ordering multiples of a single artwork.
+                    </p>
+                </div>
+
+                <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
+                    {!file ? (
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-center cursor-pointer w-full h-full flex flex-col items-center justify-center"
+                        >
+                            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6 group hover:scale-110 transition-transform duration-300">
+                                <Upload className="w-10 h-10 text-zinc-400 group-hover:text-accent transition-colors" />
                             </div>
-                            <div className="pb-12 ml-6">
-                                <p className="font-semibold">{event.status}</p>
-                                <p className="text-sm text-muted-foreground">{event.date || 'Pending...'}</p>
+                            <h3 className="text-xl font-medium text-white mb-2">Click to upload your design</h3>
+                            <p className="text-zinc-500 text-sm">PNG, JPG, or PDF. 300 DPI recommended.</p>
+                        </div>
+                    ) : (
+                        <div className="w-full h-full flex flex-col">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                                {/* Preview Area */}
+                                <div className="flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                                    {previewUrl && (
+                                        <img src={previewUrl} alt="Preview" className="max-w-full max-h-[300px] object-contain shadow-2xl" />
+                                    )}
+                                </div>
+
+                                {/* Pricing and Actions */}
+                                <div className="space-y-6">
+                                    <div className="bg-zinc-900/80 p-4 rounded-xl border border-white/10">
+                                        <div className="flex items-center overflow-hidden">
+                                            <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center mr-3 flex-shrink-0 text-accent">
+                                                <FileText />
+                                            </div>
+                                            <div className="truncate">
+                                                <p className="text-white font-medium truncate">{file.name}</p>
+                                                <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                            </div>
+                                            <Button 
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={resetState}
+                                                className="hover:bg-red-500/10 hover:text-red-500 text-zinc-500 ml-auto"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="flex items-center mb-1 text-zinc-400 text-xs"><Ruler className="w-3 h-3 mr-1"/> Dimensions (inches)</Label>
+                                            <div className="flex gap-2">
+                                                <Input name="width" value={dimensions.width} onChange={handleDimensionChange} placeholder="W" type="number" />
+                                                <Input name="height" value={dimensions.height} onChange={handleDimensionChange} placeholder="H" type="number" />
+                                            </div>
+                                        </div>
+                                        <div>
+                                             <Label className="block mb-1 text-zinc-400 text-xs">Quantity</Label>
+                                             <Input 
+                                                type="number" 
+                                                min="1" 
+                                                value={quantity}
+                                                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                                             />
+                                        </div>
+                                    </div>
+                                    
+                                    {(isLoadingPrice || pricePerSqInch === null) ? (
+                                         <p className="text-center text-sm text-zinc-500">Loading pricing...</p>
+                                    ) : (
+                                        <div className="text-center bg-zinc-900/50 p-4 rounded-xl border border-white/10">
+                                            <p className="text-zinc-400 text-sm">Total Price</p>
+                                            <p className="text-4xl font-bold text-white">{calculatedPrice !== null ? formatCurrency(calculatedPrice) : '...'}</p>
+                                        </div>
+                                    )}
+
+                                    <Button 
+                                        onClick={handleAddToCart}
+                                        disabled={isProcessing || calculatedPrice === null}
+                                        className="w-full text-lg h-12"
+                                    >
+                                        {isProcessing ? (
+                                            <span className="flex items-center">
+                                                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                                                Processing...
+                                            </span>
+                                        ) : (
+                                            <>Add to Cart <ArrowRight className="ml-2 w-5 h-5" /></>
+                                        )}
+                                    </Button>
+                                </div>
                             </div>
                         </div>
-                    ))}
+                    )}
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg" />
                 </div>
-            </CardContent>
-        </Card>
-      ) : (
-        <div className="mt-8 text-center text-muted-foreground">
-            <Search className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-white">No order found</h3>
-            <p className="mt-1 text-sm text-gray-500">Enter an order ID to see its status.</p>
+            </div>
         </div>
-      )}
-    </div>
-  );
-}
+    );
+};
