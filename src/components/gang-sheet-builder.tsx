@@ -281,6 +281,14 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     return { x: 0, y: 0 };
   };
 
+  const sanitizeFilename = (filename: string): string => {
+    return filename
+      .toLowerCase()
+      .replace(/\s+/g, '-') // Replace spaces with hyphens
+      .replace(/[^a-z0-9-.]/g, '') // Remove special characters except hyphens and dots
+      .substring(0, 50); // Truncate to a reasonable length
+  };
+  
   const handleImageLoad = useCallback((imageUrl: string, fileName: string, isFromUpload: boolean, existingArtwork?: Omit<Artwork, 'id'>) => {
     const img = new window.Image();
     const isPermanent = !imageUrl.startsWith('data:');
@@ -303,7 +311,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
       const pos = findOpenPosition(w, h, items);
   
       const newItem: ArtworkOnCanvas = {
-        id: `${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
+        id: `art-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
         name: fileName,
         imageUrl: imageUrl,
         width: w,
@@ -329,13 +337,17 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         toast({ title: 'Upload complete!', description: 'Your artwork has been added to the sheet.' });
       }
   
-      // If user is logged in and it's a data URL, start background upload
+      // For logged-in users, data URLs are temporary. Upload to get a permanent URL.
       if (user && !isPermanent) {
+        // Place item on canvas immediately for good UX
+        setItems(prev => [...prev.filter(i => i.id !== newItem.id), newItem]);
         toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage in the background.' });
+        
         fetch(imageUrl)
           .then(res => res.blob())
           .then(blob => {
-            const file = new File([blob], fileName, { type: 'image/png' });
+            const sanitizedName = sanitizeFilename(fileName);
+            const file = new File([blob], sanitizedName, { type: blob.type || 'image/png' });
             return uploadFileAndGetURL(file, user.uid);
           })
           .then(permanentUrl => {
@@ -791,12 +803,12 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     const imageCache: Record<string, HTMLImageElement> = {};
     await Promise.all(
         items.map(item =>
-            new Promise<void>((resolve) => {
+            new Promise<void>((resolve, reject) => {
                 if (imageCache[item.imageUrl]) return resolve();
                 const img = new window.Image();
                 if (!item.imageUrl.startsWith('data:')) img.crossOrigin = 'Anonymous';
                 img.onload = () => { imageCache[item.imageUrl] = img; resolve(); };
-                img.onerror = () => { console.warn(`Failed to load image: ${item.imageUrl}`); resolve(); };
+                img.onerror = () => { console.error(`Failed to load image: ${item.imageUrl}`); reject(new Error(`Failed to load image for sheet generation.`)); };
                 img.src = item.imageUrl;
             })
         )
@@ -911,7 +923,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         toast({
             variant: "destructive",
             title: "Error Generating Sheet",
-            description: "Could not generate the print file. Please try again."
+            description: (e as Error).message || "Could not generate the print file. Please try again."
         });
     } finally {
         setIsGenerating(false);
@@ -1283,5 +1295,6 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
 
     
+
 
 
