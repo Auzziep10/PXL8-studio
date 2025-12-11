@@ -51,16 +51,28 @@ export const generateFinalSheetForPrint = async (
     const HEADER_HEIGHT_INCHES = 1;
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
 
+    // Fetch the image as a blob, then create an object URL
+    const response = await fetch(originalSheetUrl);
+    if (!response.ok) {
+        throw new Error(`Failed to fetch original sheet image: ${response.statusText}`);
+    }
+    const blob = await response.blob();
+    const objectUrl = URL.createObjectURL(blob);
+
+
     // Load the original sheet image
     const sheetImg = await new Promise<HTMLImageElement>((resolve, reject) => {
         const img = new window.Image();
-        img.crossOrigin = "Anonymous";
-        img.onload = () => resolve(img);
+        img.onload = () => {
+            URL.revokeObjectURL(objectUrl); // Clean up the object URL
+            resolve(img);
+        };
         img.onerror = (e) => {
+            URL.revokeObjectURL(objectUrl); // Clean up on error too
             console.error("Failed to load original sheet image for print generation", e);
             reject(new Error("Could not load original sheet image."));
         };
-        img.src = originalSheetUrl;
+        img.src = objectUrl;
     });
 
     const finalCanvas = document.createElement('canvas');
