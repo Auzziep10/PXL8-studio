@@ -15,6 +15,7 @@ import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
 import QRCode from 'qrcode';
 import { formatCurrency, sanitizeFilename } from '@/lib/utils';
+import { removeBackground } from '@/ai/flows/remove-background';
 
 
 // Debounce function to limit how often we save to Firestore
@@ -35,7 +36,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [isColorPickerActive, setIsColorPickerActive] = useState(false);
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
   
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -444,72 +445,40 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     }
   }
 
-  const removeColor = (imageUrl: string, colorToRemove: {r: number, g: number, b: number}) => {
-    return new Promise<string>((resolve, reject) => {
-        const img = new Image();
-        if (!imageUrl.startsWith('data:')) {
-            img.crossOrigin = 'Anonymous';
-        }
-        img.onload = () => {
-            const canvas = document.createElement('canvas');
-            canvas.width = img.width;
-            canvas.height = img.height;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) return reject('Could not get canvas context');
-            
-            ctx.drawImage(img, 0, 0);
-            const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = imageData.data;
-            const tolerance = 20;
+  const handleRemoveBackground = async () => {
+      if (!selectedItem) return;
 
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-                
-                if (Math.abs(r - colorToRemove.r) < tolerance && 
-                    Math.abs(g - colorToRemove.g) < tolerance && 
-                    Math.abs(b - colorToRemove.b) < tolerance) {
-                    data[i + 3] = 0; // Make transparent
-                }
-            }
-            ctx.putImageData(imageData, 0, 0);
-            resolve(canvas.toDataURL());
-        };
-        img.onerror = () => reject('Failed to load image for color removal.');
-        img.src = imageUrl;
-    });
-  };
+      setIsRemovingBg(true);
+      toast({ title: 'AI Processing...', description: 'Removing background. This may take a moment.' });
 
-  const handleRemoveColor = async (color: {r:number, g: number, b: number}) => {
-    if (!selectedItem) return;
+      try {
+          const result = await removeBackground({ imageDataUri: selectedItem.imageUrl });
+          if (!result || !result.imageDataUri) {
+              throw new Error("AI background removal failed to return an image.");
+          }
 
-    toast({title: 'Processing...', description: 'Removing selected color from the image.'});
+          // For guest users, we just update the data URL
+          if (!user) {
+              updateItem(selectedItem.id, { imageUrl: result.imageDataUri });
+              toast({ title: 'Background Removed!', description: 'The background has been made transparent.' });
+              return;
+          }
 
-    try {
-        const newImageUrl = await removeColor(selectedItem.imageUrl, color);
-        // For guest users, we just update the data URL
-        if (!user) {
-            updateItem(selectedItem.id, { imageUrl: newImageUrl });
-            toast({title: 'Color Removed!', description: 'The background color has been made transparent.'});
-            return;
-        }
+          // For logged-in users, we need to re-upload the new image to get a permanent URL
+          const blob = await (await fetch(result.imageDataUri)).blob();
+          const file = new File([blob], selectedItem.name, { type: 'image/png' });
 
-        // For logged-in users, we need to re-upload the new image to get a permanent URL
-        const blob = await (await fetch(newImageUrl)).blob();
-        const file = new File([blob], selectedItem.name, { type: 'image/png' });
-        
-        const permanentUrl = await uploadFileAndGetURL(file, user.uid);
-        updateItem(selectedItem.id, { imageUrl: permanentUrl });
+          const permanentUrl = await uploadFileAndGetURL(file, user.uid);
+          updateItem(selectedItem.id, { imageUrl: permanentUrl });
 
-        toast({title: 'Color Removed!', description: 'The new version of your artwork has been saved.'});
+          toast({ title: 'Background Removed!', description: 'The new version of your artwork has been saved.' });
 
-    } catch (error) {
-        console.error("Color removal failed:", error);
-        toast({variant: 'destructive', title: 'Error', description: 'Could not remove color from image.'});
-    } finally {
-        setIsColorPickerActive(false);
-    }
+      } catch (error) {
+          console.error("AI background removal failed:", error);
+          toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Could not remove background from image.' });
+      } finally {
+          setIsRemovingBg(false);
+      }
   };
 
 
@@ -552,32 +521,6 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   const handleMouseDownOnItem = (e: React.MouseEvent, id: string) => {
       e.stopPropagation();
       e.preventDefault();
-
-      if (isColorPickerActive && selectedItemId === id) {
-          const rect = (e.target as Element).getBoundingClientRect();
-          const x = e.clientX - rect.left;
-          const y = e.clientY - rect.top;
-          
-          const canvas = document.createElement('canvas');
-          const item = items.find(i => i.id === id);
-          if (!item) return;
-
-          canvas.width = item.width * PPI;
-          canvas.height = item.height * PPI;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) return;
-          
-          const img = new Image();
-          img.crossOrigin = "Anonymous";
-          img.onload = () => {
-              ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-              const pixelData = ctx.getImageData(x / scale, y / scale, 1, 1).data;
-              handleRemoveColor({ r: pixelData[0], g: pixelData[1], b: pixelData[2] });
-          };
-          img.src = item.imageUrl;
-
-          return; // Don't start dragging
-      }
       
       const item = items.find(i => i.id === id);
       if (!item) return;
@@ -1076,9 +1019,9 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                </button>
                            </div>
                       </div>
-                       <Button variant="outline" onClick={() => setIsColorPickerActive(prev => !prev)} className={isColorPickerActive ? 'bg-blue-500/20 border-blue-500' : ''}>
+                       <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg}>
                           <Droplet className="w-4 h-4 mr-2" />
-                          {isColorPickerActive ? 'Picker Active - Click on Image' : 'Remove Color'}
+                          {isRemovingBg ? 'Removing Background...' : 'Remove Background (AI)'}
                       </Button>
                       <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
                  </div>
@@ -1178,7 +1121,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
             {/* The Sheet Canvas */}
             <div 
-                className={`relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center ${isColorPickerActive ? 'cursor-eyedropper' : ''}`}
+                className={`relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center`}
                 onMouseUp={handleMouseUp}
                 onMouseLeave={handleMouseLeave}
             >
@@ -1189,7 +1132,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                         height: `${displayHeight}px`,
                         transition: 'height 0.3s ease'
                     }}
-                    onMouseDown={() => { if (!isColorPickerActive) setSelectedItemId(null); }} // Deselect if clicking background
+                    onMouseDown={() => { setSelectedItemId(null); }} // Deselect if clicking background
                  >
                     {items.map((item) => {
                         const isSelected = selectedItemId === item.id;
@@ -1211,7 +1154,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                             <div
                                 key={item.id}
                                 ref={itemRef}
-                                className={`absolute draggable-item group ${isColorPickerActive && isSelected ? 'cursor-eyedropper' : 'cursor-move'}`}
+                                className={`absolute draggable-item group cursor-move`}
                                 style={{
                                     left: `${item.x * PPI * scale}px`,
                                     top: `${item.y * PPI * scale}px`,
