@@ -89,7 +89,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
 
   useEffect(() => {
     if (newArtworks && newArtworks.length > 0) {
-        newArtworks.forEach(artwork => handleImageLoad(artwork.imageUrl, true, artwork.name, artwork));
+        newArtworks.forEach(artwork => handleImageLoad(artwork.imageUrl, false, artwork.name, artwork));
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [newArtworks]);
@@ -224,11 +224,11 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
   }, [pricePerSqInch]);
 
   const selectedSheetPrice = useMemo(() => {
-    if (sheetConfig) {
+    if (sheetConfig && pricePerSqInch !== null) {
       return calculateFinalPrice(sheetConfig);
     }
     return 0;
-  }, [sheetConfig, calculateFinalPrice]);
+  }, [sheetConfig, pricePerSqInch, calculateFinalPrice]);
 
 
   const selectedItem = items.find(item => item.id === selectedItemId);
@@ -799,6 +799,40 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     }
     setIsGenerating(true);
     try {
+        let finalItems = [...items];
+
+        // Check for temporary images and upload them if the user is logged in
+        if (user) {
+            const itemsToUpload = items.filter(item => item.imageUrl.startsWith('data:'));
+            if (itemsToUpload.length > 0) {
+                toast({ title: 'Saving Artwork', description: 'Uploading AI-generated designs to your account...' });
+                const uploadPromises = itemsToUpload.map(async item => {
+                    const blob = await (await fetch(item.imageUrl)).blob();
+                    const file = new File([blob], item.name, { type: 'image/png' });
+                    const permanentUrl = await uploadFileAndGetURL(file, user.uid);
+                    return { itemId: item.id, newUrl: permanentUrl };
+                });
+
+                const uploadedUrls = await Promise.all(uploadPromises);
+                
+                finalItems = items.map(item => {
+                    const uploaded = uploadedUrls.find(u => u.itemId === item.id);
+                    return uploaded ? { ...item, imageUrl: uploaded.newUrl } : item;
+                });
+                
+                // Update the state so the new URLs are saved to the draft
+                setItems(finalItems);
+            }
+        } else if (items.some(item => item.imageUrl.startsWith('data:'))) {
+            toast({
+                variant: "destructive",
+                title: "Login Required",
+                description: "Please log in to save and checkout AI-generated designs."
+            });
+            setIsGenerating(false);
+            return;
+        }
+
         const previewUrl = await generatePreviewSheet();
         
         const config = sheetConfig as SheetType & { id: string };
@@ -813,7 +847,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
             discount: config.discount,
           },
           previewUrl: previewUrl,
-          artworks: items, 
+          artworks: finalItems, 
           quantity: 1,
         };
 
@@ -1040,7 +1074,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
-                  {items.map((item) => (
+                  {items.map((item, index) => (
                       <div 
                         key={item.id} 
                         onClick={() => setSelectedItemId(item.id)}
