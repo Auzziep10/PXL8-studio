@@ -90,6 +90,23 @@ service cloud.firestore {
     function isOrderDataImmutableOnUpdate() {
       return request.resource.data.userId == resource.data.userId;
     }
+    
+    /**
+     * hasValidUserOrderDataOnCreate
+     * Validates that the user-specific order's internal 'customerId' matches the owner's UID upon creation.
+     */
+    function hasValidUserOrderDataOnCreate(userId) {
+      return request.resource.data.customerId == userId;
+    }
+
+    /**
+     * isUserOrderDataImmutableOnUpdate
+     * Ensures the internal 'customerId' field of a user-specific order document cannot be changed after creation.
+     */
+    function isUserOrderDataImmutableOnUpdate() {
+      return request.resource.data.customerId == resource.data.customerId;
+    }
+
 
     /**
      * isCreatingOwnOrder
@@ -226,8 +243,14 @@ service cloud.firestore {
         // Owner can read their own orders and list their collection for their dashboard.
         allow get, list: if isOwner(userId);
         
-        // Writes to this subcollection are handled by backend logic, not directly by user.
-        allow create, update, delete: if false; 
+        // A user can create a copy of their own order in their subcollection.
+        allow create: if isOwner(userId) && hasValidUserOrderDataOnCreate(userId);
+        
+        // Admins can update the user-facing order (e.g. status changes). The user cannot.
+        allow update: if isAdmin() && isUserOrderDataImmutableOnUpdate();
+
+        // Deleting user-facing orders is disabled.
+        allow delete: if false;
       }
     }
     
