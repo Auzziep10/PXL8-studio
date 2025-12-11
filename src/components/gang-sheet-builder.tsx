@@ -1,5 +1,4 @@
 
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -300,7 +299,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
         const pos = findOpenPosition(w, h, items);
 
         const newItem: ArtworkOnCanvas = {
-          id: Date.now().toString(),
+          id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           name: fileName,
           imageUrl: imageUrl,
           width: w,
@@ -978,7 +977,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                                         className="w-12 h-8 bg-zinc-900 border-y border-white/10 text-center text-sm text-white focus:outline-none"
                                     />
                                     <button 
-                                        onClick={() => setDuplicateCount(duplicateCount + 1)}
+                                        onClick={()=> setDuplicateCount(duplicateCount + 1)}
                                         className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-r hover:bg-zinc-700 text-zinc-400 transition-colors"
                                     >
                                         +
@@ -1034,7 +1033,7 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
-                  {items.map((item, index) => (
+                  {items.map((item) => (
                       <div 
                         key={item.id} 
                         onClick={() => setSelectedItemId(item.id)}
@@ -1198,3 +1197,5 @@ export default function GangSheetBuilder({ newArtworks, usage }: { newArtworks?:
     </div>
   );
 }
+
+
