@@ -3,7 +3,7 @@
 
 import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from '@/ai/flows/improve-artwork-printability';
 import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
-import { addTextToImage, AddTextToImageInput } from '@/ai/flows/add-text-to-image';
+import { addTextToImage as addTextToImageFlow, AddTextToImageInput } from '@/ai/flows/add-text-to-image';
 import type { ShippingAddress, ShippingRate } from '@/lib/types';
 
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
@@ -28,7 +28,7 @@ export async function generateDesign(input: GenerateDesignFromPromptInput) {
 
 export async function addTextToImage(input: AddTextToImageInput) {
     try {
-        const result = await addTextToImage(input);
+        const result = await addTextToImageFlow(input);
         return { success: true, data: result };
     } catch (error) {
         console.error('Error adding text to image:', error);
