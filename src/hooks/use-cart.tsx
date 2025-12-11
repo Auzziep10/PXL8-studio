@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode, Dispatch, SetStateAction } from 'react';
-import type { CartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
+import type { CartItem, ServiceCartItem, DynamicSheetCartItem, Artwork } from '@/lib/types';
 
 interface CartContextType {
   items: CartItem[];
@@ -10,14 +10,18 @@ interface CartContextType {
   removeItem: (itemId: string) => void;
   updateItemQuantity: (itemId: string, quantity: number) => void;
   clearCart: () => void;
+  tempArtwork: Omit<Artwork, 'id'> | null;
+  addTempArtwork: (artwork: Omit<Artwork, 'id'>) => void;
+  clearTempArtwork: () => void;
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export function CartProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<CartItem[]>([]);
+  const [tempArtwork, setTempArtwork] = useState<Omit<Artwork, 'id'> | null>(null);
 
-  // Load from localStorage on initial render
+  // Load cart from localStorage on initial render
   useEffect(() => {
     try {
       const storedItems = localStorage.getItem('pxl8-cart');
@@ -30,7 +34,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // Save to localStorage whenever items change
+  // Save cart to localStorage whenever items change
   useEffect(() => {
     try {
       // Don't save large, session-specific data to localStorage.
@@ -51,6 +55,14 @@ export function CartProvider({ children }: { children: ReactNode }) {
       }
     }
   }, [items]);
+
+  const addTempArtwork = (artwork: Omit<Artwork, 'id'>) => {
+    setTempArtwork(artwork);
+  };
+  
+  const clearTempArtwork = () => {
+    setTempArtwork(null);
+  };
 
   const addItem = (item: CartItem) => {
     setItems((prevItems) => {
@@ -86,7 +98,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ items, setItems, addItem, removeItem, updateItemQuantity, clearCart }}>
+    <CartContext.Provider value={{ items, setItems, addItem, removeItem, updateItemQuantity, clearCart, tempArtwork, addTempArtwork, clearTempArtwork }}>
       {children}
     </CartContext.Provider>
   );
@@ -99,5 +111,3 @@ export function useCart() {
   }
   return context;
 }
-
-    

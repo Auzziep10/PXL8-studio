@@ -6,7 +6,7 @@ import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight } from 'lucide-react';
 import { Artwork, ServiceCartItem, ServiceAddOn } from '@/lib/types';
 import GangSheetBuilder from './gang-sheet-builder';
 import { removeBackground } from '@/ai/flows/remove-background';
@@ -121,49 +121,46 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         }
     };
 
-    const handleAddArtToSheet = () => {
+    const handleSendToPage = (target: 'builder' | 'transfers') => {
         if (!generatedImage || !aiDesignFeeProduct) {
              toast({
                 variant: 'destructive',
-                title: 'Cannot Add Artwork',
+                title: 'Cannot Proceed',
                 description: !generatedImage ? 'No image has been generated.' : 'AI pricing is not available.',
             });
             return;
         };
 
-        // 1. Create the visual artwork to be added to the builder
         const newArtwork: Omit<Artwork, 'id'> = {
             name: sanitizeFilename(prompt) || 'ai-design',
             imageUrl: generatedImage,
-            width: 5, // Default size, can be adjusted by user
+            width: 5, // Default size
             height: 5,
             dpi: 300,
         };
-        
-        // 2. Add the artwork to the gang sheet builder canvas
-        onDesignGenerated(newArtwork);
 
-        // 3. Add the corresponding service fee to the cart
         addToCart({
             ...aiDesignFeeProduct,
-            quantity: 1, // Add one fee per creation
+            quantity: 1,
         });
 
-
+        onDesignGenerated(newArtwork, target);
+        
         toast({
-            title: 'Artwork Added & Fee Applied',
-            description: `The design is on your sheet, and a ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)} fee is in your cart.`,
+            title: 'Artwork Sent!',
+            description: `The design is ready on the ${target} page, and a ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)} fee is in your cart.`,
         });
 
-        // Switch to the builder view so the user can see their new art
-        document.querySelector<HTMLButtonElement>('button[data-radix-collection-item][value="builder"]')?.click();
+        setView('generate');
+        setGeneratedImage(null);
+        setPrompt('');
     };
 
 
     const generationFeeText = isLoadingService
         ? 'Loading pricing...'
         : aiDesignFeeProduct
-        ? `Each generation added to a sheet costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}.`
+        ? `Each generation costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}. The fee is added to your cart when you use the design.`
         : 'AI design pricing not configured.';
 
     return (
@@ -171,11 +168,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             <Card className="glass-panel border-white/10">
                 <CardHeader className="text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-                        <Wand2 className="w-8 h-8 text-primary" />
+                        <Sparkles className="w-8 h-8 text-primary" />
                     </div>
                     <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
                     <CardDescription className="text-zinc-400">
-                        Describe the design you want to create, and our AI will generate it for you. {generationFeeText}
+                        {generationFeeText}
                     </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
@@ -195,7 +192,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             >
                                 {isLoading ? (
                                     <span className="flex items-center">
-                                        <Sparkles className="w-5 h-5 mr-2 animate-pulse" />
+                                        <Wand2 className="w-5 h-5 mr-2 animate-pulse" />
                                         Generating...
                                     </span>
                                 ) : (
@@ -204,19 +201,24 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             </Button>
                         </div>
                     ) : (
-                        <div className="space-y-4 text-center">
+                        <div className="space-y-6 text-center">
                             <div className="bg-checkerboard-dark rounded-xl border border-white/10 p-4 aspect-square max-w-lg mx-auto">
                                 <img src={generatedImage!} alt="AI Generated Design" className="w-full h-full object-contain" />
                             </div>
-                            <div className="flex justify-center gap-4">
-                                <Button onClick={handleAddArtToSheet} className="text-base" size="lg">
+                            <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
                                     <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
                                 </Button>
+                                <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
+                                    <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
+                                </Button>
+                            </div>
+                            <div className="flex justify-center gap-4">
                                 <Button onClick={handleRemoveBackground} variant="outline" className="text-base" disabled={isRemovingBg}>
                                     <Scissors className="w-5 h-5 mr-2" />
                                     {isRemovingBg ? 'Removing...' : 'Remove Background'}
                                 </Button>
-                                <Button onClick={() => setView('generate')} variant="secondary" className="text-base">
+                                <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
                                     <Wand2 className="w-5 h-5 mr-2" /> Generate Another
                                 </Button>
                             </div>
@@ -236,5 +238,5 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 }
 
 interface AiDesignGeneratorProps {
-  onDesignGenerated: (artwork: Omit<Artwork, 'id'>) => void;
+  onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
 }

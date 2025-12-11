@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PXL8Logo } from '@/components/icons';
-import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon } from 'lucide-react';
+import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
@@ -17,6 +17,7 @@ import type { User as AppUser } from '@/lib/types';
 
 const navLinks = [
   { href: '/track', label: 'Transfers', icon: SearchIcon },
+  { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
   { href: '/build', label: 'Builder', icon: Wand2 },
   { href: '/upload', label: 'Upload', icon: Upload },
 ];

@@ -2,7 +2,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { DynamicSheetCartItem, ServiceAddOn } from '@/lib/types';
+import { DynamicSheetCartItem, ServiceAddOn, Artwork } from '@/lib/types';
 import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
 export default function SingleTransferUploadPage() {
-    const { addItem: onAddToCart } = useCart();
+    const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
     const { toast } = useToast();
     const firestore = useFirestore();
 
@@ -41,6 +41,16 @@ export default function SingleTransferUploadPage() {
     const fileInputRef = useRef<HTMLInputElement>(null);
     
     const imageAspectRatio = useRef<number | null>(null);
+    
+    // Effect to handle temporary artwork from AI generator
+    useEffect(() => {
+        if (tempArtwork) {
+            handleIncomingArtwork(tempArtwork);
+            clearTempArtwork();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [tempArtwork]);
+
 
     useEffect(() => {
         const width = parseFloat(dimensions.width);
@@ -54,6 +64,20 @@ export default function SingleTransferUploadPage() {
             setCalculatedPrice(null);
         }
     }, [dimensions, quantity, pricePerSqInch]);
+
+    const handleIncomingArtwork = (artwork: Omit<Artwork, 'id'>) => {
+        setPreviewUrl(artwork.imageUrl);
+        setDimensions({ width: artwork.width.toString(), height: artwork.height.toString() });
+
+        const img = new Image();
+        img.onload = () => {
+             imageAspectRatio.current = img.naturalWidth / img.naturalHeight;
+        };
+        img.src = artwork.imageUrl;
+        
+        // We don't have a real file object, so we create a placeholder name
+        setFile({ name: artwork.name } as File);
+    };
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -223,7 +247,7 @@ export default function SingleTransferUploadPage() {
                                             </div>
                                             <div className="truncate">
                                                 <p className="text-white font-medium truncate">{file.name}</p>
-                                                <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                                {file.size > 0 && <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
                                             </div>
                                             <Button 
                                                 variant="ghost"

@@ -15,7 +15,7 @@ import {
   SidebarInset,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon } from 'lucide-react';
+import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
 import { PXL8Logo } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -62,6 +62,7 @@ export default function DashboardLayout({
 
   const siteNavItems = [
     { href: '/track', label: 'Transfers', icon: SearchIcon },
+    { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
     { href: '/build', label: 'Builder', icon: Wand2 },
     { href: '/upload', label: 'Upload', icon: Upload },
   ];
