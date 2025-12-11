@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ShippingRate, ShippingAddress, Order, OrderStatus, SheetSize as SheetSizeType, CartItem, OrderItem, ArtworkOnCanvas, SheetCartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 import { createCheckoutSession } from '@/services/stripeService';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency, sanitizeFilename } from '@/lib/utils';
 import { getShippingRates } from '@/app/actions';
 import NextImage from 'next/image';
 import Link from 'next/link';
@@ -18,6 +18,8 @@ import { useUser, useFirestore, useMemoFirebase, useDoc, useStorage } from '@/fi
 import { doc, setDoc, serverTimestamp, collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
+import { uploadFileAndGetURL } from '@/firebase/storage';
+
 
 interface CheckoutFormData {
     firstName: string;
@@ -152,7 +154,7 @@ const generateFinalSheetForPrint = async (
 
 
 export default function CartPage() {
-    const { items: cartItems, removeItem, updateItemQuantity, clearCart } = useCart();
+    const { items: cartItems, removeItem, updateItemQuantity, clearCart, setItems: setCartItems } = useCart();
     const { toast } = useToast();
     
     const [isCheckingOut, setIsCheckingOut] = useState(false);
@@ -336,6 +338,54 @@ export default function CartPage() {
         setIsCheckingOut(true);
 
         try {
+             // --- Pre-checkout Step: Handle temporary images ---
+            const itemsWithTempImages = cartItems.filter(item => 
+                (item.type === 'sheet' && item.artworks.some(art => art.imageUrl.startsWith('data:'))) ||
+                (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:'))
+            );
+
+            if (itemsWithTempImages.length > 0 && !currentUser) {
+                toast({
+                    variant: 'destructive',
+                    title: 'Login Required',
+                    description: 'Please log in or create an account to save your AI-generated designs before checking out.',
+                });
+                setIsCheckingOut(false);
+                return;
+            }
+
+            let finalCartItems = [...cartItems];
+
+            if (itemsWithTempImages.length > 0 && currentUser) {
+                toast({ title: 'Saving Your Designs...', description: 'Uploading temporary images to your account.' });
+
+                const updatedItems = await Promise.all(finalCartItems.map(async (item) => {
+                    if (item.type === 'sheet') {
+                        const updatedArtworks = await Promise.all(item.artworks.map(async (art) => {
+                            if (art.imageUrl.startsWith('data:')) {
+                                const blob = await (await fetch(art.imageUrl)).blob();
+                                const file = new File([blob], sanitizeFilename(art.name) || 'ai-design.png', { type: blob.type });
+                                const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                                return { ...art, imageUrl: permanentUrl };
+                            }
+                            return art;
+                        }));
+                        return { ...item, artworks: updatedArtworks };
+                    }
+                    if (item.type === 'dynamic_sheet' && item.previewUrl.startsWith('data:')) {
+                         const blob = await (await fetch(item.previewUrl)).blob();
+                         const file = new File([blob], sanitizeFilename(item.name) || 'uploaded-sheet.png', { type: blob.type });
+                         const permanentUrl = await uploadFileAndGetURL(file, currentUser.uid);
+                         return { ...item, previewUrl: permanentUrl };
+                    }
+                    return item;
+                }));
+
+                finalCartItems = updatedItems;
+                setCartItems(updatedItems); // Update the cart state with permanent URLs
+            }
+
+
             // --- Generate New Order ID ---
             const now = new Date();
             const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -364,7 +414,7 @@ export default function CartPage() {
             };
 
             const finalOrderItems: OrderItem[] = await Promise.all(
-                cartItems.map(async (item): Promise<OrderItem> => {
+                finalCartItems.map(async (item): Promise<OrderItem> => {
                     if (item.type === 'service') {
                         return {
                             id: item.id,
@@ -381,7 +431,6 @@ export default function CartPage() {
                     // This logic is for 'sheet' and 'dynamic_sheet' types
                     const sheetWidth = item.type === 'sheet' ? item.sheetSize.width : item.width;
                     const sheetHeight = item.type === 'sheet' ? item.sheetSize.height : item.height;
-                    const previewUrl = item.previewUrl;
                     
                     let artworks: ArtworkOnCanvas[];
                     if (item.type === 'sheet') {
@@ -416,20 +465,15 @@ export default function CartPage() {
                     const previewStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-preview.png`);
                     const printReadyStorageRef = ref(storage, `production-sheets/${orderId}/${item.id}-print.png`);
 
-                    const [previewSnapshot, printReadySnapshot] = await Promise.all([
-                        uploadString(previewStorageRef, previewUrl, 'data_url'),
-                        uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url'),
-                    ]);
-
-                    const [previewDownloadURL, printReadyDownloadURL] = await Promise.all([
-                        getDownloadURL(previewSnapshot.ref),
-                        getDownloadURL(printReadySnapshot.ref)
-                    ]);
+                    await uploadString(previewStorageRef, artworks[0].imageUrl, 'data_url').catch(err => console.error("Preview upload failed", err));
                     
+                    const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
+                    const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+
                     return {
                         id: item.id,
                         quantity: item.quantity,
-                        previewUrl: previewDownloadURL,
+                        previewUrl: artworks[0].imageUrl,
                         printReadyUrl: printReadyDownloadURL,
                         sheetSizeName: itemName,
                         sheetWidth,
@@ -466,21 +510,22 @@ export default function CartPage() {
             }
 
             if (!isTestMode) {
-                // Create a lightweight version of cart items for Stripe, removing large data URLs
-                const stripeCartItems = cartItems.map(item => {
-                    const { artworks, previewUrl, ...rest } = item as any;
-                    return rest;
+                const stripeCartItems = finalCartItems.map(item => {
+                    return {
+                        name: item.sheetSizeName,
+                        quantity: item.quantity,
+                        price: item.sheetPrice,
+                    };
                 });
                 await createCheckoutSession(stripeCartItems, total);
             }
             
-            // This logic now runs for both test and real orders
             toast({ title: 'Order Placed!', description: 'Your order has been successfully submitted.' });
             clearCart();
             
         } catch (error) {
             console.error("Checkout failed", error);
-            toast({ variant: 'destructive', title: 'Checkout Failed', description: 'There was an issue processing your order. See console for details.' });
+            toast({ variant: 'destructive', title: 'Checkout Failed', description: (error as Error).message || 'There was an issue processing your order.' });
         } finally {
             setIsCheckingOut(false);
         }
@@ -731,7 +776,7 @@ export default function CartPage() {
                                 </div>
                                 <div>
                                     <Label className="block text-xs font-medium text-zinc-400 mb-1">Phone</Label>
-                                    <div className="relative">
+                                    <div className">
                                         <Phone className="absolute left-3 top-3 w-4 h-4 text-zinc-500" />
                                         <Input required name="phone" value={formData.phone} onChange={handleInputChange} type="tel" className="pl-10" />
                                     </div>
@@ -902,3 +947,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    

@@ -1,10 +1,11 @@
 'use client';
 
-import { useState, useEffect, createContext, useContext, ReactNode } from 'react';
+import { useState, useEffect, createContext, useContext, ReactNode, Dispatch, SetStateAction } from 'react';
 import type { CartItem, ServiceCartItem, DynamicSheetCartItem } from '@/lib/types';
 
 interface CartContextType {
   items: CartItem[];
+  setItems: Dispatch<SetStateAction<CartItem[]>>;
   addItem: (item: CartItem) => void;
   removeItem: (itemId: string) => void;
   updateItemQuantity: (itemId: string, quantity: number) => void;
@@ -85,7 +86,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
   };
 
   return (
-    <CartContext.Provider value={{ items, addItem, removeItem, updateItemQuantity, clearCart }}>
+    <CartContext.Provider value={{ items, setItems, addItem, removeItem, updateItemQuantity, clearCart }}>
       {children}
     </CartContext.Provider>
   );
@@ -98,3 +99,5 @@ export function useCart() {
   }
   return context;
 }
+
+    
