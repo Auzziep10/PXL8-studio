@@ -20,9 +20,13 @@ interface AiDesignGeneratorProps {
 
 const sanitizeFilename = (name: string): string => {
   return name
+    .replace(/(\r\n|\n|\r)/gm, " ") // Replace newlines with a space
+    .trim()
+    .toLowerCase()
     .replace(/\s+/g, '-') // Replace spaces with hyphens
-    .replace(/[^a-zA-Z0-9-]/g, '') // Remove all non-alphanumeric characters except hyphens
+    .replace(/[^a-z0-9-]/g, '') // Remove all other invalid characters
     .substring(0, 50) // Truncate to 50 chars
+    .replace(/-+/g, '-') // Collapse multiple hyphens
     .replace(/^-+|-+$/g, ''); // Remove leading/trailing hyphens
 };
 
