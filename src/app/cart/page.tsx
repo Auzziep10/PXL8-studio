@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -214,6 +215,8 @@ export default function CartPage() {
     const [selectedRateId, setSelectedRateId] = useState<string | null>(null);
     const [isLoadingRates, setIsLoadingRates] = useState(false);
 
+    const hasPhysicalItems = cartItems.some(i => i.type === 'sheet' || i.type === 'dynamic_sheet');
+
     const subtotal = cartItems.reduce((acc, item) => {
         if (item.type === 'sheet') {
             return acc + (item.sheetSize.price * item.quantity);
@@ -325,7 +328,7 @@ export default function CartPage() {
             toast({ variant: 'destructive', title: 'Password required', description: 'Please enter a password to create your account.' });
             return;
         }
-        const hasPhysicalItems = cartItems.some(i => i.type === 'sheet' || i.type === 'dynamic_sheet');
+        
         if (hasPhysicalItems && !selectedRateId && !isTestMode) {
             toast({ variant: 'destructive', title: 'Shipping method required', description: 'Please select a shipping method.' });
             return;
