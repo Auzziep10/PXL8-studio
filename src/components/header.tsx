@@ -17,9 +17,9 @@ import type { User as AppUser } from '@/lib/types';
 
 const navLinks = [
   { href: '/track', label: 'Transfers', icon: SearchIcon },
-  { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
   { href: '/build', label: 'Builder', icon: Wand2 },
   { href: '/upload', label: 'Upload', icon: Upload },
+  { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
 ];
 
 export default function Header() {

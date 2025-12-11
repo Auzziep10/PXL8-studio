@@ -62,9 +62,9 @@ export default function DashboardLayout({
 
   const siteNavItems = [
     { href: '/track', label: 'Transfers', icon: SearchIcon },
-    { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
     { href: '/build', label: 'Builder', icon: Wand2 },
     { href: '/upload', label: 'Upload', icon: Upload },
+    { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
   ];
 
   const adminNavItems = [
