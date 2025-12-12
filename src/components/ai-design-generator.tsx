@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -58,6 +58,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     // --- Magic Wand State ---
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [bgRemovalTolerance, setBgRemovalTolerance] = useState(20);
+    const [imageHistory, setImageHistory] = useState<string[]>([]);
+
 
     // --- Text State ---
     const [textItems, setTextItems] = useState<TextItem[]>([]);
@@ -136,6 +138,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setGeneratedImage(null);
         setGeneratedImageDataUri(null);
         setTextItems([]);
+        setImageHistory([]);
 
         try {
             const result = await generateDesign(formData);
@@ -145,6 +148,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 img.onload = () => {
                     setGeneratedImage(img);
                     setGeneratedImageDataUri(result.data!.imageDataUri);
+                    setImageHistory([result.data!.imageDataUri]);
                     setView('edit');
                     toast({ title: 'Design Generated!', description: 'Your new design is ready for edits.' });
                 };
@@ -238,10 +242,27 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
       newImg.onload = () => {
           setGeneratedImage(newImg);
           setGeneratedImageDataUri(newDataUrl);
+          setImageHistory(prev => [...prev, newDataUrl]);
       };
       newImg.src = newDataUrl;
 
       toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
+    };
+
+    const handleUndo = () => {
+        if (imageHistory.length <= 1) return;
+        
+        const newHistory = [...imageHistory];
+        newHistory.pop(); // Remove current state
+        const previousUrl = newHistory[newHistory.length - 1]; // Get the new last state
+
+        const newImg = new Image();
+        newImg.onload = () => {
+            setGeneratedImage(newImg);
+            setGeneratedImageDataUri(previousUrl);
+            setImageHistory(newHistory);
+        };
+        newImg.src = previousUrl;
     };
 
 
@@ -461,10 +482,21 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                              <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
                                 <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
                                 <div className="space-y-3 pt-2">
-                                    <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                        <Droplet className="w-4 h-4 mr-2" />
-                                        {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
-                                    </Button>
+                                     <div className="flex items-center gap-2">
+                                        <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                            <Droplet className="w-4 h-4 mr-2" />
+                                            {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                        </Button>
+                                        <Button 
+                                            variant="ghost" 
+                                            size="icon"
+                                            onClick={handleUndo} 
+                                            disabled={imageHistory.length <= 1}
+                                            title="Undo last background removal"
+                                        >
+                                            <Undo className="w-4 h-4"/>
+                                        </Button>
+                                    </div>
                                     {isRemovingBg && (
                                         <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
                                             <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>

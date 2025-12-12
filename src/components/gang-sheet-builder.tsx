@@ -3,7 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem, ServiceAddOn } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent, ChevronDown } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent, ChevronDown, Undo } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -128,7 +128,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     debounce((sheetData: { items: ArtworkOnCanvas[], selectedSizeId: string | null }) => {
       if (gangSheetDocRef) {
         const storableItems = sheetData.items.map(item => {
-            const { analysis, imageUrl, ...rest } = item;
+            const { analysis, imageUrl, history, ...rest } = item;
              // Ensure imageUrl is a permanent URL, not a temp data URL
             if (!imageUrl || imageUrl.startsWith('data:')) {
                 // This shouldn't happen for logged-in users, but as a safeguard
@@ -322,6 +322,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                 rotation: 0,
                 canvasWidth: w * PPI,
                 canvasHeight: h * PPI,
+                history: [url],
             };
 
             setItems(prev => [...prev, newItem]);
@@ -354,7 +355,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             // Silently update the item with the permanent URL
             setItems(prev =>
               prev.map(item =>
-                item.imageUrl === imageUrl ? { ...item, imageUrl: permanentUrl } : item
+                item.imageUrl === imageUrl ? { ...item, imageUrl: permanentUrl, history: [permanentUrl] } : item
               )
             );
           })
@@ -506,14 +507,30 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
               const blob = await (await fetch(newDataUrl)).blob();
               const file = new File([blob], sanitizeFilename(selectedItem.name), { type: 'image/png' });
               const permanentUrl = await uploadFileAndGetURL(file, user.uid);
-              updateItem(selectedItem.id, { imageUrl: permanentUrl });
+              updateItem(selectedItem.id, { 
+                  imageUrl: permanentUrl, 
+                  history: [...(selectedItem.history || [selectedItem.imageUrl]), permanentUrl] 
+              });
           } else {
-              updateItem(selectedItem.id, { imageUrl: newDataUrl });
+              updateItem(selectedItem.id, { 
+                  imageUrl: newDataUrl, 
+                  history: [...(selectedItem.history || [selectedItem.imageUrl]), newDataUrl] 
+              });
           }
   
           toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
       };
       img.src = selectedItem.imageUrl;
+  };
+
+  const handleUndo = () => {
+    if (!selectedItem || !selectedItem.history || selectedItem.history.length <= 1) return;
+    
+    const newHistory = [...selectedItem.history];
+    newHistory.pop(); // Remove current state
+    const previousUrl = newHistory[newHistory.length - 1]; // Get the new last state
+
+    updateItem(selectedItem.id, { imageUrl: previousUrl, history: newHistory });
   };
 
 
@@ -536,17 +553,18 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
       for (let i = 0; i < count; i++) {
           const pos = findOpenPosition(itemToClone.width, itemToClone.height, currentItemsForCheck);
           
-          const newItem: Omit<ArtworkOnCanvas, 'analysis' | 'analysisLoading'> & { analysis?: any } = {
+          const newItem: Omit<ArtworkOnCanvas, 'analysis' | 'analysisLoading' | 'history'> & { analysis?: any, history?: string[] } = {
               ...itemToClone,
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`,
               x: pos.x,
               y: pos.y,
+              history: [itemToClone.imageUrl]
           };
           delete newItem.analysis;
           delete newItem.analysisLoading;
 
-          newItems.push(newItem);
-          currentItemsForCheck.push(newItem);
+          newItems.push(newItem as ArtworkOnCanvas);
+          currentItemsForCheck.push(newItem as ArtworkOnCanvas);
       }
       setItems(prev => [...prev, ...newItems]);
       setDuplicateCount(1); // Reset after adding
@@ -1110,10 +1128,21 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
                                     {/* New Magic Wand Tool */}
                                     <div className="space-y-3 pt-4 border-t border-border">
-                                        <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                            <Droplet className="w-4 h-4 mr-2" />
-                                            {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
-                                        </Button>
+                                        <div className="flex items-center gap-2">
+                                            <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                <Droplet className="w-4 h-4 mr-2" />
+                                                {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                            </Button>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon"
+                                                onClick={handleUndo} 
+                                                disabled={!selectedItem.history || selectedItem.history.length <= 1}
+                                                title="Undo last background removal"
+                                            >
+                                                <Undo className="w-4 h-4"/>
+                                            </Button>
+                                        </div>
                                         {isRemovingBg && (
                                             <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
                                                 <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>

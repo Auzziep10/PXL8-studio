@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DynamicSheetCartItem, ServiceAddOn, Artwork } from '@/lib/types';
-import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet } from 'lucide-react';
+import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet, Undo } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -43,6 +43,8 @@ export default function SingleTransferUploadPage() {
     // --- Magic Wand State ---
     const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [bgRemovalTolerance, setBgRemovalTolerance] = useState(20);
+    const [imageHistory, setImageHistory] = useState<string[]>([]);
+
 
     const imageAspectRatio = useRef<number | null>(null);
 
@@ -72,6 +74,7 @@ export default function SingleTransferUploadPage() {
 
     const handleIncomingArtwork = (artwork: Omit<Artwork, 'id'>) => {
         setPreviewUrl(artwork.imageUrl);
+        setImageHistory([artwork.imageUrl]);
         setDimensions({ width: artwork.width.toString(), height: artwork.height.toString() });
 
         const img = new Image();
@@ -127,9 +130,21 @@ export default function SingleTransferUploadPage() {
 
             const newDataUrl = tempCanvas.toDataURL('image/png');
             setPreviewUrl(newDataUrl);
+            setImageHistory(prev => [...prev, newDataUrl]);
             toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
         };
         sourceImage.src = previewUrl;
+    };
+
+    const handleUndo = () => {
+        if (imageHistory.length <= 1) return;
+        
+        const newHistory = [...imageHistory];
+        newHistory.pop(); // Remove current state
+        const previousUrl = newHistory[newHistory.length - 1]; // Get the new last state
+
+        setPreviewUrl(previousUrl);
+        setImageHistory(newHistory);
     };
 
 
@@ -148,6 +163,7 @@ export default function SingleTransferUploadPage() {
             reader.onload = (e) => {
                 const result = e.target?.result as string;
                 setPreviewUrl(result);
+                setImageHistory([result]);
 
                 const img = new Image();
                 img.onload = () => {
@@ -189,6 +205,7 @@ export default function SingleTransferUploadPage() {
         setQuantity(1);
         setDimensions({ width: '', height: '' });
         imageAspectRatio.current = null;
+        setImageHistory([]);
         if (fileInputRef.current) {
             fileInputRef.current.value = '';
         }
@@ -304,10 +321,21 @@ export default function SingleTransferUploadPage() {
                                     <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
                                         <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
                                         <div className="space-y-3 pt-2">
-                                            <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                                <Droplet className="w-4 h-4 mr-2" />
-                                                {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
-                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                    <Droplet className="w-4 h-4 mr-2" />
+                                                    {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon"
+                                                    onClick={handleUndo} 
+                                                    disabled={imageHistory.length <= 1}
+                                                    title="Undo last background removal"
+                                                >
+                                                    <Undo className="w-4 h-4"/>
+                                                </Button>
+                                            </div>
                                             {isRemovingBg && (
                                                 <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
                                                     <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>

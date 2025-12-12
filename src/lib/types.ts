@@ -75,6 +75,7 @@ export interface ArtworkOnCanvas extends Artwork {
   quantity: number;
   analysis?: ImproveArtworkPrintabilityOutput;
   analysisLoading?: boolean;
+  history?: string[];
 }
 
 export interface SheetSize {
