@@ -15,8 +15,10 @@ import { Button } from './ui/button';
 import { uploadFileAndGetURL } from '@/firebase/storage';
 import QRCode from 'qrcode';
 import { formatCurrency, sanitizeFilename } from '@/lib/utils';
-import { removeBackground } from '@/ai/flows/remove-background';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
+import { Label } from './ui/label';
+import { Slider } from './ui/slider';
+import { cn } from '@/lib/utils';
 
 
 // Debounce function to limit how often we save to Firestore
@@ -37,10 +39,13 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
-  const [isRemovingBg, setIsRemovingBg] = useState(false);
   
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
+  
+  // --- New State for Magic Wand Tool ---
+  const [isRemovingBg, setIsRemovingBg] = useState(false);
+  const [bgRemovalTolerance, setBgRemovalTolerance] = useState(20);
 
   const sheetSizesQuery = useMemoFirebase(
     () => (firestore ? query(collection(firestore, 'sheetSizes'), where('usage', '==', usage)) : null),
@@ -446,40 +451,70 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
     }
   }
 
-  const handleRemoveBackground = async () => {
-      if (!selectedItem) return;
-
-      setIsRemovingBg(true);
-      toast({ title: 'AI Processing...', description: 'Removing background. This may take a moment.' });
-
-      try {
-          const result = await removeBackground({ imageDataUri: selectedItem.imageUrl });
-          if (!result || !result.imageDataUri) {
-              throw new Error("AI background removal failed to return an image.");
-          }
-
-          // For guest users, we just update the data URL
-          if (!user) {
-              updateItem(selectedItem.id, { imageUrl: result.imageDataUri });
-              toast({ title: 'Background Removed!', description: 'The background has been made transparent.' });
+  // --- Background Removal ---
+  const handleCanvasClickForBgRemoval = async (e: React.MouseEvent<HTMLDivElement>) => {
+      if (!isRemovingBg || !selectedItem) return;
+  
+      const canvas = e.currentTarget;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+  
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+      if (!tempCtx) return;
+  
+      const img = new Image();
+      img.crossOrigin = 'Anonymous';
+      img.onload = async () => {
+          tempCanvas.width = img.width;
+          tempCanvas.height = img.height;
+          tempCtx.drawImage(img, 0, 0);
+  
+          // Get the color at the clicked pixel, scaled to the original image size
+          const clickedPixelX = Math.floor(x * (img.width / canvas.offsetWidth));
+          const clickedPixelY = Math.floor(y * (img.height / canvas.offsetHeight));
+          const pixelData = tempCtx.getImageData(clickedPixelX, clickedPixelY, 1, 1).data;
+          
+          if (pixelData[3] === 0) {
+              toast({ title: "Already Transparent", description: "You clicked on a transparent area." });
               return;
           }
-
-          // For logged-in users, we need to re-upload the new image to get a permanent URL
-          const blob = await (await fetch(result.imageDataUri)).blob();
-          const file = new File([blob], selectedItem.name, { type: 'image/png' });
-
-          const permanentUrl = await uploadFileAndGetURL(file, user.uid);
-          updateItem(selectedItem.id, { imageUrl: permanentUrl });
-
-          toast({ title: 'Background Removed!', description: 'The new version of your artwork has been saved.' });
-
-      } catch (error) {
-          console.error("AI background removal failed:", error);
-          toast({ variant: 'destructive', title: 'Error', description: (error as Error).message || 'Could not remove background from image.' });
-      } finally {
-          setIsRemovingBg(false);
-      }
+  
+          const [r, g, b] = pixelData;
+  
+          // Perform the color removal
+          const imageData = tempCtx.getImageData(0, 0, img.width, img.height);
+          const data = imageData.data;
+          
+          for (let i = 0; i < data.length; i += 4) {
+              const diff = Math.sqrt(
+                  Math.pow(data[i] - r, 2) +
+                  Math.pow(data[i + 1] - g, 2) +
+                  Math.pow(data[i + 2] - b, 2)
+              );
+              if (diff < bgRemovalTolerance) {
+                  data[i + 3] = 0; // Set alpha to 0
+              }
+          }
+          tempCtx.putImageData(imageData, 0, 0);
+  
+          const newDataUrl = tempCanvas.toDataURL('image/png');
+  
+          // Update the item
+          if (user) {
+              toast({ title: "Processing...", description: "Uploading new version of the artwork." });
+              const blob = await (await fetch(newDataUrl)).blob();
+              const file = new File([blob], selectedItem.name, { type: 'image/png' });
+              const permanentUrl = await uploadFileAndGetURL(file, user.uid);
+              updateItem(selectedItem.id, { imageUrl: permanentUrl });
+          } else {
+              updateItem(selectedItem.id, { imageUrl: newDataUrl });
+          }
+  
+          toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
+      };
+      img.src = selectedItem.imageUrl;
   };
 
 
@@ -520,6 +555,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
   // --- Drag, Resize, Rotate Handlers ---
   const handleMouseDownOnItem = (e: React.MouseEvent, id: string) => {
+      if (isRemovingBg) return; // Prevent moving items while in BG removal mode
       e.stopPropagation();
       e.preventDefault();
       
@@ -1072,10 +1108,29 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                             </button>
                                         </div>
                                     </div>
-                                    <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg}>
-                                        <Droplet className="w-4 h-4 mr-2" />
-                                        {isRemovingBg ? 'Removing Background...' : 'Remove Background (AI)'}
-                                    </Button>
+
+                                    {/* New Magic Wand Tool */}
+                                    <div className="space-y-3 pt-4 border-t border-border">
+                                        <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                            <Droplet className="w-4 h-4 mr-2" />
+                                            {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                        </Button>
+                                        {isRemovingBg && (
+                                            <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                                <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
+                                                <div>
+                                                    <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                    <Slider 
+                                                        value={[bgRemovalTolerance]} 
+                                                        onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                        max={100} 
+                                                        step={1}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                    
                                     <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
                                 </div>
                             </AccordionContent>
@@ -1118,13 +1173,16 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                 onMouseLeave={handleMouseLeave}
             >
                  <div 
-                    className={`relative bg-checkerboard-dark sheet-canvas shadow-2xl bg-muted-foreground/10 border border-border rounded-sm`}
+                    className={cn(
+                        `relative bg-checkerboard-dark sheet-canvas shadow-2xl bg-muted-foreground/10 border border-border rounded-sm`,
+                        isRemovingBg && selectedItem && 'cursor-eyedropper'
+                    )}
                     style={{
                         width: `${displayWidth}px`,
                         height: `${displayHeight}px`,
                         transition: 'height 0.3s ease'
                     }}
-                    onMouseDown={() => { setSelectedItemId(null); }} // Deselect if clicking background
+                    onMouseDown={() => { if(!isRemovingBg) setSelectedItemId(null); }} // Deselect if clicking background
                  >
                     {items.map((item) => {
                         const isSelected = selectedItemId === item.id;
@@ -1146,7 +1204,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                             <div
                                 key={item.id}
                                 ref={itemRef}
-                                className={`absolute draggable-item group cursor-move`}
+                                className={`absolute draggable-item group ${isRemovingBg ? '' : 'cursor-move'}`}
                                 style={{
                                     left: `${item.x * PPI * scale}px`,
                                     top: `${item.y * PPI * scale}px`,
@@ -1157,6 +1215,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                     zIndex: isSelected ? 50 : 10,
                                 }}
                                 onMouseDown={(e) => handleMouseDownOnItem(e, item.id)}
+                                onClick={(e) => isRemovingBg && handleCanvasClickForBgRemoval(e)}
                             >
                                 <div className={`w-full h-full relative transition-all duration-150`}>
                                     <div className={`absolute -inset-0.5 border-2 rounded transition-all duration-150 pointer-events-none 
@@ -1174,7 +1233,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                       <div className="w-full h-full bg-destructive/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
                                     )}
 
-                                    {isSelected && (
+                                    {isSelected && !isRemovingBg && (
                                         <>
                                             <div 
                                                 className="absolute -bottom-1 -right-1 w-3 h-3 bg-white border-2 border-primary cursor-se-resize rounded-sm z-20"

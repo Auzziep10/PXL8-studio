@@ -13,7 +13,6 @@ import { collection, query, where } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
-import { removeBackground } from '@/ai/flows/remove-background';
 
 export default function SingleTransferUploadPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
@@ -43,7 +42,6 @@ export default function SingleTransferUploadPage() {
     
     const imageAspectRatio = useRef<number | null>(null);
 
-    const [isRemovingBg, setIsRemovingBg] = useState(false);
     
     // Effect to handle temporary artwork from AI generator
     useEffect(() => {
@@ -129,26 +127,6 @@ export default function SingleTransferUploadPage() {
             }
         } else {
             setDimensions(prev => ({...prev, [name]: value}));
-        }
-    };
-    
-    const handleRemoveBackground = async () => {
-        if (!previewUrl) return;
-        setIsRemovingBg(true);
-        toast({title: 'Processing...', description: 'Removing background with AI. Please wait.'});
-        try {
-            const result = await removeBackground({imageDataUri: previewUrl});
-            if (result && result.imageDataUri) {
-                setPreviewUrl(result.imageDataUri);
-                toast({title: 'Background Removed!', description: 'The background has been made transparent.'});
-            } else {
-                throw new Error('AI background removal failed to return an image.');
-            }
-        } catch (error) {
-            console.error("AI background removal failed:", error);
-            toast({variant: 'destructive', title: 'Error', description: 'Could not remove background from image.'});
-        } finally {
-            setIsRemovingBg(false);
         }
     };
     
@@ -304,18 +282,6 @@ export default function SingleTransferUploadPage() {
                                                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
                                              />
                                         </div>
-                                    </div>
-
-                                    <div>
-                                        <Button 
-                                            variant="outline"
-                                            onClick={handleRemoveBackground}
-                                            disabled={isRemovingBg}
-                                            className="w-full"
-                                        >
-                                            <Droplet className="w-4 h-4 mr-2" />
-                                            {isRemovingBg ? 'Removing Background...' : 'Remove Background'}
-                                        </Button>
                                     </div>
                                     
                                     {(isLoadingPrice || pricePerSqInch === null) ? (
