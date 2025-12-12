@@ -1,3 +1,4 @@
+
 'use client';
 
 import Link from 'next/link';
@@ -118,7 +119,7 @@ export default function Home() {
                             Unmatched Quality, Built on Precision
                         </h2>
                         <p className="mt-4 text-lg text-muted-foreground">
-                            Our platform is engineered from the ground up for Direct-to-Film printing. From AI-powered resolution checking to automated sheet generation, we ensure every print is perfect.
+                            Our platform is engineered from the ground up for Direct-to-Film printing. From precise resolution checking to automated sheet generation, we ensure every print is perfect.
                         </p>
                         <div className="mt-8 space-y-6">
                             <div className="flex items-start gap-4">
