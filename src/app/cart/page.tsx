@@ -280,10 +280,9 @@ export default function CartPage() {
                     
                     let finalPreviewUrl = item.previewUrl;
                     
-                    // Handle both SheetCartItem and DynamicSheetCartItem
                     const isDynamic = item.type === 'dynamic_sheet';
-                    const sheetWidth = isDynamic ? item.width : (item.artworks[0]?.width || 0); // Approximation for SheetCartItem
-                    const sheetHeight = isDynamic ? item.height : (item.artworks[0]?.height || 0); // Approximation
+                    const sheetWidth = isDynamic ? item.width : item.sheetSize.width;
+                    const sheetHeight = isDynamic ? item.height : item.sheetSize.height;
                     const itemName = isDynamic ? item.name : item.sheetSize.name;
                     const itemPrice = isDynamic ? item.price : item.sheetSize.price;
 

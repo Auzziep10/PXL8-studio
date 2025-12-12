@@ -170,6 +170,29 @@ const generateFinalSheetForPrint = async (
 };
 
 
+// --- ServiceCard Component ---
+const ServiceCard: React.FC<{ item: OrderItem }> = ({ item }) => {
+    return (
+        <div className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden shadow-sm">
+            <div className="p-4 flex justify-between items-center bg-zinc-800/30">
+                <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-lg bg-zinc-700 flex items-center justify-center border border-white/5">
+                        <Wand2 className="w-5 h-5 text-accent" />
+                    </div>
+                    <div>
+                        <p className="text-white font-bold">{item.sheetSizeName}</p>
+                        <p className="text-xs text-zinc-400">
+                            {item.quantity > 1 ? `${item.quantity} units` : '1 unit'} • Service Fee
+                        </p>
+                    </div>
+                </div>
+                <p className="text-lg font-bold text-white">${item.sheetPrice.toFixed(2)}</p>
+            </div>
+        </div>
+    );
+};
+
+
 // --- AssetCard Component ---
 const AssetCard: React.FC<{
   item: OrderItem;
@@ -1144,6 +1167,10 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                 <div className="space-y-6">
                   {Array.isArray(selectedOrder.items) &&
                     selectedOrder.items.map((item: OrderItem, idx) => {
+                      const isService = !item.originalSheetUrl && item.sheetWidth === 0 && item.sheetHeight === 0;
+                      if (isService) {
+                          return <ServiceCard key={idx} item={item} />;
+                      }
                       return (
                         <AssetCard
                           key={idx}
