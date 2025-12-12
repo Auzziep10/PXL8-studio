@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -36,6 +36,12 @@ interface TextItem {
     font: string;
     fontSize: number;
     color: string;
+    x: number;
+    y: number;
+}
+
+interface ImageTransform {
+    scale: number;
     x: number;
     y: number;
 }
@@ -70,6 +76,10 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
+    const [imageTransform, setImageTransform] = useState<ImageTransform>({ scale: 1, x: 0, y: 0 });
+    const [draggingImage, setDraggingImage] = useState(false);
+
+
     const addOnsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'serviceAddOns'), where('name', '==', 'AI Design Creation'));
@@ -92,15 +102,23 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         const canvas = canvasRef.current;
         const ctx = canvas?.getContext('2d');
         if (!ctx || !canvas) return;
-
+    
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-        // Draw background image
+    
+        // Draw background image with transformations
         if (generatedImage) {
-            ctx.drawImage(generatedImage, 0, 0, canvas.width, canvas.height);
+            const { scale, x, y } = imageTransform;
+            const scaledWidth = canvas.width * scale;
+            const scaledHeight = canvas.height * scale;
+            
+            // The x and y from state are offsets from the center
+            const finalX = (canvas.width - scaledWidth) / 2 + x;
+            const finalY = (canvas.height - scaledHeight) / 2 + y;
+    
+            ctx.drawImage(generatedImage, finalX, finalY, scaledWidth, scaledHeight);
         }
-
+    
         // Draw each text item
         textItems.forEach(text => {
             ctx.font = `${text.fontSize}px ${text.font}`;
@@ -109,8 +127,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             ctx.textBaseline = 'middle';
             ctx.fillText(text.content, text.x, text.y);
         });
-
-    }, [generatedImage, textItems]);
+    }, [generatedImage, textItems, imageTransform]);
 
     useEffect(() => {
         drawCanvas();
@@ -139,6 +156,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setGeneratedImageDataUri(null);
         setTextItems([]);
         setImageHistory([]);
+        setImageTransform({ scale: 1, x: 0, y: 0 });
 
         try {
             const result = await generateDesign(formData);
@@ -197,6 +215,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setTextItems([]);
         setActiveTextId(null);
         setFormData({ subject: '', style: '', colors: '', mood: '' });
+        setImageTransform({ scale: 1, x: 0, y: 0 });
     };
     
     // --- Background Removal ---
@@ -341,24 +360,37 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             }
         }
         
-        // If no text was clicked, deselect
+        // If no text was clicked, start dragging the image
+        setDraggingImage(true);
         setActiveTextId(null);
+        setDragOffset({
+            x: coords.x - imageTransform.x,
+            y: coords.y - imageTransform.y,
+        });
     };
 
     const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
         const coords = getCoords(e);
-        if (!coords || !draggingTextId) return;
-
-        updateActiveText({
-            x: coords.x - dragOffset.x,
-            y: coords.y - dragOffset.y,
-        });
+        if (!coords) return;
+    
+        if (draggingTextId) {
+            updateActiveText({
+                x: coords.x - dragOffset.x,
+                y: coords.y - dragOffset.y,
+            });
+        } else if (draggingImage) {
+            setImageTransform(prev => ({
+                ...prev,
+                x: coords.x - dragOffset.x,
+                y: coords.y - dragOffset.y,
+            }));
+        }
     };
 
     const handleCanvasMouseUp = () => {
         setDraggingTextId(null);
+        setDraggingImage(false);
     };
-
 
     const generationFeeText = isLoadingService
         ? 'Loading pricing...'
@@ -430,7 +462,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         </div>
                     ) : (
                         <div className="space-y-6">
-                             <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : 'cursor-move')}>
+                             <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
                                 <canvas
                                     ref={canvasRef}
                                     width={512}
@@ -441,6 +473,26 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     onMouseUp={handleCanvasMouseUp}
                                     onMouseLeave={handleCanvasMouseUp}
                                 />
+                            </div>
+
+                            <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
+                                <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Transform</Label>
+                                <div className="space-y-3 pt-2">
+                                     <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
+                                            <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
+                                        </div>
+                                        <div>
+                                            <Label className="text-xs">Position (X, Y)</Label>
+                                            <div className="flex gap-2">
+                                                <Input type="number" value={imageTransform.x} onChange={e => setImageTransform(p => ({ ...p, x: parseInt(e.target.value) || 0}))} />
+                                                <Input type="number" value={imageTransform.y} onChange={e => setImageTransform(p => ({ ...p, y: parseInt(e.target.value) || 0}))} />
+                                            </div>
+                                        </div>
+                                     </div>
+                                     <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0 })} size="sm" variant="ghost">Reset Transform</Button>
+                                </div>
                             </div>
                              
                              <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
