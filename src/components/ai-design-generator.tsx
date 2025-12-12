@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -48,12 +48,14 @@ interface TextItem {
     x: number;
     y: number;
     rotation: number;
+    // New properties for advanced effects
     strokeWidth: number;
     strokeColor: string;
     shadowBlur: number;
     shadowOffsetX: number;
     shadowOffsetY: number;
     shadowColor: string;
+    bend: number; // For arc warping
 }
 
 interface ImageTransform {
@@ -150,33 +152,61 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             ctx.shadowBlur = text.shadowBlur;
             ctx.shadowOffsetX = text.shadowOffsetX;
             ctx.shadowOffsetY = text.shadowOffsetY;
-
-            // Set transform
-            ctx.translate(text.x, text.y);
-            ctx.rotate(text.rotation * Math.PI / 180);
-            ctx.translate(-text.x, -text.y);
             
             // Set styles
             ctx.font = `${text.fontSize}px ${text.font}`;
             ctx.fillStyle = text.color;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+            
+            // Handle Warping (Arc)
+            if (text.bend !== 0) {
+                const textWidth = ctx.measureText(text.content).width;
+                const radius = (textWidth * 180) / (Math.abs(text.bend) * Math.PI);
+                const angle = textWidth / radius;
+                
+                ctx.translate(text.x, text.y);
+                ctx.rotate(text.rotation * Math.PI / 180);
+                
+                if (text.bend > 0) { // Arc up
+                    ctx.translate(0, radius);
+                    for (let i = 0; i < text.content.length; i++) {
+                        const char = text.content[i];
+                        const charWidth = ctx.measureText(char).width;
+                        ctx.rotate(charWidth / 2 / radius);
+                        ctx.fillText(char, 0, -radius);
+                        ctx.strokeText(char, 0, -radius);
+                        ctx.rotate(charWidth / 2 / radius);
+                    }
+                } else { // Arc down
+                    ctx.translate(0, -radius);
+                    for (let i = 0; i < text.content.length; i++) {
+                        const char = text.content[i];
+                        const charWidth = ctx.measureText(char).width;
+                        ctx.rotate(-charWidth / 2 / radius);
+                        ctx.fillText(char, 0, radius);
+                        ctx.strokeText(char, 0, radius);
+                        ctx.rotate(-charWidth / 2 / radius);
+                    }
+                }
 
-            // Draw filled text
-            ctx.fillText(text.content, text.x, text.y);
+            } else {
+                 // Standard (non-warped) text rendering
+                ctx.translate(text.x, text.y);
+                ctx.rotate(text.rotation * Math.PI / 180);
 
-            // Draw outline if needed
-            if (text.strokeWidth > 0) {
-                // Clear shadow for the stroke, otherwise it strokes the shadow too
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-                ctx.shadowOffsetX = 0;
-                ctx.shadowOffsetY = 0;
+                // Draw filled text
+                ctx.fillText(text.content, 0, 0);
 
-                ctx.strokeStyle = text.strokeColor;
-                ctx.lineWidth = text.strokeWidth;
-                ctx.strokeText(text.content, text.x, text.y);
+                // Draw outline if needed
+                if (text.strokeWidth > 0) {
+                    ctx.shadowColor = 'transparent'; // Clear shadow for stroke
+                    ctx.strokeStyle = text.strokeColor;
+                    ctx.lineWidth = text.strokeWidth;
+                    ctx.strokeText(text.content, 0, 0);
+                }
             }
+
 
             ctx.restore();
         });
@@ -391,6 +421,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             shadowColor: '#000000',
             shadowOffsetX: 0,
             shadowOffsetY: 0,
+            bend: 0,
         };
         setTextItems(prev => [...prev, newText]);
         setActiveTextId(newText.id);
@@ -650,7 +681,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                                 </div>
                                                             </AccordionContent>
                                                         </AccordionItem>
-                                                        <AccordionItem value="shadow" className="border-b-0">
+                                                        <AccordionItem value="shadow">
                                                             <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Paintbrush className="w-4 h-4"/>Drop Shadow</span></AccordionTrigger>
                                                             <AccordionContent className="space-y-3 pt-2">
                                                                 <div>
@@ -668,6 +699,15 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                                 <div className="flex items-center gap-2">
                                                                     <Label htmlFor="shadow-color" className="text-xs">Color</Label>
                                                                     <Input id="shadow-color" type="color" value={activeTextItem.shadowColor} onChange={(e) => updateActiveText({ shadowColor: e.target.value })} className="p-1 h-8 w-10 ml-auto" />
+                                                                </div>
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                        <AccordionItem value="warp" className="border-b-0">
+                                                            <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Spline className="w-4 h-4"/>Warp</span></AccordionTrigger>
+                                                            <AccordionContent className="space-y-3 pt-2">
+                                                                <div>
+                                                                    <Label htmlFor="text-bend" className="text-xs">Bend: {activeTextItem.bend.toFixed(0)}</Label>
+                                                                    <Slider id="text-bend" min={-100} max={100} step={1} value={[activeTextItem.bend]} onValueChange={([v]) => updateActiveText({ bend: v })} />
                                                                 </div>
                                                             </AccordionContent>
                                                         </AccordionItem>
@@ -754,5 +794,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         </div>
     );
 }
+
+    
 
     

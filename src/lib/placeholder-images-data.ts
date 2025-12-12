@@ -20,7 +20,7 @@ export const placeholderImagesData = [
     {
       "id": "homepageTechPrint",
       "description": "Close-up of a high-tech printing head",
-      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765558224713-Entrepreneurial%20Studio%20Scene.png?alt=media&token=e43ae544-b8b7-407b-90f2-f4f99e3c8924",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765580553650-Generated%20Image%20December%2012%2C%202025%20-%203_58PM.jpeg?alt=media&token=07ba5c8d-488d-42d7-bd2a-d11bc1221e60",
       "imageHint": "printing technology"
     },
     {
