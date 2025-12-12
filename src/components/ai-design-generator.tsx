@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Shadow } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -651,7 +651,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                             </AccordionContent>
                                                         </AccordionItem>
                                                         <AccordionItem value="shadow" className="border-b-0">
-                                                            <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Shadow className="w-4 h-4"/>Drop Shadow</span></AccordionTrigger>
+                                                            <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Paintbrush className="w-4 h-4"/>Drop Shadow</span></AccordionTrigger>
                                                             <AccordionContent className="space-y-3 pt-2">
                                                                 <div>
                                                                     <Label htmlFor="shadow-blur" className="text-xs">Blur: {activeTextItem.shadowBlur}px</Label>
@@ -754,3 +754,5 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         </div>
     );
 }
+
+    
