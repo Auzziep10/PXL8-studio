@@ -968,12 +968,22 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                                       <p className="text-xs text-muted-foreground">{item.width}" x {item.height}"</p>
                                                   </div>
                                               </div>
-                                              <button 
-                                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                                                className="text-muted-foreground hover:text-red-500 transition-colors"
-                                              >
-                                                  <Trash2 className="w-4 h-4" />
-                                              </button>
+                                              <div className="flex items-center">
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); handleBulkDuplicate(item, 1); }}
+                                                    className="text-muted-foreground hover:text-primary transition-colors p-1"
+                                                    title="Duplicate Artwork"
+                                                >
+                                                    <Copy className="w-4 h-4" />
+                                                </button>
+                                                <button 
+                                                    onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                                    className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                                                    title="Remove Artwork"
+                                                >
+                                                    <Trash2 className="w-4 h-4" />
+                                                </button>
+                                              </div>
                                           </div>
                                       </div>
                                   ))}
