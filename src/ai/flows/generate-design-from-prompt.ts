@@ -13,11 +13,10 @@ import {ai} from '@/ai/genkit';
 import {z} from 'genkit';
 
 const GenerateDesignFromPromptInputSchema = z.object({
-  subject: z.string().describe('The primary subject of the graphic.'),
+  subject: z.string().describe('The primary subject of the graphic, described in free-text.'),
   style: z.string().describe('The artistic style of the graphic.'),
   colors: z.string().describe('The desired color palette.'),
   mood: z.string().describe('The overall mood or feeling.'),
-  text: z.string().optional().describe('Optional text to include in the design.'),
 });
 export type GenerateDesignFromPromptInput = z.infer<typeof GenerateDesignFromPromptInputSchema>;
 

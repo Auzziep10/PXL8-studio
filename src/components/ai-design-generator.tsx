@@ -18,7 +18,6 @@ import { collection, query, where } from 'firebase/firestore';
 import { sanitizeFilename } from '@/lib/utils';
 
 // --- Dropdown Options ---
-const subjectOptions = ["Animals", "Nature", "Space", "Technology", "Fantasy", "Abstract", "Sports", "Food & Drink", "Mythology", "Skulls"];
 const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco"];
 const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients"];
 const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro"];
@@ -34,7 +33,6 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         style: '',
         colors: '',
         mood: '',
-        text: '',
     });
     const [textToAdd, setTextToAdd] = useState('');
     const [isApplyingText, setIsApplyingText] = useState(false);
@@ -69,7 +67,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             toast({
                 variant: 'destructive',
                 title: 'All fields are required',
-                description: 'Please select an option from each dropdown to generate a design.',
+                description: 'Please describe a subject and select an option from each dropdown.',
             });
             return;
         }
@@ -176,7 +174,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             return;
         };
         
-        const promptSummary = `${formData.subject} ${formData.style} ${formData.text || ''}`.trim();
+        const promptSummary = `${formData.subject} ${formData.style}`.trim();
 
         const newArtwork: Omit<Artwork, 'id'> = {
             name: sanitizeFilename(promptSummary) || 'ai-design',
@@ -202,7 +200,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setView('generate');
         setGeneratedImage(null);
         setTextToAdd('');
-        setFormData({ subject: '', style: '', colors: '', mood: '', text: '' });
+        setFormData({ subject: '', style: '', colors: '', mood: '' });
     };
 
 
@@ -227,14 +225,16 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 <CardContent className="space-y-6">
                     {view === 'generate' ? (
                          <div className="space-y-4">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <Label>Subject</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, subject: value }))} disabled={isLoading}>
-                                        <SelectTrigger><SelectValue placeholder="e.g., Animals" /></SelectTrigger>
-                                        <SelectContent>{subjectOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
+                            <div>
+                                <Label>Subject</Label>
+                                <Input 
+                                    placeholder="e.g., A robot surfing on a slice of pizza"
+                                    value={formData.subject}
+                                    onChange={(e) => setFormData(p => ({...p, subject: e.target.value}))}
+                                    disabled={isLoading}
+                                />
+                             </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <Label>Style</Label>
                                     <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading}>
@@ -242,8 +242,6 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         <SelectContent>{styleOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
-                            </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <Label>Color Palette</Label>
                                     <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading}>
@@ -259,15 +257,6 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Select>
                                 </div>
                             </div>
-                             <div>
-                                 <Label>Optional Text</Label>
-                                 <Input 
-                                     placeholder="e.g., 'Happy Camper'"
-                                     value={formData.text}
-                                     onChange={(e) => setFormData(p => ({...p, text: e.target.value}))}
-                                     disabled={isLoading}
-                                 />
-                             </div>
                             
                             <Button
                                 onClick={handleGenerate}
