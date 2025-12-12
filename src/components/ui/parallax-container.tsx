@@ -50,7 +50,6 @@ export function ParallaxContainer({
         style={{
           transform: `translateY(${translateY}px) scale(1.25)`,
           willChange: 'transform',
-          transition: 'transform 0.2s ease-out', // Smooth out the transform
         }}
         className="h-full w-full"
       >
