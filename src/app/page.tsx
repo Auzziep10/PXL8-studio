@@ -56,7 +56,7 @@ export default function Home() {
                     {heroImage && (
                         <div 
                             className="absolute inset-0 h-[150%] w-full top-[-25%]" // Make image taller and position it
-                            style={{ transform: `translateY(${heroScroll * -0.2}px)`}} // Apply parallax
+                            style={{ transform: `translateY(${heroScroll * -0.3}px)`}} // Apply parallax
                         >
                             <Image
                                 src={heroImage.imageUrl}
@@ -113,16 +113,23 @@ export default function Home() {
             </section>
 
             {/* Full-width Image Section 1 */}
-            <section className="relative h-[500px] bg-secondary">
-                {vibrantInksImage && (
-                    <Image
-                        src={vibrantInksImage.imageUrl}
-                        alt={vibrantInksImage.description}
-                        fill
-                        className="object-cover"
-                        data-ai-hint={vibrantInksImage.imageHint}
-                    />
-                )}
+            <section className="relative h-[500px] bg-secondary overflow-hidden">
+                <div className="absolute inset-0 z-0">
+                    {vibrantInksImage && (
+                        <div 
+                            className="absolute inset-0 h-[150%] w-full top-[-25%]"
+                            style={{ transform: `translateY(${heroScroll * -0.3}px)`}}
+                        >
+                            <Image
+                                src={vibrantInksImage.imageUrl}
+                                alt={vibrantInksImage.description}
+                                fill
+                                className="object-cover"
+                                data-ai-hint={vibrantInksImage.imageHint}
+                            />
+                        </div>
+                    )}
+                </div>
                  <div className="absolute inset-0 bg-black/20"></div>
             </section>
             
