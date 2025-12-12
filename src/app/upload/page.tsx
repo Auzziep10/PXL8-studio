@@ -59,8 +59,8 @@ export default function PrebuiltUploadPage() {
 
     useEffect(() => {
         if (detectedDimensions && pricePerSqInch !== null) {
-            // Validate width
-            if (detectedDimensions.w > maxWidth) {
+            // Validate width, allowing for a small floating point tolerance
+            if (detectedDimensions.w > maxWidth + 0.01) {
                 setValidationError(`Image width (${detectedDimensions.w.toFixed(1)}") exceeds the maximum allowed width of ${maxWidth}" for this tier.`);
                 setCalculatedPrice(null);
                 return;
