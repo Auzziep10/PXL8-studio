@@ -400,7 +400,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Render Logic ---
     return (
-        <div className="max-w-4xl mx-auto py-8 px-4">
+        <div className="max-w-7xl mx-auto py-8 px-4">
             <Card className="glass-panel border-white/10">
                 <CardHeader className="text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
@@ -409,9 +409,9 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
                     <CardDescription className="text-zinc-400">{generationFeeText}</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-6">
+                <CardContent>
                     {view === 'generate' ? (
-                         <div className="space-y-4">
+                         <div className="space-y-4 max-w-2xl mx-auto">
                             {isUserLoading ? (
                                 <div className="h-10 bg-muted rounded-md animate-pulse" />
                             ) : !user && (
@@ -461,127 +461,131 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             </Button>
                         </div>
                     ) : (
-                        <div className="space-y-6">
-                             <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
-                                <canvas
-                                    ref={canvasRef}
-                                    width={512}
-                                    height={512}
-                                    className="w-full h-full object-contain"
-                                    onMouseDown={handleCanvasMouseDown}
-                                    onMouseMove={handleCanvasMouseMove}
-                                    onMouseUp={handleCanvasMouseUp}
-                                    onMouseLeave={handleCanvasMouseUp}
-                                />
-                            </div>
-
-                            <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Transform</Label>
-                                <div className="space-y-3 pt-2">
-                                     <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
-                                            <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
-                                        </div>
-                                        <div>
-                                            <Label className="text-xs">Position (X, Y)</Label>
-                                            <div className="flex gap-2">
-                                                <Input type="number" value={imageTransform.x} onChange={e => setImageTransform(p => ({ ...p, x: parseInt(e.target.value) || 0}))} />
-                                                <Input type="number" value={imageTransform.y} onChange={e => setImageTransform(p => ({ ...p, y: parseInt(e.target.value) || 0}))} />
+                        <div className="grid md:grid-cols-3 gap-8">
+                            <div className="md:col-span-1 space-y-4">
+                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
+                                    <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Transform</Label>
+                                    <div className="space-y-3 pt-2">
+                                        <div className="grid grid-cols-1 gap-4">
+                                            <div>
+                                                <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
+                                                <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
+                                            </div>
+                                            <div>
+                                                <Label className="text-xs">Position (X, Y)</Label>
+                                                <div className="flex gap-2">
+                                                    <Input type="number" value={imageTransform.x} onChange={e => setImageTransform(p => ({ ...p, x: parseInt(e.target.value) || 0}))} />
+                                                    <Input type="number" value={imageTransform.y} onChange={e => setImageTransform(p => ({ ...p, y: parseInt(e.target.value) || 0}))} />
+                                                </div>
                                             </div>
                                         </div>
-                                     </div>
-                                     <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0 })} size="sm" variant="ghost">Reset Transform</Button>
-                                </div>
-                            </div>
-                             
-                             <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                <div className="flex items-center justify-between">
-                                    <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
-                                    <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
+                                        <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0 })} size="sm" variant="ghost">Reset Transform</Button>
+                                    </div>
                                 </div>
                                 
-                                {activeTextItem && (
-                                    <div className="p-4 bg-background/30 rounded-lg space-y-4 animate-in fade-in">
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div>
-                                                <Label htmlFor="text-content">Text</Label>
-                                                <Input id="text-content" value={activeTextItem.content} onChange={(e) => updateActiveText({ content: e.target.value })} />
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="text-font">Font</Label>
-                                                 <Select value={activeTextItem.font} onValueChange={(v) => updateActiveText({ font: v })}>
-                                                    <SelectTrigger id="text-font"><SelectValue /></SelectTrigger>
-                                                    <SelectContent>{fontOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                                </Select>
-                                            </div>
-                                        </div>
-                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                                            <div>
-                                                <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
-                                                <Slider id="text-size" min={10} max={150} step={1} value={[activeTextItem.fontSize]} onValueChange={([v]) => updateActiveText({ fontSize: v })} />
-                                            </div>
-                                            <div className="flex items-center gap-4">
-                                                <Label htmlFor="text-color">Color</Label>
-                                                <Input id="text-color" type="color" value={activeTextItem.color} onChange={(e) => updateActiveText({ color: e.target.value })} className="p-1 h-10 w-16" />
-                                                <Button onClick={deleteActiveText} variant="destructive" size="sm">Delete</Button>
-                                            </div>
-                                         </div>
+                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
+                                        <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
                                     </div>
-                                )}
-                             </div>
-
-                             <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Image Tools</Label>
-                                <div className="space-y-3 pt-2">
-                                     <div className="flex items-center gap-2">
-                                        <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                            <Droplet className="w-4 h-4 mr-2" />
-                                            {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
-                                        </Button>
-                                        <Button 
-                                            variant="ghost" 
-                                            size="icon"
-                                            onClick={handleUndo} 
-                                            disabled={imageHistory.length <= 1}
-                                            title="Undo last background removal"
-                                        >
-                                            <Undo className="w-4 h-4"/>
-                                        </Button>
-                                    </div>
-                                    {isRemovingBg && (
-                                        <div className="bg-muted/50 p-3 rounded-lg space-y-2 animate-in fade-in">
-                                            <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
-                                            <div>
-                                                <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
-                                                <Slider 
-                                                    value={[bgRemovalTolerance]} 
-                                                    onValueChange={([val]) => setBgRemovalTolerance(val)}
-                                                    max={100} 
-                                                    step={1}
-                                                />
+                                    
+                                    {activeTextItem && (
+                                        <div className="p-4 bg-background/30 rounded-lg space-y-4 animate-in fade-in">
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                <div>
+                                                    <Label htmlFor="text-content">Text</Label>
+                                                    <Input id="text-content" value={activeTextItem.content} onChange={(e) => updateActiveText({ content: e.target.value })} />
+                                                </div>
+                                                <div>
+                                                    <Label htmlFor="text-font">Font</Label>
+                                                    <Select value={activeTextItem.font} onValueChange={(v) => updateActiveText({ font: v })}>
+                                                        <SelectTrigger id="text-font"><SelectValue /></SelectTrigger>
+                                                        <SelectContent>{fontOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                                    </Select>
+                                                </div>
+                                            </div>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                                                <div>
+                                                    <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
+                                                    <Slider id="text-size" min={10} max={150} step={1} value={[activeTextItem.fontSize]} onValueChange={([v]) => updateActiveText({ fontSize: v })} />
+                                                </div>
+                                                <div className="flex items-center gap-4">
+                                                    <Label htmlFor="text-color">Color</Label>
+                                                    <Input id="text-color" type="color" value={activeTextItem.color} onChange={(e) => updateActiveText({ color: e.target.value })} className="p-1 h-10 w-16" />
+                                                    <Button onClick={deleteActiveText} variant="destructive" size="sm">Delete</Button>
+                                                </div>
                                             </div>
                                         </div>
                                     )}
                                 </div>
-                             </div>
 
-                            <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
-                                    <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
-                                </Button>
-                                <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
-                                    <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
-                                </Button>
+                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
+                                    <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                                    <div className="space-y-3 pt-2">
+                                        <div className="flex items-center gap-2">
+                                            <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                <Droplet className="w-4 h-4 mr-2" />
+                                                {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                            </Button>
+                                            <Button 
+                                                variant="ghost" 
+                                                size="icon"
+                                                onClick={handleUndo} 
+                                                disabled={imageHistory.length <= 1}
+                                                title="Undo last background removal"
+                                            >
+                                                <Undo className="w-4 h-4"/>
+                                            </Button>
+                                        </div>
+                                        {isRemovingBg && (
+                                            <div className="bg-muted/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                                <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
+                                                <div>
+                                                    <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                    <Slider 
+                                                        value={[bgRemovalTolerance]} 
+                                                        onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                        max={100} 
+                                                        step={1}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
                             </div>
-                            <div className="flex justify-center">
-                                <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
-                                    <Wand2 className="w-5 h-5 mr-2" /> Generate Another
-                                </Button>
+                            <div className="md:col-span-2">
+                                <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
+                                    <canvas
+                                        ref={canvasRef}
+                                        width={512}
+                                        height={512}
+                                        className="w-full h-full object-contain"
+                                        onMouseDown={handleCanvasMouseDown}
+                                        onMouseMove={handleCanvasMouseMove}
+                                        onMouseUp={handleCanvasMouseUp}
+                                        onMouseLeave={handleCanvasMouseUp}
+                                    />
+                                </div>
+                                <div className="space-y-4 mt-6">
+                                     <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                        <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
+                                            <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
+                                        </Button>
+                                        <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
+                                            <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
+                                        </Button>
+                                    </div>
+                                    <div className="flex justify-center">
+                                        <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
+                                            <Wand2 className="w-5 h-5 mr-2" /> Generate Another
+                                        </Button>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     )}
-                    <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2">
+                    <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2 mt-6">
                         <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                         <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
                     </div>
