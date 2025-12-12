@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem, ServiceAddOn } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent, ChevronDown } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -16,6 +16,7 @@ import { uploadFileAndGetURL } from '@/firebase/storage';
 import QRCode from 'qrcode';
 import { formatCurrency, sanitizeFilename } from '@/lib/utils';
 import { removeBackground } from '@/ai/flows/remove-background';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 // Debounce function to limit how often we save to Firestore
@@ -889,219 +890,200 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Controls */}
-          <div className="lg:col-span-1 space-y-6">
-            
-            {/* 1. Sheet Selection */}
-            <div className="glass-panel rounded-2xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-foreground flex items-center">
-                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">1</span>
-                    Select Sheet Size
-                  </h3>
-                  {user && (
-                    <div className="flex items-center text-xs text-muted-foreground">
-                        <Save className="w-3 h-3 mr-1.5 text-accent" />
-                        <span>Auto-saved to cloud</span>
-                    </div>
-                  )}
-              </div>
-              <div className="space-y-3">
-                {(isLoadingSizes || isLoadingPrice) ? (
-                    <p className="text-muted-foreground text-sm">Loading pricing...</p>
-                ) : sortedSheetSizes?.length === 0 ? (
-                    <p className="text-muted-foreground text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
-                ) : sortedSheetSizes?.map((config) => {
-                    const finalPrice = calculateFinalPrice(config);
-                    return (
-                        <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-border hover:border-muted'}`}>
-                            <div className="flex items-center relative z-10">
-                            <input
-                                type="radio"
-                                name="sheetSize"
-                                value={config.id}
-                                checked={selectedSizeId === config.id}
-                                onChange={(e) => setSelectedSizeId(e.target.value)}
-                                className="h-4 w-4 text-primary focus:ring-primary border-muted-foreground"
-                            />
-                            <span className="ml-3 font-medium text-foreground">{config.name} - {config.width}" x {config.height}"</span>
-                            </div>
-                            <div className="flex flex-col items-end relative z-10">
-                                <span className="font-bold text-accent">{formatCurrency(finalPrice)}</span>
-                                {config.discount > 0 && 
-                                    <span className="text-xs text-red-500 flex items-center gap-1">
-                                        <Percent className="w-3 h-3" /> {config.discount}% Off
-                                    </span>
-                                }
-                            </div>
-                            {selectedSizeId === config.id && <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />}
-                        </label>
-                    )
-                })}
-              </div>
-            </div>
-
-            {selectedItem ? (
-                 <div className="glass-panel rounded-2xl p-6 space-y-4">
-                     <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold text-foreground">Selected Artwork</h3>
-                        <button onClick={() => setSelectedItemId(null)} className="text-muted-foreground hover:text-foreground">&times;</button>
-                     </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
-                                <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
-                            </label>
-                            <div className="relative">
-                                <input 
-                                  type="number" 
-                                  step="0.1"
-                                  min="0.1"
-                                  value={selectedItem.width}
-                                  onChange={(e) => {
-                                     const w = parseFloat(e.target.value);
-                                     if (!isNaN(w) && w > 0) {
-                                         const ratio = selectedItem.canvasHeight / selectedItem.canvasWidth;
-                                         updateItem(selectedItem.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
-                                     }
-                                  }}
-                                  className="block w-full rounded bg-background border border-input text-foreground text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
-                                />
-                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
-                            </div>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
-                                <ArrowUpDown className="w-3 h-3 mr-1" /> Height
-                            </label>
-                            <div className="relative">
-                                <input 
-                                  type="number" 
-                                  value={selectedItem.height}
-                                  readOnly
-                                  className="block w-full rounded bg-muted border border-border text-muted-foreground text-xs p-1.5 cursor-not-allowed outline-none"
-                                />
-                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
-                            </div>
-                        </div>
-                      </div>
-                      <div className="flex justify-between items-center bg-background/50 p-2 rounded text-xs font-mono text-muted-foreground">
-                          <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
-                          <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
-                      </div>
-                      <div className="flex items-center justify-between pt-2">
-                           <label className="text-xs text-muted-foreground font-medium">Duplicate:</label>
-                           <div className="flex items-center space-x-2">
-                               <div className="flex items-center">
-                                    <button 
-                                        onClick={() => setDuplicateCount(Math.max(1, duplicateCount - 1))}
-                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-l hover:bg-muted text-muted-foreground transition-colors"
-                                    >
-                                        -
-                                    </button>
-                                    <input 
-                                        type="number" 
-                                        value={duplicateCount}
-                                        onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-12 h-8 bg-background border-y border-border text-center text-sm text-foreground focus:outline-none"
-                                    />
-                                    <button 
-                                        onClick={()=> setDuplicateCount(duplicateCount + 1)}
-                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-r hover:bg-muted text-muted-foreground transition-colors"
-                                    >
-                                        +
-                                    </button>
-                               </div>
-                               <button 
-                                    onClick={() => handleBulkDuplicate(selectedItem, duplicateCount)}
-                                    className="h-8 px-3 bg-primary text-primary-foreground text-xs font-bold rounded hover:bg-primary/90 transition-colors flex items-center"
-                               >
-                                    <Copy className="w-3 h-3 mr-1" /> Add
-                               </button>
-                           </div>
-                      </div>
-                       <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg}>
-                          <Droplet className="w-4 h-4 mr-2" />
-                          {isRemovingBg ? 'Removing Background...' : 'Remove Background (AI)'}
-                      </Button>
-                      <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
-                 </div>
-            ) : (
-                <div className="glass-panel rounded-2xl p-6">
-                    <p className="text-sm text-center text-muted-foreground">Select an artwork on the canvas to see its details and use AI tools.</p>
-                </div>
-            )}
-
-            {/* 2. Upload & Item List */}
-            <div className="glass-panel rounded-2xl p-6">
-              <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-foreground flex items-center">
-                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">2</span>
-                     Designs
-                  </h3>
-                  <button 
-                    onClick={() => fileInputRef.current?.click()}
-                    className="text-xs flex items-center bg-secondary hover:bg-muted text-secondary-foreground px-3 py-1.5 rounded-lg border border-border transition-colors"
-                  >
-                      <Plus className="w-3 h-3 mr-1" /> Add New
-                  </button>
-              </div>
-              
-              <input ref={fileInputRef} type="file" className="hidden" accept="image/*,image/svg+xml" onChange={handleFileUpload} />
-
-              {items.length === 0 ? (
-                <div 
-                  onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
-                >
-                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                     <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
-                  </div>
-                  <p className="mt-2 text-sm font-medium text-foreground">Upload Artwork</p>
-                  <p className="text-xs text-muted-foreground">PNG, JPG, SVG (300 DPI)</p>
-                </div>
-              ) : (
-                <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
-                  {items.map((item) => (
-                      <div 
-                        key={item.id} 
-                        onClick={() => setSelectedItemId(item.id)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-secondary border-primary ring-1 ring-primary/20' : 'bg-background/50 border-border hover:bg-secondary'}`}
-                      >
-                          <div className="flex items-start justify-between">
-                              <div className="flex items-center space-x-3">
-                                  <div className="w-12 h-12 rounded border border-border overflow-hidden bg-checkerboard-dark flex-shrink-0">
-                                      {item.imageUrl ? (
-                                        <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
-                                      ): (
-                                        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">No img</div>
-                                      )}
-                                  </div>
-                                  <div className="min-w-0">
-                                      <p className="text-sm font-medium text-foreground truncate w-24" title={item.name}>{item.name}</p>
-                                      <p className="text-xs text-muted-foreground">{item.width}" x {item.height}"</p>
-                                  </div>
+          <div className="lg:col-span-1 flex flex-col gap-4">
+            <div className="flex-grow space-y-4">
+                <Accordion type="multiple" defaultValue={['item-1', 'item-2']} className="w-full glass-panel rounded-2xl px-6">
+                    <AccordionItem value="item-1">
+                        <AccordionTrigger className="text-lg font-semibold text-foreground">
+                             <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">1</span>
+                             Select Sheet Size
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2">
+                             <div className="space-y-3">
+                                {(isLoadingSizes || isLoadingPrice) ? (
+                                    <p className="text-muted-foreground text-sm">Loading pricing...</p>
+                                ) : sortedSheetSizes?.length === 0 ? (
+                                    <p className="text-muted-foreground text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
+                                ) : sortedSheetSizes?.map((config) => {
+                                    const finalPrice = calculateFinalPrice(config);
+                                    return (
+                                        <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-border hover:border-muted'}`}>
+                                            <div className="flex items-center relative z-10">
+                                            <input
+                                                type="radio"
+                                                name="sheetSize"
+                                                value={config.id}
+                                                checked={selectedSizeId === config.id}
+                                                onChange={(e) => setSelectedSizeId(e.target.value)}
+                                                className="h-4 w-4 text-primary focus:ring-primary border-muted-foreground"
+                                            />
+                                            <span className="ml-3 font-medium text-foreground">{config.name} - {config.width}" x {config.height}"</span>
+                                            </div>
+                                            <div className="flex flex-col items-end relative z-10">
+                                                <span className="font-bold text-accent">{formatCurrency(finalPrice)}</span>
+                                                {config.discount > 0 && 
+                                                    <span className="text-xs text-red-500 flex items-center gap-1">
+                                                        <Percent className="w-3 h-3" /> {config.discount}% Off
+                                                    </span>
+                                                }
+                                            </div>
+                                            {selectedSizeId === config.id && <div className="absolute inset-0 bg-gradient-to-r from-primary/10 to-transparent pointer-events-none" />}
+                                        </label>
+                                    )
+                                })}
                               </div>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                                className="text-muted-foreground hover:text-red-500 transition-colors"
-                              >
-                                  <Trash2 className="w-4 h-4" />
-                              </button>
-                          </div>
-                      </div>
-                  ))}
-                </div>
-              )}
+                        </AccordionContent>
+                    </AccordionItem>
+                     <AccordionItem value="item-2">
+                        <AccordionTrigger className="text-lg font-semibold text-foreground">
+                            <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">2</span>
+                             Designs ({items.length})
+                        </AccordionTrigger>
+                        <AccordionContent className="pt-2">
+                              <Button onClick={() => fileInputRef.current?.click()} className="w-full mb-4">
+                                  <Plus className="w-4 h-4 mr-2" /> Add New Design
+                              </Button>
+                              <input ref={fileInputRef} type="file" className="hidden" accept="image/*,image/svg+xml" onChange={handleFileUpload} />
+                              {items.length === 0 ? (
+                                <p className="text-center text-sm text-muted-foreground py-4">No designs uploaded.</p>
+                              ) : (
+                                <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 builder-scroll">
+                                  {items.map((item) => (
+                                      <div 
+                                        key={item.id} 
+                                        onClick={() => setSelectedItemId(item.id)}
+                                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-secondary border-primary ring-1 ring-primary/20' : 'bg-background/50 border-border hover:bg-secondary'}`}
+                                      >
+                                          <div className="flex items-start justify-between">
+                                              <div className="flex items-center space-x-3">
+                                                  <div className="w-12 h-12 rounded border border-border overflow-hidden bg-checkerboard-dark flex-shrink-0">
+                                                      {item.imageUrl ? (
+                                                        <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
+                                                      ): (
+                                                        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">No img</div>
+                                                      )}
+                                                  </div>
+                                                  <div className="min-w-0">
+                                                      <p className="text-sm font-medium text-foreground truncate w-24" title={item.name}>{item.name}</p>
+                                                      <p className="text-xs text-muted-foreground">{item.width}" x {item.height}"</p>
+                                                  </div>
+                                              </div>
+                                              <button 
+                                                onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
+                                                className="text-muted-foreground hover:text-red-500 transition-colors"
+                                              >
+                                                  <Trash2 className="w-4 h-4" />
+                                              </button>
+                                          </div>
+                                      </div>
+                                  ))}
+                                </div>
+                              )}
+                        </AccordionContent>
+                    </AccordionItem>
+                    {selectedItem && (
+                         <AccordionItem value="item-3">
+                            <AccordionTrigger className="text-lg font-semibold text-foreground">
+                                <Wand2 className="w-5 h-5 mr-2 text-primary" />
+                                 Selected Artwork
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2">
+                                <div className="space-y-4">
+                                    <div className="grid grid-cols-2 gap-2">
+                                        <div>
+                                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
+                                                <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
+                                            </label>
+                                            <div className="relative">
+                                                <input 
+                                                type="number" 
+                                                step="0.1"
+                                                min="0.1"
+                                                value={selectedItem.width}
+                                                onChange={(e) => {
+                                                    const w = parseFloat(e.target.value);
+                                                    if (!isNaN(w) && w > 0) {
+                                                        const ratio = selectedItem.canvasHeight / selectedItem.canvasWidth;
+                                                        updateItem(selectedItem.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
+                                                    }
+                                                }}
+                                                className="block w-full rounded bg-background border border-input text-foreground text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                                />
+                                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
+                                                <ArrowUpDown className="w-3 h-3 mr-1" /> Height
+                                            </label>
+                                            <div className="relative">
+                                                <input 
+                                                type="number" 
+                                                value={selectedItem.height}
+                                                readOnly
+                                                className="block w-full rounded bg-muted border border-border text-muted-foreground text-xs p-1.5 cursor-not-allowed outline-none"
+                                                />
+                                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex justify-between items-center bg-background/50 p-2 rounded text-xs font-mono text-muted-foreground">
+                                        <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
+                                        <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
+                                    </div>
+                                    <div className="flex items-center justify-between pt-2">
+                                        <label className="text-xs text-muted-foreground font-medium">Duplicate:</label>
+                                        <div className="flex items-center space-x-2">
+                                            <div className="flex items-center">
+                                                    <button 
+                                                        onClick={() => setDuplicateCount(Math.max(1, duplicateCount - 1))}
+                                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-l hover:bg-muted text-muted-foreground transition-colors"
+                                                    >
+                                                        -
+                                                    </button>
+                                                    <input 
+                                                        type="number" 
+                                                        value={duplicateCount}
+                                                        onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
+                                                        className="w-12 h-8 bg-background border-y border-border text-center text-sm text-foreground focus:outline-none"
+                                                    />
+                                                    <button 
+                                                        onClick={()=> setDuplicateCount(duplicateCount + 1)}
+                                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-r hover:bg-muted text-muted-foreground transition-colors"
+                                                    >
+                                                        +
+                                                    </button>
+                                            </div>
+                                            <button 
+                                                    onClick={() => handleBulkDuplicate(selectedItem, duplicateCount)}
+                                                    className="h-8 px-3 bg-primary text-primary-foreground text-xs font-bold rounded hover:bg-primary/90 transition-colors flex items-center"
+                                            >
+                                                    <Copy className="w-3 h-3 mr-1" /> Add
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <Button variant="outline" onClick={handleRemoveBackground} disabled={isRemovingBg}>
+                                        <Droplet className="w-4 h-4 mr-2" />
+                                        {isRemovingBg ? 'Removing Background...' : 'Remove Background (AI)'}
+                                    </Button>
+                                    <AiAnalysisPanel artwork={selectedItem} onAnalyze={handleRunAnalysis} isLoggedIn={!!user} />
+                                </div>
+                            </AccordionContent>
+                         </AccordionItem>
+                    )}
+                </Accordion>
             </div>
             
-            <button
-                disabled={items.length === 0 || isSheetOverflowing || isGenerating || !isLoaded}
-                onClick={handleProcessAndAddToCart}
-                className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
-            >
-                {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(selectedSheetPrice)}`}
-                {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
-            </button>
+            <div className="glass-panel p-4 rounded-2xl mt-auto sticky bottom-4">
+                 <button
+                    disabled={items.length === 0 || isSheetOverflowing || isGenerating || !isLoaded}
+                    onClick={handleProcessAndAddToCart}
+                    className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
+                >
+                    {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(selectedSheetPrice)}`}
+                    {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
+                </button>
+            </div>
           </div>
 
           {/* Right Preview */}
