@@ -6,6 +6,7 @@ import { ArrowRight, Box, Droplet, Layers, MousePointer, Sparkles, Wand2 } from 
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
+import { ParallaxImage } from '@/components/ui/parallax-image';
 
 const features = [
     {
@@ -147,15 +148,13 @@ export default function Home() {
                             </div>
                         </div>
                     </div>
-                     <div className="aspect-[4/3] relative rounded-2xl overflow-hidden border border-border">
+                     <div className="perspective-container">
                         {techPrintImage && (
-                            <Image
+                           <ParallaxImage 
                                 src={techPrintImage.imageUrl}
                                 alt={techPrintImage.description}
-                                fill
-                                className="object-cover"
                                 data-ai-hint={techPrintImage.imageHint}
-                            />
+                           />
                         )}
                     </div>
                 </div>
