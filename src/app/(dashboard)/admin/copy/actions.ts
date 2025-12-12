@@ -15,7 +15,7 @@ export async function updateTextContent(id: string, newText: string) {
     // Use a regex to find and replace the text for a specific ID.
     // This looks for: "id": "the_id", ... "text": "the_old_text"
     // It's designed to be safe with multi-line strings using backticks.
-    const regex = new RegExp(`(\"id\":\\s*\"${id}\"[^{]*\"text\":\\s*\`)[^\\`]*(\`)`);
+    const regex = new RegExp(`("id":\\s*"${id}"[^{]*"text":\\s*\`)[^\\\`]*(\`)`);
 
     if (!regex.test(fileContents)) {
         throw new Error(`Text content with id "${id}" not found in the data file.`);
