@@ -23,7 +23,7 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, title, sheetWidth
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">A preview of the selected image: {title}</DialogDescription>
         </DialogHeader>
-        <div className="flex-1 flex items-center justify-center bg-checkerboard-dark p-4 overflow-auto">
+        <div className="flex-1 flex items-center justify-center checkerboard p-4 overflow-auto">
           <div 
             className="relative bg-transparent shadow-lg"
             style={{
