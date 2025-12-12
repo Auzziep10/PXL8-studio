@@ -1,4 +1,3 @@
-
 'use client';
 
 import GangSheetBuilder from '@/components/gang-sheet-builder';
