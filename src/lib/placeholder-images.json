@@ -1,6 +1,12 @@
 {
   "placeholderImages": [
     {
+      "id": "logo",
+      "description": "The main PXL8 logo",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.appspot.com/o/website-images%2FAsset%207%40300x.png?alt=media&token=f260e13b-710d-46b5-ab36-7f8fbd41bb8b",
+      "imageHint": "company logo"
+    },
+    {
       "id": "homepageHero",
       "description": "Colorful threads on a printing machine",
       "imageUrl": "https://images.unsplash.com/photo-1693031630189-a39e6d70bf22?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwcmludGluZyUyMG1hY2hpbmV8ZW58MHx8fHwxNzY1NDk4MTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
