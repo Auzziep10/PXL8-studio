@@ -44,7 +44,7 @@ const removeBackgroundFlow = ai.defineFlow(
     const {media} = await ai.generate({
       model: 'googleai/gemini-2.5-flash-image-preview',
       prompt: [
-        {text: 'Remove the background from this image. The output should be the subject on a transparent background.'},
+        {text: 'Remove the background from this image. The final output must be a PNG with a transparent alpha channel, not a checkerboard pattern.'},
         {media: {url: input.imageDataUri}},
       ],
       config: {
