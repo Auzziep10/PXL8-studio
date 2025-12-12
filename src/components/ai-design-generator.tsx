@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -63,6 +63,12 @@ interface ImageTransform {
     x: number;
     y: number;
     rotation: number;
+    brightness: number;
+    contrast: number;
+    saturate: number;
+    grayscale: number;
+    sepia: number;
+    blur: number;
 }
 
 
@@ -96,7 +102,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-    const [imageTransform, setImageTransform] = useState<ImageTransform>({ scale: 1, x: 0, y: 0, rotation: 0 });
+    const initialImageTransform: ImageTransform = {
+        scale: 1, x: 0, y: 0, rotation: 0,
+        brightness: 100, contrast: 100, saturate: 100,
+        grayscale: 0, sepia: 0, blur: 0,
+    };
+    const [imageTransform, setImageTransform] = useState<ImageTransform>(initialImageTransform);
     const [draggingImage, setDraggingImage] = useState(false);
 
 
@@ -126,9 +137,9 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         // Clear canvas
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-        // Draw background image with transformations
+        // Draw background image with transformations and filters
         if (generatedImage) {
-            const { scale, x, y, rotation } = imageTransform;
+            const { scale, x, y, rotation, brightness, contrast, saturate, grayscale, sepia, blur } = imageTransform;
             const scaledWidth = canvas.width * scale;
             const scaledHeight = canvas.height * scale;
             
@@ -136,6 +147,16 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             const finalY = (canvas.height - scaledHeight) / 2 + y;
     
             ctx.save();
+            // Apply filters
+            ctx.filter = `
+                brightness(${brightness}%)
+                contrast(${contrast}%)
+                saturate(${saturate}%)
+                grayscale(${grayscale}%)
+                sepia(${sepia}%)
+                blur(${blur}px)
+            `;
+
             ctx.translate(canvas.width / 2 + x, canvas.height / 2 + y);
             ctx.rotate(rotation * Math.PI / 180);
             ctx.translate(-(canvas.width / 2 + x), -(canvas.height / 2 + y));
@@ -233,7 +254,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 setGeneratedImageDataUri(dataUrl);
                 setImageHistory([dataUrl]);
                 setTextItems([]);
-                setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
+                setImageTransform(initialImageTransform);
                 setFormData({ subject: file.name, style: 'Custom', colors: '', mood: '' });
                 setView('edit');
                 toast({ title: 'Image Loaded', description: 'Your image is ready for editing.' });
@@ -266,7 +287,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setGeneratedImageDataUri(null);
         setTextItems([]);
         setImageHistory([]);
-        setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
+        setImageTransform(initialImageTransform);
 
         try {
             const result = await generateDesign(formData);
@@ -331,7 +352,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setTextItems([]);
         setActiveTextId(null);
         setFormData({ subject: '', style: '', colors: '', mood: '' });
-        setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
+        setImageTransform(initialImageTransform);
     };
     
     // --- Background Removal ---
@@ -605,10 +626,10 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     ) : (
                         <div className="grid md:grid-cols-3 gap-8">
                             <div className="md:col-span-1 space-y-4">
-                                <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
+                                <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3', 'item-4']} className="w-full">
                                     <AccordionItem value="item-1" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
                                         <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
-                                            <span className='flex items-center gap-2'><ZoomIn className="w-4 h-4"/> Image Tools</span>
+                                            <span className='flex items-center gap-2'><ZoomIn className="w-4 h-4"/> Image Transform</span>
                                         </AccordionTrigger>
                                         <AccordionContent className="pt-2 space-y-4">
                                             <div className="grid grid-cols-1 gap-4">
@@ -628,7 +649,21 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                     </div>
                                                 </div>
                                             </div>
-                                            <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 })} size="sm" variant="ghost">Reset Transform</Button>
+                                            <Button onClick={() => setImageTransform(p => ({ ...p, scale: 1, x: 0, y: 0, rotation: 0 }))} size="sm" variant="ghost">Reset Transform</Button>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                    <AccordionItem value="item-4" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
+                                        <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
+                                            <span className='flex items-center gap-2'><Filter className="w-4 h-4"/> Image Filters</span>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pt-2 space-y-4">
+                                            <div><Label className="text-xs">Brightness: {imageTransform.brightness}%</Label><Slider min={0} max={200} value={[imageTransform.brightness]} onValueChange={([v]) => setImageTransform(p => ({...p, brightness: v}))} /></div>
+                                            <div><Label className="text-xs">Contrast: {imageTransform.contrast}%</Label><Slider min={0} max={200} value={[imageTransform.contrast]} onValueChange={([v]) => setImageTransform(p => ({...p, contrast: v}))} /></div>
+                                            <div><Label className="text-xs">Saturation: {imageTransform.saturate}%</Label><Slider min={0} max={200} value={[imageTransform.saturate]} onValueChange={([v]) => setImageTransform(p => ({...p, saturate: v}))} /></div>
+                                            <div><Label className="text-xs">Grayscale: {imageTransform.grayscale}%</Label><Slider min={0} max={100} value={[imageTransform.grayscale]} onValueChange={([v]) => setImageTransform(p => ({...p, grayscale: v}))} /></div>
+                                            <div><Label className="text-xs">Sepia: {imageTransform.sepia}%</Label><Slider min={0} max={100} value={[imageTransform.sepia]} onValueChange={([v]) => setImageTransform(p => ({...p, sepia: v}))} /></div>
+                                            <div><Label className="text-xs">Blur: {imageTransform.blur}px</Label><Slider min={0} max={10} step={0.5} value={[imageTransform.blur]} onValueChange={([v]) => setImageTransform(p => ({...p, blur: v}))} /></div>
+                                            <Button onClick={() => setImageTransform(p => ({ ...p, brightness: 100, contrast: 100, saturate: 100, grayscale: 0, sepia: 0, blur: 0 }))} size="sm" variant="ghost">Reset Filters</Button>
                                         </AccordionContent>
                                     </AccordionItem>
                                      <AccordionItem value="item-2" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
@@ -794,7 +829,5 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         </div>
     );
 }
-
-    
 
     
