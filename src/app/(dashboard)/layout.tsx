@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -53,12 +52,21 @@ export default function DashboardLayout({
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (userProfile && userProfile.role === 'admin') {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
-    }
-  }, [userProfile]);
+    // Check custom claims first for admin role
+    user?.getIdTokenResult().then(idTokenResult => {
+      if (idTokenResult.claims.admin) {
+        setIsAdmin(true);
+      } else {
+        // Fallback to checking Firestore role
+        if (userProfile && userProfile.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      }
+    });
+  }, [user, userProfile]);
+
 
   const siteNavItems = [
     { href: '/track', label: 'Transfers', icon: SearchIcon },

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PXL8Logo } from '@/components/ui/icons';
 import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -24,6 +24,7 @@ const navLinks = [
 
 export default function Header() {
   const pathname = usePathname();
+  const router = useRouter();
   const cart = useCart();
   const { user, isUserLoading } = useUser();
   const auth = useAuth();
@@ -39,12 +40,20 @@ export default function Header() {
   const { data: userProfile, isLoading: isProfileLoading } = useDoc<AppUser>(userDocRef);
 
   useEffect(() => {
-    if (userProfile && userProfile.role === 'admin') {
-      setIsAdmin(true);
-    } else {
-      setIsAdmin(false);
-    }
-  }, [userProfile]);
+    // Check custom claims first for admin role
+    user?.getIdTokenResult().then(idTokenResult => {
+      if (idTokenResult.claims.admin) {
+        setIsAdmin(true);
+      } else {
+        // Fallback to checking Firestore role
+        if (userProfile && userProfile.role === 'admin') {
+          setIsAdmin(true);
+        } else {
+          setIsAdmin(false);
+        }
+      }
+    });
+  }, [user, userProfile]);
 
 
   const cartItemCount = cart ? cart.items.reduce((sum, item) => sum + item.quantity, 0) : 0;
@@ -54,6 +63,7 @@ export default function Header() {
   const handleLogout = async () => {
     if (auth) {
         await signOut(auth);
+        router.push('/');
     }
   };
 
@@ -78,14 +88,20 @@ export default function Header() {
           ))}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
-           {isUserLoading || isProfileLoading ? (
+           {(isUserLoading || isProfileLoading) ? (
             <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
-             <Button variant="ghost" asChild className="hover:bg-black/10 text-foreground">
+            <>
+              <Button variant="ghost" asChild className="hover:bg-black/10 text-foreground">
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
+              <Button variant="outline" onClick={handleLogout} size="sm">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            </>
           ) : (
-            <Button asChild variant="ghost" className="hover:bg-black/10 text-foreground">
+            <Button asChild>
                 <Link href="/auth/login">Login</Link>
             </Button>
           )}
