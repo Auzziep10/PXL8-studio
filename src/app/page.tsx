@@ -7,8 +7,7 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ParallaxImage } from '@/components/ui/parallax-image';
-import { useEffect, useState } from 'react';
-import { cn } from '@/lib/utils';
+import { ParallaxContainer } from '@/components/ui/parallax-container';
 
 const features = [
     {
@@ -36,40 +35,24 @@ const vibrantInksImage = PlaceHolderImages.find(p => p.id === 'homepageVibrantIn
 const techPrintImage = PlaceHolderImages.find(p => p.id === 'homepageTechPrint');
 
 export default function Home() {
-    const [heroScroll, setHeroScroll] = useState(0);
-
-    useEffect(() => {
-        const handleScroll = () => {
-            setHeroScroll(window.scrollY);
-        };
-        window.addEventListener('scroll', handleScroll);
-        return () => window.removeEventListener('scroll', handleScroll);
-    }, []);
-
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">
 
             {/* Hero Section */}
             <section className="relative h-[100vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
-                {/* This div is the "window" */}
-                <div className="absolute inset-0 z-0">
+                <ParallaxContainer className="absolute inset-0" speed={0.3}>
                     {heroImage && (
-                        <div 
-                            className="absolute inset-0 h-[150%] w-full top-[-25%]" // Make image taller and position it
-                            style={{ transform: `translateY(${heroScroll * -0.3}px)`}} // Apply parallax
-                        >
-                            <Image
-                                src={heroImage.imageUrl}
-                                alt={heroImage.description}
-                                fill
-                                className="object-cover"
-                                data-ai-hint={heroImage.imageHint}
-                                priority
-                            />
-                        </div>
+                        <Image
+                            src={heroImage.imageUrl}
+                            alt={heroImage.description}
+                            fill
+                            className="object-cover"
+                            data-ai-hint={heroImage.imageHint}
+                            priority
+                        />
                     )}
-                    <div className="absolute inset-0 bg-black/40"></div>
-                </div>
+                </ParallaxContainer>
+                <div className="absolute inset-0 bg-black/40"></div>
                 <div className="relative z-10 max-w-4xl mx-auto text-white">
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
                         The Future of Digital Apparel Decoration
@@ -114,23 +97,18 @@ export default function Home() {
 
             {/* Full-width Image Section 1 */}
             <section className="relative h-[500px] bg-secondary overflow-hidden">
-                <div className="absolute inset-0 z-0">
+                 <ParallaxContainer className="absolute inset-0" speed={0.3}>
                     {vibrantInksImage && (
-                        <div 
-                            className="absolute inset-0 h-[150%] w-full top-[-25%]"
-                            style={{ transform: `translateY(${heroScroll * -0.3}px)`}}
-                        >
-                            <Image
-                                src={vibrantInksImage.imageUrl}
-                                alt={vibrantInksImage.description}
-                                fill
-                                className="object-cover"
-                                data-ai-hint={vibrantInksImage.imageHint}
-                            />
-                        </div>
+                        <Image
+                            src={vibrantInksImage.imageUrl}
+                            alt={vibrantInksImage.description}
+                            fill
+                            className="object-cover"
+                            data-ai-hint={vibrantInksImage.imageHint}
+                        />
                     )}
-                </div>
-                 <div className="absolute inset-0 bg-black/20"></div>
+                </ParallaxContainer>
+                <div className="absolute inset-0 bg-black/20"></div>
             </section>
             
             {/* Tech Specs Section */}

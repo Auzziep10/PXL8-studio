@@ -14,7 +14,7 @@ export const placeholderImagesData = [
     {
       "id": "homepageVibrantInks",
       "description": "Vibrant ink bottles",
-      "imageUrl": "https://images.unsplash.com/photo-1609743307370-53d7de4b5e5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx2aWJyYW50JTIwaW5rfGVufDB8fHx8MTc2NTQ5ODE4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765557929174-The%20Perfect%20Peel%20Reveal.png?alt=media&token=4bd76a6a-be8d-4fd6-a3ba-272694c37de1",
       "imageHint": "vibrant ink"
     },
     {
