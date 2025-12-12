@@ -11,7 +11,7 @@ export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
 
   return (
     <NextImage
-      src="https://firebasestorage.googleapis.com/v0/b/pxl8-final.appspot.com/o/website-images%2Ff260e13b-710d-46b5-ab36-7f8fbd41bb8b?alt=media"
+      src="https://firebasestorage.googleapis.com/v0/b/pxl8-final.appspot.com/o/website-images%2FAsset%207%40300x.png?alt=media"
       alt="PXL8 Logo"
       width={Number(width)}
       height={Number(height)}
