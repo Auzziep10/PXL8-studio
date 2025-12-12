@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -127,7 +126,7 @@ export default function Home() {
                                     <Sparkles className="w-5 h-5"/>
                                 </div>
                                 <div>
-                                    <h4 className="font-semibold">Gemini AI Guard</h4>
+                                    <h4 className="font-semibold">Resolution Guard</h4>
                                     <p className="text-muted-foreground text-sm">Every pixel is scanned to prevent low-resolution prints before they happen.</p>
                                 </div>
                             </div>
