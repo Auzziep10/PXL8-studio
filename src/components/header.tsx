@@ -92,10 +92,8 @@ export default function Header() {
               href={link.href}
               className={cn(
                 'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
-                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/80',
-                isScrolled ? '' : 'text-white hover:text-white'
+                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/80'
               )}
-               style={!isScrolled ? { textShadow: '0 1px 4px rgba(0,0,0,0.5)' } : {}}
             >
               {link.label}
             </Link>
@@ -106,7 +104,7 @@ export default function Header() {
             <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
             <>
-              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-white hover:text-white')} style={!isScrolled ? { textShadow: '0 1px 4px rgba(0,0,0,0.5)' } : {}}>
+              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-foreground/80 hover:text-foreground')}>
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
               <Button onClick={handleLogout} size="sm">
@@ -120,7 +118,7 @@ export default function Header() {
             </Button>
           )}
 
-           <Button variant="ghost" size="icon" asChild className={cn('hover:bg-black/10 relative', isScrolled ? 'text-foreground' : 'text-white hover:text-white')}>
+           <Button variant="ghost" size="icon" asChild className={cn('hover:bg-black/10 relative', isScrolled ? 'text-foreground' : 'text-foreground/80 hover:text-foreground')}>
             <Link href="/cart">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemCount > 0 && (
