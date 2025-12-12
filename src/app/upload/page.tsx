@@ -167,8 +167,8 @@ export default function PrebuiltUploadPage() {
         <div className="min-h-screen pb-12">
             <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="mb-12 text-center">
-                    <h1 className="text-4xl font-bold text-white mb-4">Upload Ready-to-Print Sheet</h1>
-                    <p className="text-zinc-400 max-w-2xl mx-auto">
+                    <h1 className="text-4xl font-bold text-foreground mb-4">Upload Ready-to-Print Sheet</h1>
+                    <p className="text-muted-foreground max-w-2xl mx-auto">
                         Have your gang sheet pre-built? Upload it here. We'll automatically detect the size and calculate the price for you based on the width tier you select.
                     </p>
                 </div>
@@ -177,33 +177,33 @@ export default function PrebuiltUploadPage() {
                     <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
                         <div 
                             onClick={() => handleTierChange('standard')}
-                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'standard' ? 'border-primary' : 'border-zinc-700 hover:border-zinc-500')}
+                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'standard' ? 'border-primary' : 'border-border hover:border-muted-foreground')}
                         >
-                            <h3 className="font-bold text-white">Standard</h3>
-                            <p className="text-zinc-400 text-sm">Up to 22" Wide</p>
+                            <h3 className="font-bold text-foreground">Standard</h3>
+                            <p className="text-muted-foreground text-sm">Up to 22" Wide</p>
                         </div>
                          <div 
                             onClick={() => handleTierChange('wide')}
-                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'wide' ? 'border-primary' : 'border-zinc-700 hover:border-zinc-500')}
+                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'wide' ? 'border-primary' : 'border-border hover:border-muted-foreground')}
                         >
-                            <h3 className="font-bold text-white">Wide Format</h3>
-                            <p className="text-zinc-400 text-sm">Up to 43" Wide</p>
+                            <h3 className="font-bold text-foreground">Wide Format</h3>
+                            <p className="text-muted-foreground text-sm">Up to 43" Wide</p>
                             {wideFormatDiscount > 0 && <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2 py-1 text-xs font-medium text-accent"><Percent className="h-3 w-3" />{wideFormatDiscount}% Off</span>}
                         </div>
                     </div>
                 </div>
 
-                <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
+                <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-border hover:border-muted-foreground transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
                     {!file ? (
                         <div 
                             onClick={() => fileInputRef.current?.click()}
                             className="text-center cursor-pointer w-full h-full flex flex-col items-center justify-center"
                         >
-                            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6 group hover:scale-110 transition-transform duration-300">
-                                <Upload className="w-10 h-10 text-zinc-400 group-hover:text-accent transition-colors" />
+                            <div className="w-20 h-20 bg-muted/50 rounded-full flex items-center justify-center mb-6 group hover:scale-110 transition-transform duration-300">
+                                <Upload className="w-10 h-10 text-muted-foreground group-hover:text-primary transition-colors" />
                             </div>
-                            <h3 className="text-xl font-medium text-white mb-2">Click to upload or drag and drop</h3>
-                            <p className="text-zinc-500 text-sm max-w-xs mx-auto mb-6">
+                            <h3 className="text-xl font-medium text-foreground mb-2">Click to upload or drag and drop</h3>
+                            <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
                                 Max width ${maxWidth}". Length is unlimited. PNG recommended with transparent background.
                             </p>
                             <Button variant="secondary" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
@@ -212,21 +212,21 @@ export default function PrebuiltUploadPage() {
                         </div>
                     ) : (
                         <div className="w-full h-full flex flex-col">
-                            <div className="flex items-center justify-between mb-6 bg-zinc-900/80 p-4 rounded-xl border border-white/10">
+                            <div className="flex items-center justify-between mb-6 bg-secondary p-4 rounded-xl border border-border">
                                 <div className="flex items-center overflow-hidden">
-                                    <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center mr-3 flex-shrink-0 text-accent">
+                                    <div className="w-10 h-10 rounded bg-background flex items-center justify-center mr-3 flex-shrink-0 text-primary">
                                         <FileText />
                                     </div>
                                     <div className="truncate">
-                                        <p className="text-white font-medium truncate">{file.name}</p>
-                                        <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
+                                        <p className="text-foreground font-medium truncate">{file.name}</p>
+                                        <p className="text-xs text-muted-foreground">{(file.size / 1024 / 1024).toFixed(2)} MB</p>
                                     </div>
                                 </div>
                                 <Button 
                                     variant="ghost"
                                     size="icon"
                                     onClick={resetState}
-                                    className="hover:bg-red-500/10 hover:text-red-500 text-zinc-500"
+                                    className="hover:bg-red-500/10 hover:text-red-500 text-muted-foreground"
                                 >
                                     <Trash2 className="w-5 h-5" />
                                 </Button>
@@ -234,18 +234,18 @@ export default function PrebuiltUploadPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                 {/* Preview Area */}
-                                <div className="flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                                <div className="flex-grow bg-checkerboard-dark rounded-xl border border-border relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
                                     {previewUrl ? (
                                         <img src={previewUrl} alt="Preview" className="max-w-full max-h-[300px] object-contain shadow-2xl" />
                                     ) : (
-                                        <div className="text-zinc-500 flex flex-col items-center">
+                                        <div className="text-muted-foreground flex flex-col items-center">
                                             <FileText className="w-16 h-16 mb-2 opacity-50" />
                                             <p>Preview not available for this file type</p>
                                         </div>
                                     )}
-                                    <div className="absolute top-4 right-4 bg-black/60 backdrop-blur-md px-3 py-1 rounded-full border border-white/10 flex items-center">
-                                        <ShieldCheck className="w-4 h-4 text-accent mr-2" />
-                                        <span className="text-xs text-white font-medium">Ready for Checkout</span>
+                                    <div className="absolute top-4 right-4 bg-background/60 backdrop-blur-md px-3 py-1 rounded-full border border-border flex items-center">
+                                        <ShieldCheck className="w-4 h-4 text-primary mr-2" />
+                                        <span className="text-xs text-foreground font-medium">Ready for Checkout</span>
                                     </div>
                                 </div>
 
@@ -255,19 +255,19 @@ export default function PrebuiltUploadPage() {
                                     {pricePerSqInch === null && !isLoadingPrice && <p className="text-red-500">Dynamic pricing is not configured.</p>}
                                     
                                     {detectedDimensions && (
-                                        <div className="bg-zinc-900/50 p-4 rounded-xl border border-white/10">
-                                            <div className="flex justify-between items-center text-sm mb-2 text-zinc-400">
+                                        <div className="bg-secondary p-4 rounded-xl border border-border">
+                                            <div className="flex justify-between items-center text-sm mb-2 text-muted-foreground">
                                                 <span className="flex items-center"><Ruler className="w-4 h-4 mr-2"/> Detected Size</span>
-                                                <span className="font-mono text-white">{detectedDimensions.w.toFixed(1)}" x {detectedDimensions.h.toFixed(1)}"</span>
+                                                <span className="font-mono text-foreground">{detectedDimensions.w.toFixed(1)}" x {detectedDimensions.h.toFixed(1)}"</span>
                                             </div>
-                                             <div className="flex justify-between items-center text-sm text-zinc-400">
+                                             <div className="flex justify-between items-center text-sm text-muted-foreground">
                                                 <span className="flex items-center"><DollarSign className="w-4 h-4 mr-2"/> Price / sq. in.</span>
-                                                <span className="font-mono text-white">{pricePerSqInch ? formatCurrency(pricePerSqInch) : 'N/A'}</span>
+                                                <span className="font-mono text-foreground">{pricePerSqInch ? formatCurrency(pricePerSqInch) : 'N/A'}</span>
                                             </div>
                                             {widthTier === 'wide' && wideFormatDiscount > 0 && (
-                                                 <div className="flex justify-between items-center text-sm text-accent mt-2 pt-2 border-t border-white/5">
+                                                 <div className="flex justify-between items-center text-sm text-primary mt-2 pt-2 border-t border-border">
                                                     <span className="flex items-center"><Percent className="w-4 h-4 mr-2"/> Wide Discount</span>
-                                                    <span className="font-mono text-white">{wideFormatDiscount}%</span>
+                                                    <span className="font-mono text-foreground">{wideFormatDiscount}%</span>
                                                 </div>
                                             )}
                                         </div>
@@ -282,20 +282,20 @@ export default function PrebuiltUploadPage() {
 
                                     {calculatedPrice !== null && !validationError && (
                                         <div className="text-center">
-                                            <p className="text-zinc-400 text-sm">Calculated Price</p>
-                                            <p className="text-4xl font-bold text-white">{formatCurrency(calculatedPrice)}</p>
+                                            <p className="text-muted-foreground text-sm">Calculated Price</p>
+                                            <p className="text-4xl font-bold text-foreground">{formatCurrency(calculatedPrice)}</p>
                                         </div>
                                     )}
 
                                     <div className="grid grid-cols-3 gap-4">
                                          <div className="col-span-1">
-                                             <Label className="block text-xs text-zinc-400 mb-1 ml-1">Quantity</Label>
+                                             <Label className="block text-xs text-muted-foreground mb-1 ml-1">Quantity</Label>
                                              <Input 
                                                 type="number" 
                                                 min="1" 
                                                 value={quantity}
                                                 onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                                                className="w-full bg-zinc-900 border border-white/10 rounded-xl px-4 py-3 text-white focus:ring-primary focus:border-primary transition-all"
+                                                className="w-full bg-background border border-border rounded-xl px-4 py-3 text-foreground focus:ring-primary focus:border-primary transition-all"
                                              />
                                          </div>
                                          <Button 
