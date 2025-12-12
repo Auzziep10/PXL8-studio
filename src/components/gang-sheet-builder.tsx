@@ -1201,7 +1201,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             >
                  <div 
                     className={cn(
-                        `relative bg-checkerboard-dark sheet-canvas shadow-2xl`,
+                        `relative checkerboard sheet-canvas shadow-2xl`,
                         isRemovingBg && selectedItem && 'cursor-eyedropper'
                     )}
                     style={{
