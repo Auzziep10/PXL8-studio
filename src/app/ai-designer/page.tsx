@@ -1,13 +1,12 @@
 
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useCart } from '@/hooks/use-cart';
 import AiDesignGenerator from '@/components/ai-design-generator';
 import type { Artwork } from '@/lib/types';
 
-export default function AiDesignerPage() {
+export default function DesignStudioPage() {
     const router = useRouter();
     const { addTempArtwork } = useCart();
 

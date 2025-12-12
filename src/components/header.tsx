@@ -19,7 +19,7 @@ const navLinks = [
   { href: '/track', label: 'Transfers' },
   { href: '/build', label: 'Builder' },
   { href: '/upload', label: 'Upload' },
-  { href: '/ai-designer', label: 'AI Designer' },
+  { href: '/design-studio', label: 'Design Studio' },
 ];
 
 export default function Header() {

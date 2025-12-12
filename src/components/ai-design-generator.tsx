@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -22,11 +22,14 @@ import { textContent } from '@/lib/text-content';
 
 
 // --- Dropdown Options ---
-const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco"];
-const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients"];
-const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro"];
-const fontOptions = ["Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Impact", "Comic Sans MS"];
-
+const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco", "Abstract", "Graffiti"];
+const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients", "Duotone"];
+const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro", "Whimsical", "Aggressive"];
+const fontOptions = [
+    "Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", 
+    "Impact", "Comic Sans MS", "Lobster", "Roboto", "Montserrat", "Oswald", 
+    "Pacifico", "Bangers", "Anton", "Poppins"
+];
 
 interface AiDesignGeneratorProps {
   onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
@@ -40,12 +43,14 @@ interface TextItem {
     color: string;
     x: number;
     y: number;
+    rotation: number;
 }
 
 interface ImageTransform {
     scale: number;
     x: number;
     y: number;
+    rotation: number;
 }
 
 
@@ -55,6 +60,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const { toast } = useToast();
     const firestore = useFirestore();
     const { user, isUserLoading } = useUser();
+    const fileInputRef = useRef<HTMLInputElement>(null);
 
     // --- State Management ---
     const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({ subject: '', style: '', colors: '', mood: '' });
@@ -78,7 +84,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
     const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
-    const [imageTransform, setImageTransform] = useState<ImageTransform>({ scale: 1, x: 0, y: 0 });
+    const [imageTransform, setImageTransform] = useState<ImageTransform>({ scale: 1, x: 0, y: 0, rotation: 0 });
     const [draggingImage, setDraggingImage] = useState(false);
 
 
@@ -110,30 +116,67 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     
         // Draw background image with transformations
         if (generatedImage) {
-            const { scale, x, y } = imageTransform;
+            const { scale, x, y, rotation } = imageTransform;
             const scaledWidth = canvas.width * scale;
             const scaledHeight = canvas.height * scale;
             
-            // The x and y from state are offsets from the center
             const finalX = (canvas.width - scaledWidth) / 2 + x;
             const finalY = (canvas.height - scaledHeight) / 2 + y;
     
+            ctx.save();
+            ctx.translate(canvas.width / 2 + x, canvas.height / 2 + y);
+            ctx.rotate(rotation * Math.PI / 180);
+            ctx.translate(-(canvas.width / 2 + x), -(canvas.height / 2 + y));
             ctx.drawImage(generatedImage, finalX, finalY, scaledWidth, scaledHeight);
+            ctx.restore();
         }
     
         // Draw each text item
         textItems.forEach(text => {
+            ctx.save();
+            ctx.translate(text.x, text.y);
+            ctx.rotate(text.rotation * Math.PI / 180);
+            ctx.translate(-text.x, -text.y);
+            
             ctx.font = `${text.fontSize}px ${text.font}`;
             ctx.fillStyle = text.color;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(text.content, text.x, text.y);
+            ctx.restore();
         });
     }, [generatedImage, textItems, imageTransform]);
 
     useEffect(() => {
         drawCanvas();
     }, [drawCanvas]);
+
+
+    const handleFileSelect = (file: File) => {
+        if (!file.type.startsWith('image/')) {
+            toast({ variant: 'destructive', title: 'Invalid File', description: 'Please select an image file.' });
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const dataUrl = e.target?.result as string;
+            const img = new Image();
+            img.crossOrigin = "anonymous";
+            img.onload = () => {
+                setGeneratedImage(img);
+                setGeneratedImageDataUri(dataUrl);
+                setImageHistory([dataUrl]);
+                setTextItems([]);
+                setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
+                setFormData({ subject: file.name, style: 'Custom', colors: '', mood: '' });
+                setView('edit');
+                toast({ title: 'Image Loaded', description: 'Your image is ready for editing.' });
+            };
+            img.src = dataUrl;
+        };
+        reader.readAsDataURL(file);
+    };
 
 
     // --- Core Actions ---
@@ -158,7 +201,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setGeneratedImageDataUri(null);
         setTextItems([]);
         setImageHistory([]);
-        setImageTransform({ scale: 1, x: 0, y: 0 });
+        setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
 
         try {
             const result = await generateDesign(formData);
@@ -186,8 +229,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     const handleSendToPage = (target: 'builder' | 'transfers') => {
         const canvas = canvasRef.current;
-        if (!canvas || !aiDesignFeeProduct) {
-             toast({ variant: 'destructive', title: 'Cannot Proceed' });
+        if (!canvas) return;
+
+        const isAiGenerated = formData.style !== 'Custom';
+        
+        if (isAiGenerated && !aiDesignFeeProduct) {
+             toast({ variant: 'destructive', title: 'Cannot Proceed', description: 'AI Design fee is not configured.' });
              return;
         };
         
@@ -195,19 +242,21 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         const promptSummary = `${formData.subject} ${formData.style}`.trim();
 
         const newArtwork: Omit<Artwork, 'id'> = {
-            name: sanitizeFilename(promptSummary) || 'ai-design',
+            name: sanitizeFilename(promptSummary) || 'design-studio-creation',
             imageUrl: finalImageDataUrl,
             width: 5,
             height: 5,
             dpi: 300,
         };
 
-        addToCart({ ...aiDesignFeeProduct, quantity: 1 });
+        if (isAiGenerated) {
+            addToCart({ ...aiDesignFeeProduct!, quantity: 1 });
+        }
         onDesignGenerated(newArtwork, target);
         
         toast({
             title: 'Artwork Sent!',
-            description: `The design is ready on the ${target} page, and a fee is in your cart.`,
+            description: `The design is ready on the ${target} page. ${isAiGenerated ? 'A fee is in your cart.' : ''}`,
         });
 
         // Reset state
@@ -217,7 +266,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setTextItems([]);
         setActiveTextId(null);
         setFormData({ subject: '', style: '', colors: '', mood: '' });
-        setImageTransform({ scale: 1, x: 0, y: 0 });
+        setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 });
     };
     
     // --- Background Removal ---
@@ -300,6 +349,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             color: '#000000',
             x: canvas.width / 2,
             y: canvas.height / 2,
+            rotation: 0,
         };
         setTextItems(prev => [...prev, newText]);
         setActiveTextId(newText.id);
@@ -346,6 +396,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             const textWidth = metrics.width;
             const textHeight = text.fontSize; // Approximation
 
+            // This collision detection does not account for rotation.
+            // A more complex check (e.g., rotating point) would be needed for perfect accuracy.
             if (
                 coords.x >= text.x - textWidth / 2 &&
                 coords.x <= text.x + textWidth / 2 &&
@@ -414,20 +466,36 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 <CardContent>
                     {view === 'generate' ? (
                          <div className="space-y-4 max-w-2xl mx-auto">
+                            <div className="grid grid-cols-2 gap-4">
+                                <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-32 flex-col gap-2">
+                                    <Upload className="w-8 h-8" />
+                                    <span>Upload Your Image</span>
+                                </Button>
+                                <div className="h-32 flex flex-col items-center justify-center text-center">
+                                    <h3 className="font-bold text-lg">... OR ...</h3>
+                                </div>
+                            </div>
+                            <input
+                                type="file"
+                                ref={fileInputRef}
+                                className="hidden"
+                                onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                                accept="image/*"
+                            />
                             {isUserLoading ? (
                                 <div className="h-10 bg-muted rounded-md animate-pulse" />
                             ) : !user && (
                                 <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col items-center text-center">
                                     <User className="w-8 h-8 text-yellow-500 mb-2" />
-                                    <p className="text-sm font-medium text-foreground mb-2">Login to Create</p>
-                                    <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate and save AI designs.</p>
+                                    <p className="text-sm font-medium text-foreground mb-2">Login to Create with AI</p>
+                                    <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate designs with AI.</p>
                                     <Button asChild size="sm">
                                         <Link href="/auth/login">Login or Sign Up</Link>
                                     </Button>
                                 </div>
                             )}
                              <div>
-                                <Label>Subject</Label>
+                                <Label>Subject (with AI)</Label>
                                 <Input 
                                     placeholder="e.g., A robot surfing on a slice of pizza"
                                     value={formData.subject}
@@ -458,20 +526,24 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Select>
                                 </div>
                             </div>
-                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || !aiDesignFeeProduct || !user} className="w-full mt-4 text-lg py-6">
-                                {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : 'Generate Design'}
+                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || (formData.style !== 'Custom' && !aiDesignFeeProduct) || !user} className="w-full mt-4 text-lg py-6">
+                                {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : <><Wand2 className="w-5 h-5 mr-2" />Generate with AI</>}
                             </Button>
                         </div>
                     ) : (
                         <div className="grid md:grid-cols-3 gap-8">
                             <div className="md:col-span-1 space-y-4">
                                 <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                    <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Transform</Label>
+                                    <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Tools</Label>
                                     <div className="space-y-3 pt-2">
                                         <div className="grid grid-cols-1 gap-4">
                                             <div>
                                                 <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
                                                 <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
+                                            </div>
+                                             <div>
+                                                <Label htmlFor="image-rotation" className="text-xs">Rotation: {imageTransform.rotation.toFixed(0)}°</Label>
+                                                <Slider id="image-rotation" min={-180} max={180} step={1} value={[imageTransform.rotation]} onValueChange={([v]) => setImageTransform(p => ({...p, rotation: v}))} />
                                             </div>
                                             <div>
                                                 <Label className="text-xs">Position (X, Y)</Label>
@@ -481,13 +553,13 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                 </div>
                                             </div>
                                         </div>
-                                        <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0 })} size="sm" variant="ghost">Reset Transform</Button>
+                                        <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 })} size="sm" variant="ghost">Reset Transform</Button>
                                     </div>
                                 </div>
                                 
                                 <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
                                     <div className="flex items-center justify-between">
-                                        <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
+                                        <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Tools</Label>
                                         <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
                                     </div>
                                     
@@ -506,6 +578,10 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                                     </Select>
                                                 </div>
                                             </div>
+                                            <div className="space-y-2">
+                                                <Label htmlFor="text-rotation" className="text-xs">Rotation: {activeTextItem.rotation.toFixed(0)}°</Label>
+                                                <Slider id="text-rotation" min={-180} max={180} step={1} value={[activeTextItem.rotation]} onValueChange={([v]) => updateActiveText({ rotation: v })} />
+                                            </div>
                                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                                                 <div>
                                                     <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
@@ -522,7 +598,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                 </div>
 
                                 <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                    <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                                    <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Background Remover</Label>
                                     <div className="space-y-3 pt-2">
                                         <div className="flex items-center gap-2">
                                             <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
@@ -580,7 +656,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </div>
                                     <div className="flex justify-center">
                                         <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
-                                            <Wand2 className="w-5 h-5 mr-2" /> Generate Another
+                                            <Wand2 className="w-5 h-5 mr-2" /> Start Over
                                         </Button>
                                     </div>
                                 </div>

@@ -29,7 +29,7 @@ export const textContentData: TextContentItem[] = [
   {
     "id": "home_feature_ai_title",
     "description": "Title for the AI Design Studio feature card.",
-    "text": "AI Design Studio"
+    "text": "Design Studio"
   },
   {
     "id": "home_feature_ai_desc",
@@ -79,12 +79,12 @@ export const textContentData: TextContentItem[] = [
   {
     "id": "ai_designer_title",
     "description": "Main title for the AI Design Studio page.",
-    "text": "AI Design Studio"
+    "text": "Design Studio"
   },
   {
     "id": "ai_designer_fee_text",
     "description": "Text describing the fee for AI design generations.",
-    "text": "Each generation costs {price}. The fee is added to your cart when you use the design."
+    "text": "A small fee of {price} is added to your cart for each AI generation used in an order."
   },
   {
     "id": "single_transfer_title",
