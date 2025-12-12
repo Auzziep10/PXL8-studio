@@ -49,14 +49,43 @@ export const generateFinalSheetForPrint = async (
 ): Promise<string> => {
     const BASE_DPI = 300;
     const HEADER_HEIGHT_INCHES = 1;
+    const BUFFER_INCHES = 0.5; // New buffer
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
+    const BUFFER_PX = BUFFER_INCHES * BASE_DPI;
 
     let sourceImageUrl = orderItem.originalSheetUrl;
-    let finalCanvasWidth = orderItem.sheetWidth * BASE_DPI;
-    let finalCanvasHeight = (orderItem.sheetHeight * BASE_DPI) + HEADER_HEIGHT_PX;
     let isSingleTransferLayout = orderItem.sheetSizeName === 'Single Design Transfer';
+    
+    let finalCanvasWidth: number;
+    let finalCanvasHeight: number;
+    let sheetContentHeightInches: number;
+
+
+    if (isSingleTransferLayout) {
+        const SHEET_WIDTH_INCHES = 22;
+        const SPACING_INCHES = 0.25;
+
+        const itemWidthInches = orderItem.sheetWidth;
+        const itemHeightInches = orderItem.sheetHeight;
+
+        const itemsPerRow = Math.floor((SHEET_WIDTH_INCHES + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
+        const numRows = Math.ceil(orderItem.quantity / itemsPerRow);
+
+        sheetContentHeightInches = (itemHeightInches * numRows) + (SPACING_INCHES * (numRows + 1));
+        
+        finalCanvasWidth = SHEET_WIDTH_INCHES * BASE_DPI;
+    } else {
+        sheetContentHeightInches = orderItem.sheetHeight;
+        finalCanvasWidth = orderItem.sheetWidth * BASE_DPI;
+    }
+    
+    // Calculate total canvas height including header and buffer
+    finalCanvasHeight = (sheetContentHeightInches * BASE_DPI) + HEADER_HEIGHT_PX + BUFFER_PX;
 
     const finalCanvas = document.createElement('canvas');
+    finalCanvas.width = finalCanvasWidth;
+    finalCanvas.height = finalCanvasHeight;
+
     const finalCtx = finalCanvas.getContext('2d');
     if (!finalCtx) throw new Error('No final context');
     
@@ -85,26 +114,13 @@ export const generateFinalSheetForPrint = async (
     });
 
     if (isSingleTransferLayout) {
-        // --- Automatic Gang Sheet Layout for Single Transfers ---
-        const SHEET_WIDTH_INCHES = 22;
         const SPACING_INCHES = 0.25;
-
         const itemWidthInches = orderItem.sheetWidth;
         const itemHeightInches = orderItem.sheetHeight;
-
-        const itemsPerRow = Math.floor((SHEET_WIDTH_INCHES + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
-        const numRows = Math.ceil(orderItem.quantity / itemsPerRow);
-
-        const sheetHeightInches = (itemHeightInches * numRows) + (SPACING_INCHES * (numRows + 1));
-        
-        finalCanvasWidth = SHEET_WIDTH_INCHES * BASE_DPI;
-        finalCanvasHeight = (sheetHeightInches * BASE_DPI) + HEADER_HEIGHT_PX;
-
-        finalCanvas.width = finalCanvasWidth;
-        finalCanvas.height = finalCanvasHeight;
+        const itemsPerRow = Math.floor((22 + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
 
         let currentX = SPACING_INCHES * BASE_DPI;
-        let currentY = HEADER_HEIGHT_PX + (SPACING_INCHES * BASE_DPI);
+        let currentY = HEADER_HEIGHT_PX + BUFFER_PX + (SPACING_INCHES * BASE_DPI); // Start Y after header and buffer
         let placedItems = 0;
 
         for (let i = 0; i < orderItem.quantity; i++) {
@@ -126,9 +142,8 @@ export const generateFinalSheetForPrint = async (
         }
     } else {
         // --- Standard Gang Sheet (already laid out) ---
-        finalCanvas.width = finalCanvasWidth;
-        finalCanvas.height = finalCanvasHeight;
-        finalCtx.drawImage(sourceImage, 0, HEADER_HEIGHT_PX, finalCanvas.width, orderItem.sheetHeight * BASE_DPI);
+        // Draw the main artwork after the header and buffer
+        finalCtx.drawImage(sourceImage, 0, HEADER_HEIGHT_PX + BUFFER_PX, finalCanvasWidth, orderItem.sheetHeight * BASE_DPI);
     }
     
     // Draw the white header over the top
@@ -530,7 +545,7 @@ export default function CartPage() {
                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-border flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                         onClick={() => handlePreview(item)}
                     >
-                        {item.previewUrl ? (
+                        {item.previewUrl && !('previewStripped' in item) ? (
                             <Image src={item.previewUrl} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
                         ) : (
                              <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs p-1 text-center">
@@ -629,7 +644,7 @@ export default function CartPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="bg-background border border-border rounded-2xl overflow-hidden">
+                    <div className="bg-card border border-border rounded-2xl overflow-hidden">
                         <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
                             <h2 className="text-lg font-bold text-foreground flex items-center">
                                 <ShoppingBag className="w-5 h-5 mr-2 text-primary" />
@@ -641,7 +656,7 @@ export default function CartPage() {
                         </div>
                     </div>
 
-                    <form id="checkout-form" onSubmit={handleCheckoutProcess} className="bg-background border border-border rounded-2xl overflow-hidden">
+                    <form id="checkout-form" onSubmit={handleCheckoutProcess} className="bg-card border border-border rounded-2xl overflow-hidden">
                          <div className="p-6 border-b border-border bg-muted/30">
                             <h2 className="text-lg font-bold text-foreground flex items-center">
                                 <UserIcon className="w-5 h-5 mr-2 text-accent" />
@@ -801,7 +816,7 @@ export default function CartPage() {
                 </div>
 
                 <div className="lg:col-span-1">
-                    <div className="bg-background p-6 rounded-2xl border border-border sticky top-24">
+                    <div className="bg-card p-6 rounded-2xl border border-border sticky top-24">
                         
                         <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
                         
@@ -891,3 +906,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    
