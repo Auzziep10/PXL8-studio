@@ -15,7 +15,7 @@ import {
   SidebarFooter,
 } from '@/components/ui/sidebar';
 import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
-import { PXL8Logo } from '@/components/icons';
+import { PXL8Logo } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
