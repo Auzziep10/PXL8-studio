@@ -17,6 +17,7 @@ const GenerateDesignFromPromptInputSchema = z.object({
   style: z.string().describe('The artistic style of the graphic.'),
   colors: z.string().describe('The desired color palette.'),
   mood: z.string().describe('The overall mood or feeling.'),
+  text: z.string().optional().describe('Optional text to include in the design.'),
 });
 export type GenerateDesignFromPromptInput = z.infer<typeof GenerateDesignFromPromptInputSchema>;
 
@@ -47,11 +48,12 @@ const generateDesignFromPromptFlow = ai.defineFlow(
       Style: ${input.style}
       Color Palette: ${input.colors}
       Mood: ${input.mood}
+      ${input.text ? `Text to include: "${input.text}"` : 'Do NOT include any text in the image.'}
 
       Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
+      ${input.text ? 'The text should be clearly visible, well-placed, and stylistically match the image.' : ''}
       The final image MUST have a solid, pure green screen background (#00FF00) for easy removal.
       Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
-      Do NOT include any text in the image.
       Maintain strong silhouettes, smooth edges, and a balanced composition.
     `.trim();
 

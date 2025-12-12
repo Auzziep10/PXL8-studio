@@ -29,11 +29,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [formData, setFormData] = useState<Omit<GenerateDesignFromPromptInput, 'text'>>({
+    const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({
         subject: '',
         style: '',
         colors: '',
         mood: '',
+        text: '',
     });
     const [textToAdd, setTextToAdd] = useState('');
     const [isApplyingText, setIsApplyingText] = useState(false);
@@ -175,7 +176,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             return;
         };
         
-        const promptSummary = `${formData.subject} ${formData.style}`;
+        const promptSummary = `${formData.subject} ${formData.style} ${formData.text || ''}`.trim();
 
         const newArtwork: Omit<Artwork, 'id'> = {
             name: sanitizeFilename(promptSummary) || 'ai-design',
@@ -201,7 +202,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         setView('generate');
         setGeneratedImage(null);
         setTextToAdd('');
-        setFormData({ subject: '', style: '', colors: '', mood: '' });
+        setFormData({ subject: '', style: '', colors: '', mood: '', text: '' });
     };
 
 
@@ -258,6 +259,15 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Select>
                                 </div>
                             </div>
+                             <div>
+                                 <Label>Optional Text</Label>
+                                 <Input 
+                                     placeholder="e.g., 'Happy Camper'"
+                                     value={formData.text}
+                                     onChange={(e) => setFormData(p => ({...p, text: e.target.value}))}
+                                     disabled={isLoading}
+                                 />
+                             </div>
                             
                             <Button
                                 onClick={handleGenerate}
