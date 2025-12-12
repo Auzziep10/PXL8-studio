@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowRight, Box, Droplet, Layers, MousePointer, Sparkles, Wand2 } from 'lucide-react';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 const features = [
     {
@@ -27,6 +28,10 @@ const features = [
     },
 ];
 
+const heroImage = PlaceHolderImages.find(p => p.id === 'homepageHero');
+const vibrantInksImage = PlaceHolderImages.find(p => p.id === 'homepageVibrantInks');
+const techPrintImage = PlaceHolderImages.find(p => p.id === 'homepageTechPrint');
+
 export default function Home() {
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">
@@ -34,14 +39,16 @@ export default function Home() {
             {/* Hero Section */}
             <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8">
                 <div className="absolute inset-0 z-0">
-                    <Image
-                        src="https://picsum.photos/seed/hero-print/1800/1200"
-                        alt="Colorful threads on a printing machine"
-                        fill
-                        className="object-cover"
-                        data-ai-hint="printing machine"
-                        priority
-                    />
+                    {heroImage && (
+                        <Image
+                            src={heroImage.imageUrl}
+                            alt={heroImage.description}
+                            fill
+                            className="object-cover"
+                            data-ai-hint={heroImage.imageHint}
+                            priority
+                        />
+                    )}
                     <div className="absolute inset-0 bg-white/30"></div>
                 </div>
                 <div className="relative z-10 max-w-4xl mx-auto text-foreground">
@@ -88,13 +95,15 @@ export default function Home() {
 
             {/* Full-width Image Section 1 */}
             <section className="relative h-[500px] bg-secondary">
-                <Image
-                    src="https://picsum.photos/seed/colorful-inks/1800/800"
-                    alt="Vibrant ink bottles"
-                    fill
-                    className="object-cover"
-                    data-ai-hint="vibrant ink"
-                />
+                {vibrantInksImage && (
+                    <Image
+                        src={vibrantInksImage.imageUrl}
+                        alt={vibrantInksImage.description}
+                        fill
+                        className="object-cover"
+                        data-ai-hint={vibrantInksImage.imageHint}
+                    />
+                )}
                  <div className="absolute inset-0 bg-black/20"></div>
             </section>
             
@@ -139,13 +148,15 @@ export default function Home() {
                         </div>
                     </div>
                      <div className="aspect-[4/3] relative rounded-2xl overflow-hidden border border-border">
-                        <Image
-                            src="https://picsum.photos/seed/tech-print/800/600"
-                            alt="Close-up of a high-tech printing head"
-                            fill
-                            className="object-cover"
-                            data-ai-hint="printing technology"
-                        />
+                        {techPrintImage && (
+                            <Image
+                                src={techPrintImage.imageUrl}
+                                alt={techPrintImage.description}
+                                fill
+                                className="object-cover"
+                                data-ai-hint={techPrintImage.imageHint}
+                            />
+                        )}
                     </div>
                 </div>
             </section>

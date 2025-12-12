@@ -1,6 +1,24 @@
 {
   "placeholderImages": [
     {
+      "id": "homepageHero",
+      "description": "Colorful threads on a printing machine",
+      "imageUrl": "https://images.unsplash.com/photo-1693031630189-a39e6d70bf22?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwcmludGluZyUyMG1hY2hpbmV8ZW58MHx8fHwxNzY1NDk4MTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "printing machine"
+    },
+    {
+      "id": "homepageVibrantInks",
+      "description": "Vibrant ink bottles",
+      "imageUrl": "https://images.unsplash.com/photo-1609743307370-53d7de4b5e5e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHx2aWJyYW50JTIwaW5rfGVufDB8fHx8MTc2NTQ5ODE4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "vibrant ink"
+    },
+    {
+      "id": "homepageTechPrint",
+      "description": "Close-up of a high-tech printing head",
+      "imageUrl": "https://images.unsplash.com/photo-1611505908502-5b67e53e3a76?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxwcmludGluZyUyMHRlY2hub2xvZ3l8ZW58MHx8fHwxNzY1NDk4MTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "printing technology"
+    },
+    {
       "id": "design1",
       "description": "A vibrant abstract design with geometric shapes.",
       "imageUrl": "https://images.unsplash.com/photo-1533135091724-62cc5402aa20?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxhYnN0cmFjdCUyMGdlb21ldHJpY3xlbnwwfHx8fDE3NjUxNzM4ODF8MA&ixlib=rb-4.1.0&q=80&w=1080",
