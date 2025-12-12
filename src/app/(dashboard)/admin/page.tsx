@@ -30,7 +30,7 @@ import { useFirestore, useCollection, useDoc, useMemoFirebase, useUser } from '@
 import { collection, query, updateDoc, doc, getDoc } from 'firebase/firestore';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { OrderStatus } from '@/lib/types';
-import { generateFinalSheetForPrint } from '@/app/cart/page';
+import { generateFinalSheetForPrint } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 
