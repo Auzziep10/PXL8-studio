@@ -140,8 +140,22 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         // Draw background image with transformations and filters
         if (generatedImage) {
             const { scale, x, y, rotation, brightness, contrast, saturate, grayscale, sepia, blur } = imageTransform;
-            const scaledWidth = canvas.width * scale;
-            const scaledHeight = canvas.height * scale;
+            
+            // Correctly calculate scaled dimensions while preserving aspect ratio
+            const canvasAspectRatio = canvas.width / canvas.height;
+            const imageAspectRatio = generatedImage.naturalWidth / generatedImage.naturalHeight;
+            
+            let renderWidth, renderHeight;
+            if (canvasAspectRatio > imageAspectRatio) {
+                renderHeight = canvas.height;
+                renderWidth = renderHeight * imageAspectRatio;
+            } else {
+                renderWidth = canvas.width;
+                renderHeight = renderWidth / imageAspectRatio;
+            }
+
+            const scaledWidth = renderWidth * scale;
+            const scaledHeight = renderHeight * scale;
             
             const finalX = (canvas.width - scaledWidth) / 2 + x;
             const finalY = (canvas.height - scaledHeight) / 2 + y;
