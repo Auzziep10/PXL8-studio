@@ -430,7 +430,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         </div>
                     ) : (
                         <div className="space-y-6">
-                             <div className={cn("bg-checkerboard-dark rounded-xl border border-white/10 p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : 'cursor-move')}>
+                             <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : 'cursor-move')}>
                                 <canvas
                                     ref={canvasRef}
                                     width={512}
@@ -443,9 +443,9 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                 />
                             </div>
                              
-                             <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
+                             <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
                                 <div className="flex items-center justify-between">
-                                    <Label className="flex items-center gap-2 text-zinc-300"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
+                                    <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
                                     <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
                                 </div>
                                 
@@ -479,8 +479,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                 )}
                              </div>
 
-                             <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
-                                <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                             <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
+                                <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Image Tools</Label>
                                 <div className="space-y-3 pt-2">
                                      <div className="flex items-center gap-2">
                                         <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
@@ -498,7 +498,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         </Button>
                                     </div>
                                     {isRemovingBg && (
-                                        <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                        <div className="bg-muted/50 p-3 rounded-lg space-y-2 animate-in fade-in">
                                             <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
                                             <div>
                                                 <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
@@ -529,8 +529,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             </div>
                         </div>
                     )}
-                    <div className="text-xs text-zinc-500 p-3 bg-zinc-900/50 rounded-lg flex items-start space-x-2">
-                        <AlertTriangle className="w-4 h-4 text-zinc-600 flex-shrink-0 mt-0.5" />
+                    <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2">
+                        <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
                         <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
                     </div>
                 </CardContent>
