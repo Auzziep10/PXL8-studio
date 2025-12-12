@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -1197,8 +1198,6 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             {/* The Sheet Canvas */}
             <div 
                 className={`relative builder-scroll overflow-auto max-h-[80vh] w-full flex justify-center`}
-                onMouseUp={handleMouseUp}
-                onMouseLeave={handleMouseLeave}
             >
                  <div 
                     className={cn(
