@@ -93,8 +93,9 @@ export default function Header() {
               className={cn(
                 'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
                 pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/80',
-                isScrolled ? '' : 'text-zinc-200 hover:text-white'
+                isScrolled ? '' : 'text-white hover:text-white'
               )}
+               style={!isScrolled ? { textShadow: '0 1px 4px rgba(0,0,0,0.5)' } : {}}
             >
               {link.label}
             </Link>
@@ -105,7 +106,7 @@ export default function Header() {
             <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
             <>
-              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-white hover:text-white')}>
+              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-white hover:text-white')} style={!isScrolled ? { textShadow: '0 1px 4px rgba(0,0,0,0.5)' } : {}}>
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
               <Button onClick={handleLogout} size="sm">
