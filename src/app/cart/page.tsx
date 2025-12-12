@@ -530,7 +530,13 @@ export default function CartPage() {
                         className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-border flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                         onClick={() => handlePreview(item)}
                     >
-                        <Image src={item.previewUrl || '/placeholder.png'} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
+                        {item.previewUrl ? (
+                            <Image src={item.previewUrl} alt={name} fill className="object-contain group-hover:scale-110 transition-transform" />
+                        ) : (
+                             <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs p-1 text-center">
+                                No Preview
+                            </div>
+                        )}
                         <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                             <ZoomIn className="w-5 h-5 text-white" />
                         </div>
@@ -579,7 +585,7 @@ export default function CartPage() {
                         </div>
                         <div className="flex items-center justify-between mt-2">
                             <p className="text-xs text-muted-foreground">Qty: {item.quantity}</p>
-                            <Button variant="ghost" size-="sm" onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-red-500 text-xs">
+                            <Button variant="ghost" size="sm" onClick={() => removeItem(item.id)} className="text-muted-foreground hover:text-red-500 text-xs">
                                 <Trash2 className="w-3 h-3 mr-1" /> Remove
                             </Button>
                         </div>
@@ -623,7 +629,7 @@ export default function CartPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
-                    <div className="glass-panel rounded-2xl border border-border overflow-hidden">
+                    <div className="bg-background border border-border rounded-2xl overflow-hidden">
                         <div className="p-6 border-b border-border flex justify-between items-center bg-muted/30">
                             <h2 className="text-lg font-bold text-foreground flex items-center">
                                 <ShoppingBag className="w-5 h-5 mr-2 text-primary" />
@@ -635,7 +641,7 @@ export default function CartPage() {
                         </div>
                     </div>
 
-                    <form id="checkout-form" onSubmit={handleCheckoutProcess} className="glass-panel rounded-2xl border border-border overflow-hidden">
+                    <form id="checkout-form" onSubmit={handleCheckoutProcess} className="bg-background border border-border rounded-2xl overflow-hidden">
                          <div className="p-6 border-b border-border bg-muted/30">
                             <h2 className="text-lg font-bold text-foreground flex items-center">
                                 <UserIcon className="w-5 h-5 mr-2 text-accent" />
@@ -721,7 +727,7 @@ export default function CartPage() {
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-border/5">
+                            <div className="pt-4 border-t border-border">
                                 <h3 className="text-foreground font-bold mb-4 flex items-center"><MapPin className="w-4 h-4 mr-2 text-blue-400"/> Shipping Address</h3>
                                 <div className="space-y-4">
                                     <div>
@@ -745,7 +751,7 @@ export default function CartPage() {
                                 </div>
                             </div>
 
-                            <div className="pt-4 border-t border-border/5">
+                            <div className="pt-4 border-t border-border">
                                  <div className="flex justify-between items-center mb-4">
                                     <h3 className="text-foreground font-bold flex items-center"><Truck className="w-4 h-4 mr-2 text-purple-400"/> Shipping Method</h3>
                                     <div className="text-xs text-muted-foreground">Powered by EasyPost</div>
@@ -795,7 +801,7 @@ export default function CartPage() {
                 </div>
 
                 <div className="lg:col-span-1">
-                    <div className="glass-panel p-6 rounded-2xl border border-border sticky top-24">
+                    <div className="bg-background p-6 rounded-2xl border border-border sticky top-24">
                         
                         <h2 className="text-xl font-bold text-foreground mb-6">Order Summary</h2>
                         

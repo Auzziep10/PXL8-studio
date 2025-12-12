@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, createContext, useContext, ReactNode, Dispatch, SetStateAction } from 'react';
-import type { CartItem, ServiceCartItem, DynamicSheetCartItem, Artwork } from '@/lib/types';
+import type { CartItem, ServiceCartItem, DynamicSheetCartItem, Artwork, SheetCartItem } from '@/lib/types';
 
 interface CartContextType {
   items: CartItem[];
@@ -37,14 +37,21 @@ export function CartProvider({ children }: { children: ReactNode }) {
   // Save cart to localStorage whenever items change
   useEffect(() => {
     try {
-      // Don't save large, session-specific data to localStorage.
       const storableItems = items.map(item => {
-        if (item.type === 'sheet' || item.type === 'dynamic_sheet') {
-          // For sheets, remove the large, session-specific data
-          const { artworks, previewUrl, ...rest } = item as any; // Use 'any' to handle union type properties
-          return rest;
+        // Only strip large data if it's a data URL and likely very large.
+        // Keep permanent URLs.
+        if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
+            // Check size. A 1MB data URL is roughly 1.37 million characters.
+            if (item.previewUrl.length > 1000000) { 
+                 const { previewUrl, artworks, ...rest } = item as (SheetCartItem | DynamicSheetCartItem);
+                 const smallItem = {
+                     ...rest,
+                     // Add a flag to indicate that the preview was stripped.
+                     previewStripped: true
+                 };
+                 return smallItem;
+            }
         }
-        // For services, the whole item is storable
         return item;
       });
       localStorage.setItem('pxl8-cart', JSON.stringify(storableItems));
