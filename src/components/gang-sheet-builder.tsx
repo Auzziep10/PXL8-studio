@@ -34,8 +34,8 @@ function debounce<F extends (...args: any[]) => any>(func: F, waitFor: number) {
 }
 
 
-export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled }: { usage: 'Builder', newArtworks?: Omit<Artwork, 'id'>[], onArtworkHandled?: (name: string) => void }) {
-  const { addItem: addToCart } = useCart();
+export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
+  const { addItem: addToCart, tempArtwork, clearTempArtwork } = useCart();
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
@@ -374,15 +374,13 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
   }, [items, sheetConfig, toast, user]);
 
 
-   // Effect to handle new artworks passed as props
+   // Effect to handle temporary artwork from the useCart hook
     useEffect(() => {
-        if (newArtworks && newArtworks.length > 0 && onArtworkHandled) {
-            newArtworks.forEach(art => {
-                handleImageLoad(art.imageUrl, art.name, false, art);
-                onArtworkHandled(art.name); // Notify parent that this artwork has been processed
-            });
+        if (tempArtwork) {
+            handleImageLoad(tempArtwork.imageUrl, tempArtwork.name, false, tempArtwork);
+            clearTempArtwork();
         }
-    }, [newArtworks, onArtworkHandled, handleImageLoad]);
+    }, [tempArtwork, clearTempArtwork, handleImageLoad]);
 
   // --- File Upload ---
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
