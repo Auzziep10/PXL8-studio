@@ -1,4 +1,3 @@
-
 'use client';
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -24,9 +23,9 @@ export function ImagePreviewModal({ isOpen, onClose, imageUrl, title, sheetWidth
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription className="sr-only">A preview of the selected image: {title}</DialogDescription>
         </DialogHeader>
-        <div className="flex-1 flex items-center justify-center bg-zinc-900 p-4 overflow-auto">
+        <div className="flex-1 flex items-center justify-center bg-checkerboard-dark p-4 overflow-auto">
           <div 
-            className="relative bg-checkerboard-dark shadow-lg"
+            className="relative bg-transparent shadow-lg"
             style={{
               aspectRatio: aspectRatio,
               width: aspectRatio >= 1 ? '100%' : 'auto',

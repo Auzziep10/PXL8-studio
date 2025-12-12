@@ -1,4 +1,3 @@
-
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { Order, User as AppUser, OrderItem, ShippingAddress } from '@/lib/types';
@@ -32,7 +31,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { OrderStatus } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
-import { createCanvas, loadImage } from 'canvas';
 import QRCode from 'qrcode';
 
 
