@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Shadow } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -19,17 +19,21 @@ import { Slider } from './ui/slider';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { textContent } from '@/lib/text-content';
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
 
 // --- Dropdown Options ---
-const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco", "Abstract", "Graffiti"];
-const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients", "Duotone"];
-const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro", "Whimsical", "Aggressive"];
 const fontOptions = [
     "Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", 
     "Impact", "Comic Sans MS", "Lobster", "Roboto", "Montserrat", "Oswald", 
-    "Pacifico", "Bangers", "Anton", "Poppins"
+    "Pacifico", "Bangers", "Anton", "Poppins", "Helvetica", "Garamond",
+    "Futura", "Bodoni", "Didot", "Rockwell", "Franklin Gothic", "Baskerville",
+    "Lato", "Open Sans", "Source Sans Pro"
 ];
+const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco", "Abstract", "Graffiti"];
+const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients", "Duotone"];
+const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro", "Whimsical", "Aggressive"];
+
 
 interface AiDesignGeneratorProps {
   onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
@@ -44,6 +48,12 @@ interface TextItem {
     x: number;
     y: number;
     rotation: number;
+    strokeWidth: number;
+    strokeColor: string;
+    shadowBlur: number;
+    shadowOffsetX: number;
+    shadowOffsetY: number;
+    shadowColor: string;
 }
 
 interface ImageTransform {
@@ -134,15 +144,40 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         // Draw each text item
         textItems.forEach(text => {
             ctx.save();
+
+            // Set shadow properties BEFORE drawing
+            ctx.shadowColor = text.shadowColor;
+            ctx.shadowBlur = text.shadowBlur;
+            ctx.shadowOffsetX = text.shadowOffsetX;
+            ctx.shadowOffsetY = text.shadowOffsetY;
+
+            // Set transform
             ctx.translate(text.x, text.y);
             ctx.rotate(text.rotation * Math.PI / 180);
             ctx.translate(-text.x, -text.y);
             
+            // Set styles
             ctx.font = `${text.fontSize}px ${text.font}`;
             ctx.fillStyle = text.color;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
+
+            // Draw filled text
             ctx.fillText(text.content, text.x, text.y);
+
+            // Draw outline if needed
+            if (text.strokeWidth > 0) {
+                // Clear shadow for the stroke, otherwise it strokes the shadow too
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+                ctx.shadowOffsetX = 0;
+                ctx.shadowOffsetY = 0;
+
+                ctx.strokeStyle = text.strokeColor;
+                ctx.lineWidth = text.strokeWidth;
+                ctx.strokeText(text.content, text.x, text.y);
+            }
+
             ctx.restore();
         });
     }, [generatedImage, textItems, imageTransform]);
@@ -350,6 +385,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             x: canvas.width / 2,
             y: canvas.height / 2,
             rotation: 0,
+            strokeWidth: 0,
+            strokeColor: '#ffffff',
+            shadowBlur: 0,
+            shadowColor: '#000000',
+            shadowOffsetX: 0,
+            shadowOffsetY: 0,
         };
         setTextItems(prev => [...prev, newText]);
         setActiveTextId(newText.id);
@@ -533,104 +574,145 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     ) : (
                         <div className="grid md:grid-cols-3 gap-8">
                             <div className="md:col-span-1 space-y-4">
-                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                    <Label className="flex items-center gap-2 text-foreground"><ZoomIn className="w-4 h-4"/> Image Tools</Label>
-                                    <div className="space-y-3 pt-2">
-                                        <div className="grid grid-cols-1 gap-4">
-                                            <div>
-                                                <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
-                                                <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
-                                            </div>
-                                             <div>
-                                                <Label htmlFor="image-rotation" className="text-xs">Rotation: {imageTransform.rotation.toFixed(0)}°</Label>
-                                                <Slider id="image-rotation" min={-180} max={180} step={1} value={[imageTransform.rotation]} onValueChange={([v]) => setImageTransform(p => ({...p, rotation: v}))} />
-                                            </div>
-                                            <div>
-                                                <Label className="text-xs">Position (X, Y)</Label>
-                                                <div className="flex gap-2">
-                                                    <Input type="number" value={imageTransform.x} onChange={e => setImageTransform(p => ({ ...p, x: parseInt(e.target.value) || 0}))} />
-                                                    <Input type="number" value={imageTransform.y} onChange={e => setImageTransform(p => ({ ...p, y: parseInt(e.target.value) || 0}))} />
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 })} size="sm" variant="ghost">Reset Transform</Button>
-                                    </div>
-                                </div>
-                                
-                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                    <div className="flex items-center justify-between">
-                                        <Label className="flex items-center gap-2 text-foreground"><CaseSensitive className="w-4 h-4"/> Text Tools</Label>
-                                        <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
-                                    </div>
-                                    
-                                    {activeTextItem && (
-                                        <div className="p-4 bg-background/30 rounded-lg space-y-4 animate-in fade-in">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3']} className="w-full">
+                                    <AccordionItem value="item-1" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
+                                        <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
+                                            <span className='flex items-center gap-2'><ZoomIn className="w-4 h-4"/> Image Tools</span>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pt-2 space-y-4">
+                                            <div className="grid grid-cols-1 gap-4">
                                                 <div>
-                                                    <Label htmlFor="text-content">Text</Label>
-                                                    <Input id="text-content" value={activeTextItem.content} onChange={(e) => updateActiveText({ content: e.target.value })} />
+                                                    <Label htmlFor="image-scale" className="text-xs">Scale: {imageTransform.scale.toFixed(2)}x</Label>
+                                                    <Slider id="image-scale" min={0.1} max={3} step={0.05} value={[imageTransform.scale]} onValueChange={([v]) => setImageTransform(p => ({ ...p, scale: v }))} />
                                                 </div>
                                                 <div>
-                                                    <Label htmlFor="text-font">Font</Label>
-                                                    <Select value={activeTextItem.font} onValueChange={(v) => updateActiveText({ font: v })}>
-                                                        <SelectTrigger id="text-font"><SelectValue /></SelectTrigger>
-                                                        <SelectContent>{fontOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                                    </Select>
+                                                    <Label htmlFor="image-rotation" className="text-xs">Rotation: {imageTransform.rotation.toFixed(0)}°</Label>
+                                                    <Slider id="image-rotation" min={-180} max={180} step={1} value={[imageTransform.rotation]} onValueChange={([v]) => setImageTransform(p => ({...p, rotation: v}))} />
                                                 </div>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <Label htmlFor="text-rotation" className="text-xs">Rotation: {activeTextItem.rotation.toFixed(0)}°</Label>
-                                                <Slider id="text-rotation" min={-180} max={180} step={1} value={[activeTextItem.rotation]} onValueChange={([v]) => updateActiveText({ rotation: v })} />
-                                            </div>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                                                 <div>
-                                                    <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
-                                                    <Slider id="text-size" min={10} max={150} step={1} value={[activeTextItem.fontSize]} onValueChange={([v]) => updateActiveText({ fontSize: v })} />
-                                                </div>
-                                                <div className="flex items-center gap-4">
-                                                    <Label htmlFor="text-color">Color</Label>
-                                                    <Input id="text-color" type="color" value={activeTextItem.color} onChange={(e) => updateActiveText({ color: e.target.value })} className="p-1 h-10 w-16" />
-                                                    <Button onClick={deleteActiveText} variant="destructive" size="sm">Delete</Button>
+                                                    <Label className="text-xs">Position (X, Y)</Label>
+                                                    <div className="flex gap-2">
+                                                        <Input type="number" value={imageTransform.x} onChange={e => setImageTransform(p => ({ ...p, x: parseInt(e.target.value) || 0}))} />
+                                                        <Input type="number" value={imageTransform.y} onChange={e => setImageTransform(p => ({ ...p, y: parseInt(e.target.value) || 0}))} />
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    )}
-                                </div>
-
-                                <div className="bg-secondary/50 rounded-xl border border-border p-4 space-y-4">
-                                    <Label className="flex items-center gap-2 text-foreground"><Droplet className="w-4 h-4"/> Background Remover</Label>
-                                    <div className="space-y-3 pt-2">
-                                        <div className="flex items-center gap-2">
-                                            <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                                <Droplet className="w-4 h-4 mr-2" />
-                                                {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
-                                            </Button>
-                                            <Button 
-                                                variant="ghost" 
-                                                size="icon"
-                                                onClick={handleUndo} 
-                                                disabled={imageHistory.length <= 1}
-                                                title="Undo last background removal"
-                                            >
-                                                <Undo className="w-4 h-4"/>
-                                            </Button>
-                                        </div>
-                                        {isRemovingBg && (
-                                            <div className="bg-muted/50 p-3 rounded-lg space-y-2 animate-in fade-in">
-                                                <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
-                                                <div>
-                                                    <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
-                                                    <Slider 
-                                                        value={[bgRemovalTolerance]} 
-                                                        onValueChange={([val]) => setBgRemovalTolerance(val)}
-                                                        max={100} 
-                                                        step={1}
-                                                    />
+                                            <Button onClick={() => setImageTransform({ scale: 1, x: 0, y: 0, rotation: 0 })} size="sm" variant="ghost">Reset Transform</Button>
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                     <AccordionItem value="item-2" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
+                                        <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
+                                            <span className='flex items-center gap-2'><CaseSensitive className="w-4 h-4"/> Text Tools</span>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pt-2 space-y-4">
+                                             <Button onClick={handleAddText} size="sm" variant="secondary" className="w-full">Add Text</Button>
+                                            {activeTextItem && (
+                                                <div className="p-4 bg-background/30 rounded-lg space-y-4 animate-in fade-in">
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                                        <div>
+                                                            <Label htmlFor="text-content">Text</Label>
+                                                            <Input id="text-content" value={activeTextItem.content} onChange={(e) => updateActiveText({ content: e.target.value })} />
+                                                        </div>
+                                                        <div>
+                                                            <Label htmlFor="text-font">Font</Label>
+                                                            <Select value={activeTextItem.font} onValueChange={(v) => updateActiveText({ font: v })}>
+                                                                <SelectTrigger id="text-font"><SelectValue /></SelectTrigger>
+                                                                <SelectContent>{fontOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                                            </Select>
+                                                        </div>
+                                                    </div>
+                                                    <div className="space-y-2">
+                                                        <Label htmlFor="text-rotation" className="text-xs">Rotation: {activeTextItem.rotation.toFixed(0)}°</Label>
+                                                        <Slider id="text-rotation" min={-180} max={180} step={1} value={[activeTextItem.rotation]} onValueChange={([v]) => updateActiveText({ rotation: v })} />
+                                                    </div>
+                                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                                                        <div>
+                                                            <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
+                                                            <Slider id="text-size" min={10} max={150} step={1} value={[activeTextItem.fontSize]} onValueChange={([v]) => updateActiveText({ fontSize: v })} />
+                                                        </div>
+                                                        <div className="flex items-center gap-4">
+                                                            <Label htmlFor="text-color">Color</Label>
+                                                            <Input id="text-color" type="color" value={activeTextItem.color} onChange={(e) => updateActiveText({ color: e.target.value })} className="p-1 h-10 w-16" />
+                                                            <Button onClick={deleteActiveText} variant="destructive" size="sm">Delete</Button>
+                                                        </div>
+                                                    </div>
+                                                     <Accordion type="multiple" className="w-full">
+                                                        <AccordionItem value="stroke">
+                                                            <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Baseline className="w-4 h-4"/>Outline</span></AccordionTrigger>
+                                                            <AccordionContent className="space-y-3 pt-2">
+                                                                <div>
+                                                                    <Label htmlFor="stroke-width" className="text-xs">Width: {activeTextItem.strokeWidth}px</Label>
+                                                                    <Slider id="stroke-width" min={0} max={10} step={0.5} value={[activeTextItem.strokeWidth]} onValueChange={([v]) => updateActiveText({ strokeWidth: v })} />
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Label htmlFor="stroke-color" className="text-xs">Color</Label>
+                                                                    <Input id="stroke-color" type="color" value={activeTextItem.strokeColor} onChange={(e) => updateActiveText({ strokeColor: e.target.value })} className="p-1 h-8 w-10 ml-auto" />
+                                                                </div>
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                        <AccordionItem value="shadow" className="border-b-0">
+                                                            <AccordionTrigger className="text-xs py-2"><span className="flex items-center gap-2"><Shadow className="w-4 h-4"/>Drop Shadow</span></AccordionTrigger>
+                                                            <AccordionContent className="space-y-3 pt-2">
+                                                                <div>
+                                                                    <Label htmlFor="shadow-blur" className="text-xs">Blur: {activeTextItem.shadowBlur}px</Label>
+                                                                    <Slider id="shadow-blur" min={0} max={25} step={1} value={[activeTextItem.shadowBlur]} onValueChange={([v]) => updateActiveText({ shadowBlur: v })} />
+                                                                </div>
+                                                                <div>
+                                                                    <Label htmlFor="shadow-offset-x" className="text-xs">Offset X: {activeTextItem.shadowOffsetX}px</Label>
+                                                                    <Slider id="shadow-offset-x" min={-20} max={20} step={1} value={[activeTextItem.shadowOffsetX]} onValueChange={([v]) => updateActiveText({ shadowOffsetX: v })} />
+                                                                </div>
+                                                                <div>
+                                                                    <Label htmlFor="shadow-offset-y" className="text-xs">Offset Y: {activeTextItem.shadowOffsetY}px</Label>
+                                                                    <Slider id="shadow-offset-y" min={-20} max={20} step={1} value={[activeTextItem.shadowOffsetY]} onValueChange={([v]) => updateActiveText({ shadowOffsetY: v })} />
+                                                                </div>
+                                                                <div className="flex items-center gap-2">
+                                                                    <Label htmlFor="shadow-color" className="text-xs">Color</Label>
+                                                                    <Input id="shadow-color" type="color" value={activeTextItem.shadowColor} onChange={(e) => updateActiveText({ shadowColor: e.target.value })} className="p-1 h-8 w-10 ml-auto" />
+                                                                </div>
+                                                            </AccordionContent>
+                                                        </AccordionItem>
+                                                     </Accordion>
                                                 </div>
+                                            )}
+                                        </AccordionContent>
+                                    </AccordionItem>
+                                     <AccordionItem value="item-3" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
+                                        <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
+                                             <span className='flex items-center gap-2'><Droplet className="w-4 h-4"/> Background</span>
+                                        </AccordionTrigger>
+                                        <AccordionContent className="pt-2 space-y-3">
+                                            <div className="flex items-center gap-2">
+                                                <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                    <Droplet className="w-4 h-4 mr-2" />
+                                                    {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                                </Button>
+                                                <Button 
+                                                    variant="ghost" 
+                                                    size="icon"
+                                                    onClick={handleUndo} 
+                                                    disabled={imageHistory.length <= 1}
+                                                    title="Undo last background removal"
+                                                >
+                                                    <Undo className="w-4 h-4"/>
+                                                </Button>
                                             </div>
-                                        )}
-                                    </div>
-                                </div>
+                                            {isRemovingBg && (
+                                                <div className="bg-muted/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                                    <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
+                                                    <div>
+                                                        <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                        <Slider 
+                                                            value={[bgRemovalTolerance]} 
+                                                            onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                            max={100} 
+                                                            step={1}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </AccordionContent>
+                                     </AccordionItem>
+                                </Accordion>
                             </div>
                             <div className="md:col-span-2">
                                 <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
