@@ -43,16 +43,15 @@ const generateDesignFromPromptFlow = ai.defineFlow(
   async input => {
     // Manually construct the prompt string for simplicity and reliability.
     const promptText = `
-      Create a high-quality logo-style graphic on a solid lime green background.
+      Create a high-quality logo-style graphic on a solid white background.
       Subject: ${input.subject}
       Style: ${input.style}
       Color Palette: ${input.colors}
       Mood: ${input.mood}
-      ${input.text ? `Text to include: "${input.text}"` : 'Do NOT include any text in the image.'}
+      Do NOT include any text in the image. The output must be purely graphical.
 
       Use simplified shapes, strong outlines, and clean composition suitable for t-shirt printing and branding.
-      ${input.text ? 'The text should be clearly visible, well-placed, and stylistically match the image.' : ''}
-      The final image MUST have a solid, pure green screen background (#00FF00) for easy removal.
+      The final image MUST have a solid, pure white background (#FFFFFF).
       Avoid detailed backgrounds, clutter, photorealism, or anything not ideal for apparel printing.
       Maintain strong silhouettes, smooth edges, and a balanced composition.
     `.trim();
