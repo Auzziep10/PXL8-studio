@@ -69,8 +69,8 @@ export default function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-white/80 px-3 py-1.5 rounded-md text-white',
-                pathname === link.href ? 'font-medium' : ''
+                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md text-foreground',
+                pathname === link.href ? 'font-medium' : 'text-foreground/60'
               )}
             >
               {link.label}
@@ -81,16 +81,16 @@ export default function Header() {
            {isUserLoading || isProfileLoading ? (
             <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
-             <Button variant="ghost" asChild className="hover:bg-black/10 text-white">
+             <Button variant="ghost" asChild className="hover:bg-black/10 text-foreground">
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
           ) : (
-            <Button asChild variant="ghost" className="hover:bg-black/10 text-white">
+            <Button asChild variant="ghost" className="hover:bg-black/10 text-foreground">
                 <Link href="/auth/login">Login</Link>
             </Button>
           )}
 
-           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-white">
+           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-foreground">
             <Link href="/cart">
                 <div className="relative">
                     <ShoppingCart className="h-5 w-5" />

@@ -42,20 +42,20 @@ export default function Home() {
                         data-ai-hint="printing machine"
                         priority
                     />
-                    <div className="absolute inset-0 bg-black/30"></div>
+                    <div className="absolute inset-0 bg-white/30"></div>
                 </div>
-                <div className="relative z-10 max-w-4xl mx-auto text-white">
+                <div className="relative z-10 max-w-4xl mx-auto text-foreground">
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
                         The Future of Digital Apparel Decoration
                     </h1>
-                    <p className="mt-6 text-lg md:text-xl text-zinc-200 max-w-2xl mx-auto">
+                    <p className="mt-6 text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">
                         PXL8 provides the tools and technology for creators and businesses to produce high-quality, on-demand apparel with unparalleled ease and precision.
                     </p>
                     <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
                         <Button asChild size="lg" className="bg-cyan-500 text-black hover:bg-cyan-400 text-lg py-7 px-10">
                             <Link href="/build">Start Creating</Link>
                         </Button>
-                        <Button asChild variant="outline" size="lg" className="border-zinc-700 bg-black/30 hover:bg-zinc-900 text-white text-lg py-7 px-10 backdrop-blur-sm">
+                        <Button asChild variant="outline" size="lg" className="border-zinc-300 bg-white/30 hover:bg-zinc-100 text-foreground text-lg py-7 px-10 backdrop-blur-sm">
                             <Link href="/upload">Upload a Sheet</Link>
                         </Button>
                     </div>
