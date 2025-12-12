@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -74,7 +73,7 @@ export default function CartPage() {
         city: '',
         state: '',
         zip: '',
-        createAccount: !currentUser,
+        createAccount: false,
         password: ''
     });
 
@@ -94,7 +93,7 @@ export default function CartPage() {
         } else {
              setFormData(prev => ({
                 ...prev,
-                createAccount: true,
+                createAccount: false,
              }));
         }
     }, [currentUser, userProfile]);
@@ -219,6 +218,7 @@ export default function CartPage() {
         if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) && !currentUser) {
             console.error("Validation failed: Guest user with temporary images.");
             toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to save and check out your AI-generated or temporary designs.' });
+            setIsCheckingOut(false);
             return;
         }
         // --- END PRE-CHECKOUT ---
@@ -282,8 +282,8 @@ export default function CartPage() {
                     
                     // Handle both SheetCartItem and DynamicSheetCartItem
                     const isDynamic = item.type === 'dynamic_sheet';
-                    const sheetWidth = isDynamic ? item.width : 0;
-                    const sheetHeight = isDynamic ? item.height : 0;
+                    const sheetWidth = isDynamic ? item.width : (item.artworks[0]?.width || 0); // Approximation for SheetCartItem
+                    const sheetHeight = isDynamic ? item.height : (item.artworks[0]?.height || 0); // Approximation
                     const itemName = isDynamic ? item.name : item.sheetSize.name;
                     const itemPrice = isDynamic ? item.price : item.sheetSize.price;
 
@@ -537,7 +537,7 @@ export default function CartPage() {
                                             />
                                         </div>
                                         <div className="ml-3 text-sm">
-                                            <Label htmlFor="createAccount" className="font-medium text-foreground">Create an account</Label>
+                                            <Label htmlFor="createAccount" className="font-medium text-foreground">Create an account? (Optional)</Label>
                                             <p className="text-muted-foreground">Save your details for faster checkout and access your order history.</p>
                                         </div>
                                     </div>

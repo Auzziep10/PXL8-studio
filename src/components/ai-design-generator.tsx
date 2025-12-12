@@ -8,14 +8,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
-import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { sanitizeFilename } from '@/lib/utils';
 import { Slider } from './ui/slider';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 
 
 // --- Dropdown Options ---
@@ -45,6 +46,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const { addItem: addToCart } = useCart();
     const { toast } = useToast();
     const firestore = useFirestore();
+    const { user, isUserLoading } = useUser();
 
     // --- State Management ---
     const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({ subject: '', style: '', colors: '', mood: '' });
@@ -115,6 +117,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Core Actions ---
     const handleGenerate = async () => {
+        if (!user) {
+             toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to generate AI designs.' });
+             return;
+        }
+
         const { subject, style, colors, mood } = formData;
         if (!subject || !style || !colors || !mood) {
             toast({ variant: 'destructive', title: 'All fields are required' });
@@ -352,39 +359,51 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 <CardContent className="space-y-6">
                     {view === 'generate' ? (
                          <div className="space-y-4">
+                            {isUserLoading ? (
+                                <div className="h-10 bg-muted rounded-md animate-pulse" />
+                            ) : !user && (
+                                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col items-center text-center">
+                                    <User className="w-8 h-8 text-yellow-500 mb-2" />
+                                    <p className="text-sm font-medium text-foreground mb-2">Login to Create</p>
+                                    <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate and save AI designs.</p>
+                                    <Button asChild size="sm">
+                                        <Link href="/auth/login">Login or Sign Up</Link>
+                                    </Button>
+                                </div>
+                            )}
                              <div>
                                 <Label>Subject</Label>
                                 <Input 
                                     placeholder="e.g., A robot surfing on a slice of pizza"
                                     value={formData.subject}
                                     onChange={(e) => setFormData(p => ({...p, subject: e.target.value}))}
-                                    disabled={isLoading}
+                                    disabled={isLoading || !user}
                                 />
                              </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                 <div>
                                     <Label>Style</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading}>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading || !user}>
                                         <SelectTrigger><SelectValue placeholder="e.g., Minimalist" /></SelectTrigger>
                                         <SelectContent>{styleOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
                                 <div>
                                     <Label>Color Palette</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading}>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading || !user}>
                                         <SelectTrigger><SelectValue placeholder="e.g., Black & White" /></SelectTrigger>
                                         <SelectContent>{colorOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
                                 <div>
                                     <Label>Mood</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, mood: value }))} disabled={isLoading}>
+                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, mood: value }))} disabled={isLoading || !user}>
                                         <SelectTrigger><SelectValue placeholder="e.g., Playful" /></SelectTrigger>
                                         <SelectContent>{moodOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
                                     </Select>
                                 </div>
                             </div>
-                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || !aiDesignFeeProduct} className="w-full mt-4 text-lg py-6">
+                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || !aiDesignFeeProduct || !user} className="w-full mt-4 text-lg py-6">
                                 {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : 'Generate Design'}
                             </Button>
                         </div>
