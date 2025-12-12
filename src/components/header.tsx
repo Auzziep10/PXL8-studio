@@ -79,8 +79,8 @@ export default function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md text-foreground',
-                pathname === link.href ? 'font-medium' : 'text-foreground/60'
+                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md text-foreground/60',
+                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/60'
               )}
             >
               {link.label}
@@ -95,27 +95,25 @@ export default function Header() {
               <Button variant="ghost" asChild className="hover:bg-black/10 text-foreground">
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
-              <Button variant="outline" onClick={handleLogout} size="sm">
+              <Button onClick={handleLogout} size="sm">
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
             </>
           ) : (
-            <Button asChild>
+             <Button asChild>
                 <Link href="/auth/login">Login</Link>
             </Button>
           )}
 
-           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-foreground">
+           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-foreground relative">
             <Link href="/cart">
-                <div className="relative">
-                    <ShoppingCart className="h-5 w-5" />
-                    {cartItemCount > 0 && (
-                        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-xs font-bold text-black">
-                            {cartItemCount}
-                        </span>
-                    )}
-                </div>
+                <ShoppingCart className="h-5 w-5" />
+                {cartItemCount > 0 && (
+                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-xs font-bold text-black">
+                        {cartItemCount}
+                    </span>
+                )}
                 <span className="sr-only">Cart</span>
             </Link>
           </Button>
