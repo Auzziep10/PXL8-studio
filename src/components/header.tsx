@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { PXL8Logo } from '@/components/icons';
+import { PXL8Logo } from '@/components/ui/icons';
 import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
@@ -69,8 +69,8 @@ export default function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-white px-3 py-1.5 rounded-md',
-                pathname === link.href ? 'text-white font-medium' : 'text-zinc-400'
+                'transition-colors hover:text-white/80 px-3 py-1.5 rounded-md text-white',
+                pathname === link.href ? 'font-medium' : ''
               )}
             >
               {link.label}
@@ -79,18 +79,18 @@ export default function Header() {
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
            {isUserLoading || isProfileLoading ? (
-            <div className='w-24 h-8 bg-zinc-800 rounded-md animate-pulse' />
+            <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
-             <Button variant="ghost" asChild className="hover:bg-white/10">
+             <Button variant="ghost" asChild className="hover:bg-black/10 text-white">
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
           ) : (
-            <Button asChild variant="ghost" className="hover:bg-white/10">
+            <Button asChild variant="ghost" className="hover:bg-black/10 text-white">
                 <Link href="/auth/login">Login</Link>
             </Button>
           )}
 
-           <Button variant="ghost" size="icon" asChild className="hover:bg-white/10">
+           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-white">
             <Link href="/cart">
                 <div className="relative">
                     <ShoppingCart className="h-5 w-5" />

@@ -29,7 +29,7 @@ const features = [
 
 export default function Home() {
     return (
-        <div className="flex flex-col min-h-screen bg-black text-white">
+        <div className="flex flex-col min-h-screen bg-background text-foreground">
 
             {/* Hero Section */}
             <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8">
@@ -42,20 +42,20 @@ export default function Home() {
                         data-ai-hint="printing machine"
                         priority
                     />
-                    <div className="absolute inset-0 bg-black/60"></div>
+                    <div className="absolute inset-0 bg-black/30"></div>
                 </div>
-                <div className="relative z-10 max-w-4xl mx-auto">
+                <div className="relative z-10 max-w-4xl mx-auto text-white">
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
                         The Future of Digital Apparel Decoration
                     </h1>
-                    <p className="mt-6 text-lg md:text-xl text-zinc-300 max-w-2xl mx-auto">
+                    <p className="mt-6 text-lg md:text-xl text-zinc-200 max-w-2xl mx-auto">
                         PXL8 provides the tools and technology for creators and businesses to produce high-quality, on-demand apparel with unparalleled ease and precision.
                     </p>
                     <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
                         <Button asChild size="lg" className="bg-cyan-500 text-black hover:bg-cyan-400 text-lg py-7 px-10">
                             <Link href="/build">Start Creating</Link>
                         </Button>
-                        <Button asChild variant="outline" size="lg" className="border-zinc-700 bg-black/30 hover:bg-zinc-900 text-lg py-7 px-10 backdrop-blur-sm">
+                        <Button asChild variant="outline" size="lg" className="border-zinc-700 bg-black/30 hover:bg-zinc-900 text-white text-lg py-7 px-10 backdrop-blur-sm">
                             <Link href="/upload">Upload a Sheet</Link>
                         </Button>
                     </div>
@@ -63,21 +63,21 @@ export default function Home() {
             </section>
 
             {/* Features Section */}
-            <section className="py-20 sm:py-32">
+            <section className="py-20 sm:py-32 bg-secondary/30">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center">
-                        <h2 className="text-base font-semibold text-cyan-400 tracking-wider uppercase">Why PXL8</h2>
+                        <h2 className="text-base font-semibold text-cyan-500 tracking-wider uppercase">Why PXL8</h2>
                         <p className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight">
                             Everything You Need to Print
                         </p>
                     </div>
                     <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
                         {features.map((feature) => (
-                            <div key={feature.title} className="bg-zinc-900 p-8 rounded-2xl border border-zinc-800 hover:border-cyan-500/50 hover:-translate-y-1 transition-all">
+                            <div key={feature.title} className="glass-panel p-8 rounded-2xl border border-border/30 hover:border-cyan-500/50 hover:-translate-y-1 transition-all">
                                 <div className="mb-6">{feature.icon}</div>
                                 <h3 className="text-xl font-bold">{feature.title}</h3>
-                                <p className="mt-4 text-zinc-400">{feature.description}</p>
-                                <Button variant="link" asChild className="mt-6 p-0 text-cyan-400 hover:text-cyan-300">
+                                <p className="mt-4 text-muted-foreground">{feature.description}</p>
+                                <Button variant="link" asChild className="mt-6 p-0 text-cyan-600 hover:text-cyan-500">
                                     <Link href={feature.href}>Learn More <ArrowRight className="ml-2 w-4 h-4" /></Link>
                                 </Button>
                             </div>
@@ -87,7 +87,7 @@ export default function Home() {
             </section>
 
             {/* Full-width Image Section 1 */}
-            <section className="relative h-[500px] bg-zinc-900">
+            <section className="relative h-[500px] bg-secondary">
                 <Image
                     src="https://picsum.photos/seed/colorful-inks/1800/800"
                     alt="Vibrant ink bottles"
@@ -95,50 +95,50 @@ export default function Home() {
                     className="object-cover"
                     data-ai-hint="vibrant ink"
                 />
-                 <div className="absolute inset-0 bg-black/40"></div>
+                 <div className="absolute inset-0 bg-black/20"></div>
             </section>
             
             {/* Tech Specs Section */}
-            <section className="py-20 sm:py-32 bg-black">
+            <section className="py-20 sm:py-32 bg-background">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                     <div>
                         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
                             Unmatched Quality, Built on Precision
                         </h2>
-                        <p className="mt-4 text-lg text-zinc-400">
+                        <p className="mt-4 text-lg text-muted-foreground">
                             Our platform is engineered from the ground up for Direct-to-Film printing. From AI-powered resolution checking to automated sheet generation, we ensure every print is perfect.
                         </p>
                         <div className="mt-8 space-y-6">
                             <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 text-cyan-400">
+                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-secondary text-cyan-500">
                                     <Sparkles className="w-5 h-5"/>
                                 </div>
                                 <div>
                                     <h4 className="font-semibold">Gemini AI Guard</h4>
-                                    <p className="text-zinc-400 text-sm">Every pixel is scanned to prevent low-resolution prints before they happen.</p>
+                                    <p className="text-muted-foreground text-sm">Every pixel is scanned to prevent low-resolution prints before they happen.</p>
                                 </div>
                             </div>
                             <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 text-cyan-400">
+                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-secondary text-cyan-500">
                                     <Droplet className="w-5 h-5"/>
                                 </div>
                                 <div>
                                     <h4 className="font-semibold">Liquid Color Science</h4>
-                                    <p className="text-zinc-400 text-sm">Proprietary ink technology for maximum opacity and vibrant, smooth gradients.</p>
+                                    <p className="text-muted-foreground text-sm">Proprietary ink technology for maximum opacity and vibrant, smooth gradients.</p>
                                 </div>
                             </div>
                              <div className="flex items-start gap-4">
-                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-zinc-800 text-cyan-400">
+                                <div className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg bg-secondary text-cyan-500">
                                     <Box className="w-5 h-5"/>
                                 </div>
                                 <div>
                                     <h4 className="font-semibold">Automated Fulfillment</h4>
-                                    <p className="text-zinc-400 text-sm">QR-coded production sheets streamline the printing and shipping process for faster turnarounds.</p>
+                                    <p className="text-muted-foreground text-sm">QR-coded production sheets streamline the printing and shipping process for faster turnarounds.</p>
                                 </div>
                             </div>
                         </div>
                     </div>
-                     <div className="aspect-[4/3] relative rounded-2xl overflow-hidden border border-zinc-800">
+                     <div className="aspect-[4/3] relative rounded-2xl overflow-hidden border border-border">
                         <Image
                             src="https://picsum.photos/seed/tech-print/800/600"
                             alt="Close-up of a high-tech printing head"

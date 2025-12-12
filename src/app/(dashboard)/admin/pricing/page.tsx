@@ -299,7 +299,7 @@ export default function PricingAdminPage() {
   };
   
   const renderSheetTable = (sizes: SheetSizeWithId[], isLoading: boolean) => (
-    <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+    <div className="glass-panel rounded-2xl border border-border/10 overflow-hidden">
         <Table>
             <TableHeader>
                 <TableRow>
@@ -319,12 +319,12 @@ export default function PricingAdminPage() {
                         const finalPrice = basePrice - (basePrice * ((sheet.discount || 0) / 100));
                         return (
                             <TableRow key={sheet.id}>
-                                <TableCell className="font-medium text-white">{sheet.name}</TableCell>
+                                <TableCell className="font-medium text-foreground">{sheet.name}</TableCell>
                                 <TableCell>{sheet.width}" x {sheet.height}"</TableCell>
                                 <TableCell className="font-mono text-accent">{sheet.discount || 0}%</TableCell>
-                                <TableCell className="text-right font-mono text-white">
+                                <TableCell className="text-right font-mono text-foreground">
                                     {formatCurrency(finalPrice)}
-                                    {sheet.discount > 0 && <span className="text-xs text-zinc-500 line-through ml-2">{formatCurrency(basePrice)}</span>}
+                                    {sheet.discount > 0 && <span className="text-xs text-muted-foreground line-through ml-2">{formatCurrency(basePrice)}</span>}
                                 </TableCell>
                                 <TableCell className="text-right">
                                     <Button variant="ghost" size="icon" onClick={() => handleOpenSheetDialog(sheet)}><Edit className="h-4 w-4" /></Button>
@@ -342,7 +342,7 @@ export default function PricingAdminPage() {
   );
 
   const renderAddOnTable = (addOns: ServiceAddOnWithId[], isLoading: boolean) => (
-      <div className="glass-panel rounded-2xl border border-white/10 overflow-hidden">
+      <div className="glass-panel rounded-2xl border border-border/10 overflow-hidden">
         <Table>
             <TableHeader>
                 <TableRow>
@@ -358,9 +358,9 @@ export default function PricingAdminPage() {
                 ) : addOns.length > 0 ? (
                     addOns.map((addOn) => (
                         <TableRow key={addOn.id}>
-                            <TableCell className="font-medium text-white">{addOn.name}</TableCell>
-                            <TableCell className="text-zinc-400">{addOn.description}</TableCell>
-                            <TableCell className="text-right font-mono text-white">
+                            <TableCell className="font-medium text-foreground">{addOn.name}</TableCell>
+                            <TableCell className="text-muted-foreground">{addOn.description}</TableCell>
+                            <TableCell className="text-right font-mono text-foreground">
                                 {addOn.type === 'wide_format_discount' ? `${addOn.price}%` : formatCurrency(addOn.price)}
                             </TableCell>
                             <TableCell className="text-right">
@@ -381,8 +381,8 @@ export default function PricingAdminPage() {
     <div className="max-w-6xl mx-auto">
         <div className="flex justify-between items-center mb-8">
             <div>
-                <h1 className="text-3xl font-bold text-white">Pricing Manager</h1>
-                <p className="text-zinc-400 text-sm mt-1">Manage pricing for sheets and service add-ons.</p>
+                <h1 className="text-3xl font-bold">Pricing Manager</h1>
+                <p className="text-muted-foreground text-sm mt-1">Manage pricing for sheets and service add-ons.</p>
             </div>
             {activeTab !== 'Dynamic' && (
                 <Button onClick={() => activeTab === 'Add-on' ? handleOpenAddOnDialog() : handleOpenSheetDialog()}>
@@ -413,7 +413,7 @@ export default function PricingAdminPage() {
                         ) : (
                             <div className="flex items-center space-x-4">
                                 <div className="relative flex-grow">
-                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-zinc-400" />
+                                    <DollarSign className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
                                     <Input 
                                         type="number" 
                                         value={newSqInchPrice}
