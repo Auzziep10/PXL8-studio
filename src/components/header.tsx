@@ -16,10 +16,10 @@ import type { User as AppUser } from '@/lib/types';
 
 
 const navLinks = [
-  { href: '/track', label: 'Transfers', icon: SearchIcon },
-  { href: '/build', label: 'Builder', icon: Wand2 },
-  { href: '/upload', label: 'Upload', icon: Upload },
-  { href: '/ai-designer', label: 'AI Designer', icon: Sparkles },
+  { href: '/track', label: 'Transfers' },
+  { href: '/build', label: 'Builder' },
+  { href: '/upload', label: 'Upload' },
+  { href: '/ai-designer', label: 'AI Designer' },
 ];
 
 export default function Header() {
@@ -58,8 +58,8 @@ export default function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container flex h-14 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
+    <header className="absolute top-0 z-50 w-full">
+      <div className="container flex h-20 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <PXL8Logo className="h-8 w-auto" />
         </Link>
@@ -69,40 +69,33 @@ export default function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
-                pathname === link.href ? 'text-foreground bg-secondary' : 'text-foreground/60'
+                'transition-colors hover:text-white px-3 py-1.5 rounded-md',
+                pathname === link.href ? 'text-white font-medium' : 'text-zinc-400'
               )}
             >
               {link.label}
             </Link>
           ))}
-          {isAuthenticated && (
-            <Link
-                href="/dashboard"
-                className={cn(
-                    'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
-                    pathname.startsWith('/dashboard') || pathname.startsWith('/admin') ? 'text-foreground bg-secondary' : 'text-foreground/60'
-                )}
-            >
-                Dashboard
-            </Link>
-          )}
         </nav>
         <div className="flex flex-1 items-center justify-end space-x-2">
-          {isAuthenticated && isAdmin && (
-             <Button variant="ghost" size="icon" asChild>
-                <Link href="/admin">
-                    <LayoutGrid className="h-5 w-5" />
-                    <span className="sr-only">Admin Panel</span>
-                </Link>
-             </Button>
+           {isUserLoading || isProfileLoading ? (
+            <div className='w-24 h-8 bg-zinc-800 rounded-md animate-pulse' />
+          ) : isAuthenticated ? (
+             <Button variant="ghost" asChild className="hover:bg-white/10">
+                <Link href="/dashboard">Dashboard</Link>
+              </Button>
+          ) : (
+            <Button asChild variant="ghost" className="hover:bg-white/10">
+                <Link href="/auth/login">Login</Link>
+            </Button>
           )}
-          <Button variant="ghost" size="icon" asChild>
+
+           <Button variant="ghost" size="icon" asChild className="hover:bg-white/10">
             <Link href="/cart">
                 <div className="relative">
                     <ShoppingCart className="h-5 w-5" />
                     {cartItemCount > 0 && (
-                        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                        <span className="absolute -top-2 -right-2 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-xs font-bold text-black">
                             {cartItemCount}
                         </span>
                     )}
@@ -110,28 +103,6 @@ export default function Header() {
                 <span className="sr-only">Cart</span>
             </Link>
           </Button>
-
-          {isUserLoading || isProfileLoading ? (
-            <div className='w-8 h-8 bg-muted rounded-full animate-pulse' />
-          ) : isAuthenticated ? (
-            <>
-              <Button variant="ghost" size="icon" asChild>
-                <Link href="/dashboard">
-                    <User className="h-5 w-5" />
-                    <span className="sr-only">Account</span>
-                </Link>
-              </Button>
-              <Button variant="ghost" size="icon" onClick={handleLogout}>
-                <LogOut className="h-5 w-5" />
-                <span className="sr-only">Logout</span>
-              </Button>
-            </>
-          ) : (
-            <Button asChild>
-                <Link href="/auth/login">Login</Link>
-            </Button>
-          )}
-
         </div>
       </div>
     </header>

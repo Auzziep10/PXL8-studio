@@ -6,12 +6,17 @@ import React from 'react';
 
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const showHeader = !pathname.startsWith('/admin') && !pathname.startsWith('/dashboard') && !pathname.startsWith('/settings');
+  const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/settings');
+  const showHeader = !isDashboard;
+
+  if (isDashboard) {
+    return <main className="flex-grow">{children}</main>;
+  }
 
   return (
     <>
-      {showHeader && <Header />}
-      <main className="flex-grow">{children}</main>
+      <Header />
+      <main className="flex-grow pt-[5rem]">{children}</main>
     </>
   );
 }
