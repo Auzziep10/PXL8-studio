@@ -31,6 +31,15 @@ export default function Header() {
   const firestore = useFirestore();
 
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 10);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const userDocRef = useMemoFirebase(() => {
     if (!firestore || !user) return null;
@@ -68,7 +77,10 @@ export default function Header() {
   };
 
   return (
-    <header className="absolute top-0 z-50 w-full">
+    <header className={cn(
+        "fixed top-0 z-50 w-full transition-all duration-300",
+        isScrolled ? 'bg-background/80 backdrop-blur-lg border-b border-border/10' : 'bg-transparent'
+    )}>
       <div className="container flex h-20 max-w-screen-2xl items-center px-4 sm:px-6 lg:px-8">
         <Link href="/" className="mr-6 flex items-center space-x-2">
           <PXL8Logo className="h-8 w-auto" />
@@ -79,8 +91,9 @@ export default function Header() {
               key={link.href}
               href={link.href}
               className={cn(
-                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md text-foreground/60',
-                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/60'
+                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
+                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/80',
+                isScrolled ? '' : 'text-zinc-200 hover:text-white'
               )}
             >
               {link.label}
@@ -92,7 +105,7 @@ export default function Header() {
             <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
           ) : isAuthenticated ? (
             <>
-              <Button variant="ghost" asChild className="hover:bg-black/10 text-foreground">
+              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-white hover:text-white')}>
                 <Link href="/dashboard">Dashboard</Link>
               </Button>
               <Button onClick={handleLogout} size="sm">
@@ -106,7 +119,7 @@ export default function Header() {
             </Button>
           )}
 
-           <Button variant="ghost" size="icon" asChild className="hover:bg-black/10 text-foreground relative">
+           <Button variant="ghost" size="icon" asChild className={cn('hover:bg-black/10 relative', isScrolled ? 'text-foreground' : 'text-white hover:text-white')}>
             <Link href="/cart">
                 <ShoppingCart className="h-5 w-5" />
                 {cartItemCount > 0 && (

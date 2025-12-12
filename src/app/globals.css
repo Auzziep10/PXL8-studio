@@ -101,11 +101,14 @@
     perspective: 1000px;
   }
   .glass-panel {
-    @apply bg-white/60 backdrop-blur-lg;
+    @apply bg-background/60 backdrop-blur-lg;
+  }
+  .dark .glass-panel {
+    @apply bg-zinc-900/60;
   }
   .bg-checkerboard-dark {
-    background-color: white;
-    background-image: linear-gradient(45deg, #e5e5e5 25%, transparent 25%), linear-gradient(-45deg, #e5e5e5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e5e5e5 75%), linear-gradient(-45deg, transparent 75%, #e5e5e5 75%);
+    background-color: hsl(var(--muted));
+    background-image: linear-gradient(45deg, hsl(var(--secondary)) 25%, transparent 25%), linear-gradient(-45deg, hsl(var(--secondary)) 25%, transparent 25%), linear-gradient(45deg, transparent 75%, hsl(var(--secondary)) 75%), linear-gradient(-45deg, transparent 75%, hsl(var(--secondary)) 75%);
     background-size: 20px 20px;
     background-position: 0 0, 0 10px, 10px -10px, -10px 0;
   }
@@ -117,11 +120,11 @@
     background: transparent;
   }
   .builder-scroll::-webkit-scrollbar-thumb {
-    background: #cccccc;
+    @apply bg-border;
     border-radius: 3px;
   }
   .builder-scroll::-webkit-scrollbar-thumb:hover {
-    background: #bbbbbb;
+    @apply bg-muted-foreground;
   }
   .cursor-eyedropper {
     cursor: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'><path d='m12 9-8.24 8.24a2.83 2.83 0 1 0 4 4L16 13l-4-4Z'/><path d='m16 5 4 4'/></svg>"), auto;

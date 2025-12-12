@@ -7,6 +7,8 @@ import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ParallaxImage } from '@/components/ui/parallax-image';
+import { useEffect, useState } from 'react';
+import { cn } from '@/lib/utils';
 
 const features = [
     {
@@ -34,36 +36,52 @@ const vibrantInksImage = PlaceHolderImages.find(p => p.id === 'homepageVibrantIn
 const techPrintImage = PlaceHolderImages.find(p => p.id === 'homepageTechPrint');
 
 export default function Home() {
+    const [heroScroll, setHeroScroll] = useState(0);
+
+    useEffect(() => {
+        const handleScroll = () => {
+            setHeroScroll(window.scrollY);
+        };
+        window.addEventListener('scroll', handleScroll);
+        return () => window.removeEventListener('scroll', handleScroll);
+    }, []);
+
     return (
         <div className="flex flex-col min-h-screen bg-background text-foreground">
 
             {/* Hero Section */}
-            <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8">
+            <section className="relative h-[100vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
+                {/* This div is the "window" */}
                 <div className="absolute inset-0 z-0">
                     {heroImage && (
-                        <Image
-                            src={heroImage.imageUrl}
-                            alt={heroImage.description}
-                            fill
-                            className="object-cover"
-                            data-ai-hint={heroImage.imageHint}
-                            priority
-                        />
+                        <div 
+                            className="absolute inset-0 h-[150%] w-full top-[-25%]" // Make image taller and position it
+                            style={{ transform: `translateY(${heroScroll * -0.2}px)`}} // Apply parallax
+                        >
+                            <Image
+                                src={heroImage.imageUrl}
+                                alt={heroImage.description}
+                                fill
+                                className="object-cover"
+                                data-ai-hint={heroImage.imageHint}
+                                priority
+                            />
+                        </div>
                     )}
-                    <div className="absolute inset-0 bg-white/30"></div>
+                    <div className="absolute inset-0 bg-black/40"></div>
                 </div>
-                <div className="relative z-10 max-w-4xl mx-auto text-foreground">
+                <div className="relative z-10 max-w-4xl mx-auto text-white">
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
                         The Future of Digital Apparel Decoration
                     </h1>
-                    <p className="mt-6 text-lg md:text-xl text-foreground/80 max-w-2xl mx-auto">
+                    <p className="mt-6 text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
                         PXL8 provides the tools and technology for creators and businesses to produce high-quality, on-demand apparel with unparalleled ease and precision.
                     </p>
                     <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
                         <Button asChild size="lg" className="bg-cyan-500 text-black hover:bg-cyan-400 text-lg py-7 px-10">
                             <Link href="/build">Start Creating</Link>
                         </Button>
-                        <Button asChild variant="outline" size="lg" className="border-zinc-300 bg-white/30 hover:bg-zinc-100 text-foreground text-lg py-7 px-10 backdrop-blur-sm">
+                        <Button asChild variant="outline" size="lg" className="border-zinc-300 bg-white/30 hover:bg-white/50 text-white hover:text-black text-lg py-7 px-10 backdrop-blur-sm">
                             <Link href="/upload">Upload a Sheet</Link>
                         </Button>
                     </div>
