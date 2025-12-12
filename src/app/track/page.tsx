@@ -305,7 +305,7 @@ export default function SingleTransferUploadPage() {
                                 <div className='space-y-4'>
                                     <div 
                                         className={cn(
-                                            "flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
+                                            "flex-grow checkerboard rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
                                             isRemovingBg && 'cursor-eyedropper'
                                         )}
                                     >

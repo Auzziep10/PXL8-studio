@@ -261,7 +261,7 @@ const AssetCard: React.FC<{
 
       {/* Card Body - Image Preview */}
       <div
-        className="p-8 bg-checkerboard-dark flex justify-center items-center relative min-h-[300px] group cursor-zoom-in"
+        className="p-8 checkerboard flex justify-center items-center relative min-h-[300px] group cursor-zoom-in"
         onClick={() => displayUrl && onPreview(displayUrl)}
       >
         {displayUrl ? (
@@ -1050,7 +1050,7 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                             order.items.map((item: OrderItem, idx: number) => (
                               <div
                                 key={idx}
-                                className="relative aspect-square bg-checkerboard-dark rounded-lg border border-border overflow-hidden group cursor-zoom-in"
+                                className="relative aspect-square checkerboard rounded-lg border border-border overflow-hidden group cursor-zoom-in"
                                 onClick={() =>
                                   setPreviewImage(item.printReadyUrl || item.originalSheetUrl)
                                 }

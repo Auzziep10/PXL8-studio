@@ -96,7 +96,7 @@ export default function MediaAdminPage() {
               </div>
             </CardHeader>
             <CardContent className="flex flex-col flex-grow">
-              <div className="aspect-video relative bg-checkerboard-dark rounded-md border overflow-hidden mb-4">
+              <div className="aspect-video relative checkerboard rounded-md border overflow-hidden mb-4">
                 <Image src={image.imageUrl} alt={image.description} fill className="object-contain" />
               </div>
               <div className="relative mb-4">

@@ -216,8 +216,7 @@ export default function CartPage() {
 
         // --- PRE-CHECKOUT UPLOAD & VALIDATION ---
         if (cartItems.some(item => (item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) && !currentUser) {
-            console.error("Validation failed: Guest user with temporary images.");
-            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to save and check out your AI-generated or temporary designs.' });
+            toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to save and check out your designs. Guests can only check out with uploaded files.' });
             setIsCheckingOut(false);
             return;
         }
@@ -389,7 +388,7 @@ export default function CartPage() {
             return (
                  <div key={item.id} className="flex flex-col sm:flex-row items-start sm:items-center space-y-4 sm:space-y-0 sm:space-x-6 pb-4 border-b border-border last:border-0 last:pb-0">
                     <div 
-                        className="w-20 h-20 bg-checkerboard-dark rounded-lg border border-border flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
+                        className="w-20 h-20 checkerboard rounded-lg border border-border flex-shrink-0 relative overflow-hidden cursor-zoom-in group"
                         onClick={() => handlePreview(item)}
                     >
                         {item.previewUrl && !('previewStripped' in item) ? (
