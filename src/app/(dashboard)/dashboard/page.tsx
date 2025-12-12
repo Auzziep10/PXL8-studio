@@ -204,7 +204,7 @@ export default function CustomerDashboardPage() {
                   <TableRow key={order.orderId}>
                     <TableCell className="font-medium font-mono">
                       <Button variant="link" asChild className="p-0 h-auto font-mono">
-                        <Link href={`/track?id=${order.orderId}`}>{order.orderId}</Link>
+                        <Link href={`/order-details?id=${order.orderId}`}>{order.orderId}</Link>
                       </Button>
                     </TableCell>
                     <TableCell>
