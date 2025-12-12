@@ -871,7 +871,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
         <div className="flex items-center justify-center min-h-[60vh]">
             <div className="flex flex-col items-center space-y-4">
                 <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-                <p className="text-zinc-400">Loading your sheet...</p>
+                <p className="text-muted-foreground">Loading your sheet...</p>
             </div>
         </div>
     )
@@ -882,8 +882,8 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
       <div className="max-w-7xl mx-auto px-4 py-8">
         {usage === 'Builder' && (
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-white">Gang Sheet Builder</h1>
-                <p className="mt-2 text-zinc-400">Upload designs and drag them to arrange.</p>
+                <h1 className="text-3xl font-bold text-foreground">Gang Sheet Builder</h1>
+                <p className="mt-2 text-muted-foreground">Upload designs and drag them to arrange.</p>
             </div>
         )}
 
@@ -894,12 +894,12 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             {/* 1. Sheet Selection */}
             <div className="glass-panel rounded-2xl p-6">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center">
-                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">1</span>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center">
+                    <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">1</span>
                     Select Sheet Size
                   </h3>
                   {user && (
-                    <div className="flex items-center text-xs text-zinc-500">
+                    <div className="flex items-center text-xs text-muted-foreground">
                         <Save className="w-3 h-3 mr-1.5 text-accent" />
                         <span>Auto-saved to cloud</span>
                     </div>
@@ -907,13 +907,13 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
               </div>
               <div className="space-y-3">
                 {(isLoadingSizes || isLoadingPrice) ? (
-                    <p className="text-zinc-400 text-sm">Loading pricing...</p>
+                    <p className="text-muted-foreground text-sm">Loading pricing...</p>
                 ) : sortedSheetSizes?.length === 0 ? (
-                    <p className="text-zinc-400 text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
+                    <p className="text-muted-foreground text-sm">No pricing tiers available for "{usage}". Please configure them in the admin pricing manager.</p>
                 ) : sortedSheetSizes?.map((config) => {
                     const finalPrice = calculateFinalPrice(config);
                     return (
-                        <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'}`}>
+                        <label key={config.id} className={`relative overflow-hidden flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${selectedSizeId === config.id ? 'border-primary bg-primary/10' : 'border-border hover:border-muted'}`}>
                             <div className="flex items-center relative z-10">
                             <input
                                 type="radio"
@@ -921,14 +921,14 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                 value={config.id}
                                 checked={selectedSizeId === config.id}
                                 onChange={(e) => setSelectedSizeId(e.target.value)}
-                                className="h-4 w-4 text-primary focus:ring-primary border-zinc-600 bg-zinc-800"
+                                className="h-4 w-4 text-primary focus:ring-primary border-muted-foreground"
                             />
-                            <span className="ml-3 font-medium text-gray-200">{config.name} - {config.width}" x {config.height}"</span>
+                            <span className="ml-3 font-medium text-foreground">{config.name} - {config.width}" x {config.height}"</span>
                             </div>
                             <div className="flex flex-col items-end relative z-10">
                                 <span className="font-bold text-accent">{formatCurrency(finalPrice)}</span>
                                 {config.discount > 0 && 
-                                    <span className="text-xs text-red-400 flex items-center gap-1">
+                                    <span className="text-xs text-red-500 flex items-center gap-1">
                                         <Percent className="w-3 h-3" /> {config.discount}% Off
                                     </span>
                                 }
@@ -943,12 +943,12 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
             {selectedItem ? (
                  <div className="glass-panel rounded-2xl p-6 space-y-4">
                      <div className="flex justify-between items-center">
-                        <h3 className="text-lg font-semibold text-white">Selected Artwork</h3>
-                        <button onClick={() => setSelectedItemId(null)} className="text-zinc-500 hover:text-white">&times;</button>
+                        <h3 className="text-lg font-semibold text-foreground">Selected Artwork</h3>
+                        <button onClick={() => setSelectedItemId(null)} className="text-muted-foreground hover:text-foreground">&times;</button>
                      </div>
                       <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
                                 <ArrowLeftRight className="w-3 h-3 mr-1" /> Width
                             </label>
                             <div className="relative">
@@ -964,13 +964,13 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                          updateItem(selectedItem.id, { width: w, height: parseFloat((w * ratio).toFixed(2)) });
                                      }
                                   }}
-                                  className="block w-full rounded bg-zinc-900 border border-white/10 text-white text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
+                                  className="block w-full rounded bg-background border border-input text-foreground text-xs p-1.5 focus:border-primary focus:ring-1 focus:ring-primary outline-none"
                                 />
-                                <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
                             </div>
                         </div>
                         <div>
-                            <label className="block text-[10px] text-zinc-500 font-bold uppercase tracking-wider mb-1 flex items-center">
+                            <label className="block text-[10px] text-muted-foreground font-bold uppercase tracking-wider mb-1 flex items-center">
                                 <ArrowUpDown className="w-3 h-3 mr-1" /> Height
                             </label>
                             <div className="relative">
@@ -978,23 +978,23 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                   type="number" 
                                   value={selectedItem.height}
                                   readOnly
-                                  className="block w-full rounded bg-zinc-900/50 border border-white/5 text-zinc-500 text-xs p-1.5 cursor-not-allowed outline-none"
+                                  className="block w-full rounded bg-muted border border-border text-muted-foreground text-xs p-1.5 cursor-not-allowed outline-none"
                                 />
-                                <span className="absolute right-2 top-1.5 text-zinc-600 text-[10px]">in</span>
+                                <span className="absolute right-2 top-1.5 text-muted-foreground text-[10px]">in</span>
                             </div>
                         </div>
                       </div>
-                      <div className="flex justify-between items-center bg-black/20 p-2 rounded text-xs font-mono text-zinc-500">
+                      <div className="flex justify-between items-center bg-background/50 p-2 rounded text-xs font-mono text-muted-foreground">
                           <span className="flex items-center"><Move className="w-3 h-3 mr-1" /> Position</span>
                           <span>X: {selectedItem.x.toFixed(2)}" Y: {selectedItem.y.toFixed(2)}"</span>
                       </div>
                       <div className="flex items-center justify-between pt-2">
-                           <label className="text-xs text-zinc-400 font-medium">Duplicate:</label>
+                           <label className="text-xs text-muted-foreground font-medium">Duplicate:</label>
                            <div className="flex items-center space-x-2">
                                <div className="flex items-center">
                                     <button 
                                         onClick={() => setDuplicateCount(Math.max(1, duplicateCount - 1))}
-                                        className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-l hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-l hover:bg-muted text-muted-foreground transition-colors"
                                     >
                                         -
                                     </button>
@@ -1002,18 +1002,18 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                         type="number" 
                                         value={duplicateCount}
                                         onChange={(e) => setDuplicateCount(Math.max(1, parseInt(e.target.value) || 1))}
-                                        className="w-12 h-8 bg-zinc-900 border-y border-white/10 text-center text-sm text-white focus:outline-none"
+                                        className="w-12 h-8 bg-background border-y border-border text-center text-sm text-foreground focus:outline-none"
                                     />
                                     <button 
                                         onClick={()=> setDuplicateCount(duplicateCount + 1)}
-                                        className="w-8 h-8 flex items-center justify-center bg-zinc-800 border border-white/10 rounded-r hover:bg-zinc-700 text-zinc-400 transition-colors"
+                                        className="w-8 h-8 flex items-center justify-center bg-secondary border border-border rounded-r hover:bg-muted text-muted-foreground transition-colors"
                                     >
                                         +
                                     </button>
                                </div>
                                <button 
                                     onClick={() => handleBulkDuplicate(selectedItem, duplicateCount)}
-                                    className="h-8 px-3 bg-white text-black text-xs font-bold rounded hover:bg-zinc-200 transition-colors flex items-center"
+                                    className="h-8 px-3 bg-primary text-primary-foreground text-xs font-bold rounded hover:bg-primary/90 transition-colors flex items-center"
                                >
                                     <Copy className="w-3 h-3 mr-1" /> Add
                                </button>
@@ -1027,20 +1027,20 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                  </div>
             ) : (
                 <div className="glass-panel rounded-2xl p-6">
-                    <p className="text-sm text-center text-zinc-400">Select an artwork on the canvas to see its details and use AI tools.</p>
+                    <p className="text-sm text-center text-muted-foreground">Select an artwork on the canvas to see its details and use AI tools.</p>
                 </div>
             )}
 
             {/* 2. Upload & Item List */}
             <div className="glass-panel rounded-2xl p-6">
               <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-semibold text-white flex items-center">
-                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-white/10 text-xs mr-2">2</span>
+                  <h3 className="text-lg font-semibold text-foreground flex items-center">
+                     <span className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-xs mr-2">2</span>
                      Designs
                   </h3>
                   <button 
                     onClick={() => fileInputRef.current?.click()}
-                    className="text-xs flex items-center bg-zinc-800 hover:bg-zinc-700 text-white px-3 py-1.5 rounded-lg border border-white/10 transition-colors"
+                    className="text-xs flex items-center bg-secondary hover:bg-muted text-secondary-foreground px-3 py-1.5 rounded-lg border border-border transition-colors"
                   >
                       <Plus className="w-3 h-3 mr-1" /> Add New
                   </button>
@@ -1051,13 +1051,13 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
               {items.length === 0 ? (
                 <div 
                   onClick={() => fileInputRef.current?.click()}
-                  className="border-2 border-dashed border-zinc-600 rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
+                  className="border-2 border-dashed border-border rounded-xl p-8 text-center hover:border-primary hover:bg-primary/5 transition-colors cursor-pointer group"
                 >
-                  <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
-                     <Upload className="h-6 w-6 text-zinc-400 group-hover:text-primary" />
+                  <div className="w-12 h-12 rounded-full bg-secondary flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                     <Upload className="h-6 w-6 text-muted-foreground group-hover:text-primary" />
                   </div>
-                  <p className="mt-2 text-sm font-medium text-white">Upload Artwork</p>
-                  <p className="text-xs text-zinc-500">PNG, JPG, SVG (300 DPI)</p>
+                  <p className="mt-2 text-sm font-medium text-foreground">Upload Artwork</p>
+                  <p className="text-xs text-muted-foreground">PNG, JPG, SVG (300 DPI)</p>
                 </div>
               ) : (
                 <div className="space-y-2 max-h-[500px] overflow-y-auto pr-2 builder-scroll">
@@ -1065,25 +1065,25 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                       <div 
                         key={item.id} 
                         onClick={() => setSelectedItemId(item.id)}
-                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-zinc-800 border-primary ring-1 ring-primary/20' : 'bg-zinc-900/50 border-white/5 hover:bg-zinc-800'}`}
+                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-secondary border-primary ring-1 ring-primary/20' : 'bg-background/50 border-border hover:bg-secondary'}`}
                       >
                           <div className="flex items-start justify-between">
                               <div className="flex items-center space-x-3">
-                                  <div className="w-12 h-12 rounded border border-white/10 overflow-hidden bg-checkerboard-dark flex-shrink-0">
+                                  <div className="w-12 h-12 rounded border border-border overflow-hidden bg-checkerboard-dark flex-shrink-0">
                                       {item.imageUrl ? (
                                         <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
                                       ): (
-                                        <div className="w-full h-full bg-zinc-800 flex items-center justify-center text-zinc-500 text-xs">No img</div>
+                                        <div className="w-full h-full bg-muted flex items-center justify-center text-muted-foreground text-xs">No img</div>
                                       )}
                                   </div>
                                   <div className="min-w-0">
-                                      <p className="text-sm font-medium text-white truncate w-24" title={item.name}>{item.name}</p>
-                                      <p className="text-xs text-zinc-500">{item.width}" x {item.height}"</p>
+                                      <p className="text-sm font-medium text-foreground truncate w-24" title={item.name}>{item.name}</p>
+                                      <p className="text-xs text-muted-foreground">{item.width}" x {item.height}"</p>
                                   </div>
                               </div>
                               <button 
                                 onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                                className="text-zinc-600 hover:text-red-400 transition-colors"
+                                className="text-muted-foreground hover:text-red-500 transition-colors"
                               >
                                   <Trash2 className="w-4 h-4" />
                               </button>
@@ -1105,14 +1105,14 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
           </div>
 
           {/* Right Preview */}
-          <div ref={containerRef} className="lg:col-span-2 glass-panel rounded-2xl border border-white/10 p-8 flex flex-col items-center relative overflow-hidden">
+          <div ref={containerRef} className="lg:col-span-2 glass-panel rounded-2xl border border-border p-8 flex flex-col items-center relative overflow-hidden">
             <div className="flex justify-between w-full max-w-2xl mb-4 z-10">
-                <span className="text-zinc-400 font-medium text-sm flex items-center">
-                    <Info className="w-4 h-4 mr-1 text-zinc-500" />
+                <span className="text-muted-foreground font-medium text-sm flex items-center">
+                    <Info className="w-4 h-4 mr-1 text-muted-foreground" />
                     Preview Scale: {(scale * 100).toFixed(0)}%
                 </span>
                 {isSheetOverflowing && (
-                    <span className="text-red-400 font-bold text-sm flex items-center animate-pulse">
+                    <span className="text-red-500 font-bold text-sm flex items-center animate-pulse">
                         <AlertTriangle className="w-4 h-4 mr-1" />
                         Items outside print area!
                     </span>
@@ -1126,7 +1126,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                 onMouseLeave={handleMouseLeave}
             >
                  <div 
-                    className="relative bg-checkerboard-dark sheet-canvas shadow-2xl bg-zinc-950 border border-white/10 rounded-sm"
+                    className={`relative bg-checkerboard-dark sheet-canvas shadow-2xl bg-muted-foreground/10 border border-border rounded-sm`}
                     style={{
                         width: `${displayWidth}px`,
                         height: `${displayHeight}px`,
@@ -1179,7 +1179,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                                           alt=""
                                       />
                                     ) : (
-                                      <div className="w-full h-full bg-zinc-800/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
+                                      <div className="w-full h-full bg-destructive/50 flex items-center justify-center text-white text-xs font-mono p-1">Re-upload required</div>
                                     )}
 
                                     {isSelected && (
@@ -1209,12 +1209,12 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
                     
                  </div>
             </div>
-            <div className="w-full flex justify-between text-zinc-500 text-xs mt-2 font-mono">
+            <div className="w-full flex justify-between text-muted-foreground text-xs mt-2 font-mono">
                 <span>0"</span>
                 <span>{sheetConfig?.width || 0}"</span>
             </div>
             
-            <div className="mt-4 text-xs text-zinc-500 flex items-center">
+            <div className="mt-4 text-xs text-muted-foreground flex items-center">
                 <Move className="w-4 h-4 mr-2" />
                 Click and drag images to arrange. Overlapping items will be highlighted red.
             </div>
