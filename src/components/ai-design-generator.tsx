@@ -1,13 +1,13 @@
 
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { generateDesign, addTextToImage, GenerateDesignFromPromptInput } from '@/app/actions';
+import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
@@ -16,11 +16,14 @@ import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { sanitizeFilename } from '@/lib/utils';
+import { Slider } from './ui/slider';
 
 // --- Dropdown Options ---
 const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco"];
 const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients"];
 const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro"];
+const fontOptions = ["Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Impact", "Comic Sans MS"];
+
 
 // --- Component ---
 export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGeneratorProps) {
@@ -28,19 +31,22 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const { toast } = useToast();
     const firestore = useFirestore();
 
-    const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({
-        subject: '',
-        style: '',
-        colors: '',
-        mood: '',
-    });
-    const [textToAdd, setTextToAdd] = useState('');
-    const [isApplyingText, setIsApplyingText] = useState(false);
+    // --- State Management ---
+    const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({ subject: '', style: '', colors: '', mood: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [isRemovingBg, setIsRemovingBg] = useState(false);
-    const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+    const [generatedImage, setGeneratedImage] = useState<HTMLImageElement | null>(null);
     const [view, setView] = useState<'generate' | 'edit'>('generate');
+
+    // --- Text State ---
+    const [textItems, setTextItems] = useState<TextItem[]>([]);
+    const [activeTextId, setActiveTextId] = useState<string | null>(null);
     
+    // --- Canvas & Dragging State ---
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const [draggingTextId, setDraggingTextId] = useState<string | null>(null);
+    const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+
     const addOnsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'serviceAddOns'), where('name', '==', 'AI Design Creation'));
@@ -51,89 +57,78 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const aiDesignFeeProduct = useMemo(() => {
         if (aiDesignService && aiDesignService.length > 0) {
             const service = aiDesignService[0];
-            return {
-                id: service.id,
-                type: 'service' as const,
-                name: service.name,
-                price: service.price,
-            };
+            return { id: service.id, type: 'service' as const, name: service.name, price: service.price };
         }
         return null;
     }, [aiDesignService]);
 
+    const activeTextItem = useMemo(() => textItems.find(t => t.id === activeTextId), [textItems, activeTextId]);
+
+    // --- Canvas Drawing Logic ---
+    const drawCanvas = useCallback(() => {
+        const canvas = canvasRef.current;
+        const ctx = canvas?.getContext('2d');
+        if (!ctx || !canvas) return;
+
+        // Clear canvas
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Draw background image
+        if (generatedImage) {
+            ctx.drawImage(generatedImage, 0, 0, canvas.width, canvas.height);
+        }
+
+        // Draw each text item
+        textItems.forEach(text => {
+            ctx.font = `${text.fontSize}px ${text.font}`;
+            ctx.fillStyle = text.color;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(text.content, text.x, text.y);
+        });
+
+    }, [generatedImage, textItems]);
+
+    useEffect(() => {
+        drawCanvas();
+    }, [drawCanvas]);
+
+
+    // --- Core Actions ---
     const handleGenerate = async () => {
         const { subject, style, colors, mood } = formData;
         if (!subject || !style || !colors || !mood) {
-            toast({
-                variant: 'destructive',
-                title: 'All fields are required',
-                description: 'Please describe a subject and select an option from each dropdown.',
-            });
+            toast({ variant: 'destructive', title: 'All fields are required' });
             return;
         }
-
         if (!aiDesignFeeProduct && !isLoadingService) {
-             toast({
-                variant: 'destructive',
-                title: 'Pricing Error',
-                description: 'AI Design pricing is not configured. Please contact support.',
-            });
-            return;
+             toast({ variant: 'destructive', title: 'Pricing Error' });
+             return;
         }
 
         setIsLoading(true);
         setGeneratedImage(null);
+        setTextItems([]);
 
         try {
             const result = await generateDesign(formData);
             if (result.success && result.data?.imageDataUri) {
-                setGeneratedImage(result.data.imageDataUri);
-                setView('edit');
-                toast({
-                    title: 'Design Generated!',
-                    description: 'Your new design is ready for edits.',
-                });
+                const img = new Image();
+                img.crossOrigin = "anonymous";
+                img.onload = () => {
+                    setGeneratedImage(img);
+                    setView('edit');
+                    toast({ title: 'Design Generated!', description: 'Your new design is ready for edits.' });
+                };
+                img.src = result.data.imageDataUri;
             } else {
                 throw new Error(result.error || 'Failed to generate design.');
             }
         } catch (error) {
             console.error('Error generating design:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Generation Failed',
-                description: (error as Error).message || 'An unexpected error occurred.',
-            });
+            toast({ variant: 'destructive', title: 'Generation Failed', description: (error as Error).message });
         } finally {
             setIsLoading(false);
-        }
-    };
-    
-    const handleApplyText = async () => {
-        if (!generatedImage || !textToAdd) return;
-
-        setIsApplyingText(true);
-        toast({ title: 'Applying Text...', description: 'AI is adding your text to the image.' });
-
-        try {
-            const result = await addTextToImage({
-                imageDataUri: generatedImage,
-                text: textToAdd,
-            });
-            if (result.success && result.data?.imageDataUri) {
-                setGeneratedImage(result.data.imageDataUri);
-                toast({ title: 'Text Applied!', description: 'Your design has been updated.' });
-            } else {
-                throw new Error(result.error || 'Failed to apply text.');
-            }
-        } catch (error) {
-            console.error('Error applying text:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Text Application Failed',
-                description: (error as Error).message,
-            });
-        } finally {
-            setIsApplyingText(false);
         }
     };
 
@@ -142,65 +137,146 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         setIsRemovingBg(true);
         try {
-            const result = await removeBackground({ imageDataUri: generatedImage });
+            const result = await removeBackground({ imageDataUri: generatedImage.src });
             if (result && result.imageDataUri) {
-                setGeneratedImage(result.imageDataUri);
-                toast({
-                    title: 'Background Removed',
-                    description: 'The background has been successfully removed.',
-                });
+                 const img = new Image();
+                 img.crossOrigin = "anonymous";
+                 img.onload = () => {
+                    setGeneratedImage(img);
+                    toast({ title: 'Background Removed' });
+                 };
+                 img.src = result.imageDataUri;
             } else {
                 throw new Error('Failed to remove background.');
             }
         } catch (error) {
             console.error('Error removing background:', error);
-            toast({
-                variant: 'destructive',
-                title: 'Background Removal Failed',
-                description: (error as Error).message || 'An unexpected error occurred.',
-            });
+            toast({ variant: 'destructive', title: 'Background Removal Failed' });
         } finally {
             setIsRemovingBg(false);
         }
     };
 
     const handleSendToPage = (target: 'builder' | 'transfers') => {
-        if (!generatedImage || !aiDesignFeeProduct) {
-             toast({
-                variant: 'destructive',
-                title: 'Cannot Proceed',
-                description: !generatedImage ? 'No image has been generated.' : 'AI pricing is not available.',
-            });
-            return;
+        const canvas = canvasRef.current;
+        if (!canvas || !aiDesignFeeProduct) {
+             toast({ variant: 'destructive', title: 'Cannot Proceed' });
+             return;
         };
         
+        const finalImageDataUrl = canvas.toDataURL('image/png');
         const promptSummary = `${formData.subject} ${formData.style}`.trim();
 
         const newArtwork: Omit<Artwork, 'id'> = {
             name: sanitizeFilename(promptSummary) || 'ai-design',
-            imageUrl: generatedImage,
-            width: 5, // Default size
+            imageUrl: finalImageDataUrl,
+            width: 5,
             height: 5,
             dpi: 300,
         };
 
-        addToCart({
-            ...aiDesignFeeProduct,
-            quantity: 1,
-        });
-
+        addToCart({ ...aiDesignFeeProduct, quantity: 1 });
         onDesignGenerated(newArtwork, target);
         
         toast({
             title: 'Artwork Sent!',
-            description: `The design is ready on the ${target} page, and a ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)} fee is in your cart.`,
+            description: `The design is ready on the ${target} page, and a fee is in your cart.`,
         });
 
         // Reset state
         setView('generate');
         setGeneratedImage(null);
-        setTextToAdd('');
+        setTextItems([]);
+        setActiveTextId(null);
         setFormData({ subject: '', style: '', colors: '', mood: '' });
+    };
+
+    // --- Text Manipulation ---
+    const handleAddText = () => {
+        const canvas = canvasRef.current;
+        if (!canvas) return;
+
+        const newText: TextItem = {
+            id: `text-${Date.now()}`,
+            content: 'New Text',
+            font: 'Arial',
+            fontSize: 40,
+            color: '#000000',
+            x: canvas.width / 2,
+            y: canvas.height / 2,
+        };
+        setTextItems(prev => [...prev, newText]);
+        setActiveTextId(newText.id);
+    };
+    
+    const updateActiveText = (updates: Partial<TextItem>) => {
+        if (!activeTextId) return;
+        setTextItems(prev => prev.map(t => t.id === activeTextId ? { ...t, ...updates } : t));
+    };
+
+    const deleteActiveText = () => {
+        if (!activeTextId) return;
+        setTextItems(prev => prev.filter(t => t.id !== activeTextId));
+        setActiveTextId(null);
+    };
+
+    // --- Canvas Event Handlers ---
+    const getCoords = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const canvas = canvasRef.current;
+        if (!canvas) return null;
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: e.clientX - rect.left,
+            y: e.clientY - rect.top,
+        };
+    };
+
+    const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const coords = getCoords(e);
+        if (!coords || !canvasRef.current) return;
+        const ctx = canvasRef.current.getContext('2d');
+        if (!ctx) return;
+
+        // Check if clicking on any text item (in reverse order for layering)
+        for (let i = textItems.length - 1; i >= 0; i--) {
+            const text = textItems[i];
+            ctx.font = `${text.fontSize}px ${text.font}`;
+            const metrics = ctx.measureText(text.content);
+            const textWidth = metrics.width;
+            const textHeight = text.fontSize; // Approximation
+
+            if (
+                coords.x >= text.x - textWidth / 2 &&
+                coords.x <= text.x + textWidth / 2 &&
+                coords.y >= text.y - textHeight / 2 &&
+                coords.y <= text.y + textHeight / 2
+            ) {
+                setActiveTextId(text.id);
+                setDraggingTextId(text.id);
+                setDragOffset({
+                    x: coords.x - text.x,
+                    y: coords.y - text.y
+                });
+                return; // Stop after finding the top-most text
+            }
+        }
+        
+        // If no text was clicked, deselect
+        setActiveTextId(null);
+    };
+
+    const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        const coords = getCoords(e);
+        if (!coords || !draggingTextId) return;
+
+        updateActiveText({
+            x: coords.x - dragOffset.x,
+            y: coords.y - dragOffset.y,
+        });
+    };
+
+    const handleCanvasMouseUp = () => {
+        setDraggingTextId(null);
     };
 
 
@@ -210,6 +286,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         ? `Each generation costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}. The fee is added to your cart when you use the design.`
         : 'AI design pricing not configured.';
 
+    // --- Render Logic ---
     return (
         <div className="max-w-4xl mx-auto py-8 px-4">
             <Card className="glass-panel border-white/10">
@@ -218,14 +295,12 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         <Sparkles className="w-8 h-8 text-primary" />
                     </div>
                     <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
-                    <CardDescription className="text-zinc-400">
-                        {generationFeeText}
-                    </CardDescription>
+                    <CardDescription className="text-zinc-400">{generationFeeText}</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-6">
                     {view === 'generate' ? (
                          <div className="space-y-4">
-                            <div>
+                             <div>
                                 <Label>Subject</Label>
                                 <Input 
                                     placeholder="e.g., A robot surfing on a slice of pizza"
@@ -257,52 +332,66 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Select>
                                 </div>
                             </div>
-                            
-                            <Button
-                                onClick={handleGenerate}
-                                disabled={isLoading || isLoadingService || !aiDesignFeeProduct}
-                                className="w-full mt-4 text-lg py-6"
-                            >
-                                {isLoading ? (
-                                    <span className="flex items-center">
-                                        <Wand2 className="w-5 h-5 mr-2 animate-pulse" />
-                                        Generating...
-                                    </span>
-                                ) : (
-                                    'Generate Design'
-                                )}
+                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || !aiDesignFeeProduct} className="w-full mt-4 text-lg py-6">
+                                {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : 'Generate Design'}
                             </Button>
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            <div className="bg-checkerboard-dark rounded-xl border border-white/10 p-4 aspect-square max-w-lg mx-auto">
-                                <img src={generatedImage!} alt="AI Generated Design" className="w-full h-full object-contain" />
+                            <div className="bg-checkerboard-dark rounded-xl border border-white/10 p-2 mx-auto aspect-square max-w-lg cursor-move">
+                                <canvas
+                                    ref={canvasRef}
+                                    width={512}
+                                    height={512}
+                                    className="w-full h-full object-contain"
+                                    onMouseDown={handleCanvasMouseDown}
+                                    onMouseMove={handleCanvasMouseMove}
+                                    onMouseUp={handleCanvasMouseUp}
+                                    onMouseLeave={handleCanvasMouseUp}
+                                />
                             </div>
                              
-                             {/* Editing Controls */}
                              <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
-                                <div className="flex flex-col sm:flex-row gap-4">
-                                     <div className="flex-grow space-y-2">
-                                        <Label className="flex items-center gap-2 text-zinc-300"><CaseSensitive className="w-4 h-4"/> Add Text</Label>
-                                        <div className="flex gap-2">
-                                            <Input 
-                                                placeholder="e.g., 'Happy Camper'" 
-                                                value={textToAdd}
-                                                onChange={(e) => setTextToAdd(e.target.value)}
-                                                disabled={isApplyingText}
-                                            />
-                                            <Button onClick={handleApplyText} disabled={isApplyingText || !textToAdd}>
-                                                {isApplyingText ? <RefreshCw className="animate-spin" /> : 'Apply'}
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label className="flex items-center gap-2 text-zinc-300"><Scissors className="w-4 h-4"/> Edit Image</Label>
-                                        <Button onClick={handleRemoveBackground} variant="outline" className="w-full" disabled={isRemovingBg}>
-                                            {isRemovingBg ? 'Removing...' : 'Remove Background'}
-                                        </Button>
-                                    </div>
+                                <div className="flex items-center justify-between">
+                                    <Label className="flex items-center gap-2 text-zinc-300"><CaseSensitive className="w-4 h-4"/> Text Editor</Label>
+                                    <Button onClick={handleAddText} size="sm" variant="secondary">Add Text</Button>
                                 </div>
+                                
+                                {activeTextItem && (
+                                    <div className="p-4 bg-background/30 rounded-lg space-y-4 animate-in fade-in">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div>
+                                                <Label htmlFor="text-content">Text</Label>
+                                                <Input id="text-content" value={activeTextItem.content} onChange={(e) => updateActiveText({ content: e.target.value })} />
+                                            </div>
+                                            <div>
+                                                <Label htmlFor="text-font">Font</Label>
+                                                 <Select value={activeTextItem.font} onValueChange={(v) => updateActiveText({ font: v })}>
+                                                    <SelectTrigger id="text-font"><SelectValue /></SelectTrigger>
+                                                    <SelectContent>{fontOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                                </Select>
+                                            </div>
+                                        </div>
+                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
+                                            <div>
+                                                <Label htmlFor="text-size">Size: {activeTextItem.fontSize}px</Label>
+                                                <Slider id="text-size" min={10} max={150} step={1} value={[activeTextItem.fontSize]} onValueChange={([v]) => updateActiveText({ fontSize: v })} />
+                                            </div>
+                                            <div className="flex items-center gap-4">
+                                                <Label htmlFor="text-color">Color</Label>
+                                                <Input id="text-color" type="color" value={activeTextItem.color} onChange={(e) => updateActiveText({ color: e.target.value })} className="p-1 h-10 w-16" />
+                                                <Button onClick={deleteActiveText} variant="destructive" size="sm">Delete</Button>
+                                            </div>
+                                         </div>
+                                    </div>
+                                )}
+                             </div>
+
+                             <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
+                                <Label className="flex items-center gap-2 text-zinc-300"><Scissors className="w-4 h-4"/> Image Tools</Label>
+                                <Button onClick={handleRemoveBackground} variant="outline" className="w-full" disabled={isRemovingBg}>
+                                    {isRemovingBg ? 'Removing...' : 'Remove Background'}
+                                </Button>
                              </div>
 
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -322,10 +411,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     )}
                     <div className="text-xs text-zinc-500 p-3 bg-zinc-900/50 rounded-lg flex items-start space-x-2">
                         <AlertTriangle className="w-4 h-4 text-zinc-600 flex-shrink-0 mt-0.5" />
-                        <span>
-                            AI-generated images are provided at approximately 300 DPI at 5"x5". Larger sizes may result in quality loss. 
-                            Always review the final placement on the gang sheet.
-                        </span>
+                        <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
                     </div>
                 </CardContent>
             </Card>
@@ -335,4 +421,14 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
 interface AiDesignGeneratorProps {
   onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
+}
+
+interface TextItem {
+    id: string;
+    content: string;
+    font: string;
+    fontSize: number;
+    color: string;
+    x: number;
+    y: number;
 }
