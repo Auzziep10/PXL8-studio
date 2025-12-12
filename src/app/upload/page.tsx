@@ -14,7 +14,13 @@ import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 
-type UploadWidthTier = 'standard' | 'wide';
+const uploadTiers = [
+    { id: '22', label: 'Standard', maxWidth: 22, discount: 0 },
+    { id: '51', label: 'Wide Format', maxWidth: 51, discount: 5 },
+    { id: '63', label: 'Grand Format', maxWidth: 63, discount: 10 },
+];
+
+type UploadWidthTier = '22' | '51' | '63';
 
 export default function PrebuiltUploadPage() {
     const { addItem: onAddToCart } = useCart();
@@ -30,13 +36,15 @@ export default function PrebuiltUploadPage() {
     const { pricePerSqInch, wideFormatDiscount } = useMemo(() => {
         if (addOns && addOns.length > 0) {
             const sqInch = addOns.find(a => a.type === 'per_sq_inch')?.price || null;
+            // This discount logic might need adjustment if different tiers have different discounts.
+            // For now, we'll use the first one found.
             const discount = addOns.find(a => a.type === 'wide_format_discount')?.price || 0;
             return { pricePerSqInch: sqInch, wideFormatDiscount: discount };
         }
         return { pricePerSqInch: null, wideFormatDiscount: 0 };
     }, [addOns]);
 
-    const [widthTier, setWidthTier] = useState<UploadWidthTier>('standard');
+    const [widthTier, setWidthTier] = useState<UploadWidthTier>('22');
     const [file, setFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [quantity, setQuantity] = useState(1);
@@ -46,7 +54,8 @@ export default function PrebuiltUploadPage() {
     const [validationError, setValidationError] = useState<string | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    const maxWidth = widthTier === 'standard' ? 22 : 43;
+    const selectedTier = useMemo(() => uploadTiers.find(t => t.id === widthTier)!, [widthTier]);
+    const maxWidth = selectedTier.maxWidth;
 
     useEffect(() => {
         if (detectedDimensions && pricePerSqInch !== null) {
@@ -61,14 +70,15 @@ export default function PrebuiltUploadPage() {
             const area = detectedDimensions.w * detectedDimensions.h;
             let price = area * pricePerSqInch;
             
-            if (widthTier === 'wide' && wideFormatDiscount > 0) {
-                price = price - (price * (wideFormatDiscount / 100));
+            // Apply discount based on the selected tier's config
+            if (selectedTier.discount > 0) {
+                price = price - (price * (selectedTier.discount / 100));
             }
             setCalculatedPrice(price);
         } else {
             setCalculatedPrice(null);
         }
-    }, [detectedDimensions, pricePerSqInch, widthTier, maxWidth, wideFormatDiscount]);
+    }, [detectedDimensions, pricePerSqInch, widthTier, maxWidth, selectedTier]);
 
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,7 +145,7 @@ export default function PrebuiltUploadPage() {
             const item: DynamicSheetCartItem = {
                 id: `dyn-${Date.now()}`,
                 type: 'dynamic_sheet',
-                name: `Custom Upload (${widthTier})`,
+                name: `Custom Upload (${selectedTier.label})`,
                 previewUrl: previewUrl,
                 width: detectedDimensions.w,
                 height: detectedDimensions.h,
@@ -174,22 +184,21 @@ export default function PrebuiltUploadPage() {
                 </div>
 
                 <div className="mb-8">
-                    <div className="grid grid-cols-2 gap-4 max-w-md mx-auto">
-                        <div 
-                            onClick={() => handleTierChange('standard')}
-                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'standard' ? 'border-primary' : 'border-border hover:border-muted-foreground')}
-                        >
-                            <h3 className="font-bold text-foreground">Standard</h3>
-                            <p className="text-muted-foreground text-sm">Up to 22" Wide</p>
-                        </div>
-                         <div 
-                            onClick={() => handleTierChange('wide')}
-                            className={cn('glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', widthTier === 'wide' ? 'border-primary' : 'border-border hover:border-muted-foreground')}
-                        >
-                            <h3 className="font-bold text-foreground">Wide Format</h3>
-                            <p className="text-muted-foreground text-sm">Up to 43" Wide</p>
-                            {wideFormatDiscount > 0 && <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2 py-1 text-xs font-medium text-accent"><Percent className="h-3 w-3" />{wideFormatDiscount}% Off</span>}
-                        </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-2xl mx-auto">
+                        {uploadTiers.map(tier => (
+                            <div 
+                                key={tier.id}
+                                onClick={() => handleTierChange(tier.id as UploadWidthTier)}
+                                className={cn(
+                                    'glass-panel p-6 rounded-2xl border-2 text-center cursor-pointer transition-all', 
+                                    widthTier === tier.id ? 'border-primary' : 'border-border hover:border-muted-foreground'
+                                )}
+                            >
+                                <h3 className="font-bold text-foreground">{tier.label}</h3>
+                                <p className="text-muted-foreground text-sm">Up to {tier.maxWidth}" Wide</p>
+                                {tier.discount > 0 && <span className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-accent/10 px-2 py-1 text-xs font-medium text-accent"><Percent className="h-3 w-3" />{tier.discount}% Off</span>}
+                            </div>
+                        ))}
                     </div>
                 </div>
 
@@ -204,7 +213,7 @@ export default function PrebuiltUploadPage() {
                             </div>
                             <h3 className="text-xl font-medium text-foreground mb-2">Click to upload or drag and drop</h3>
                             <p className="text-muted-foreground text-sm max-w-xs mx-auto mb-6">
-                                Max width ${maxWidth}". Length is unlimited. PNG recommended with transparent background.
+                                Max width {maxWidth}". Length is unlimited. PNG recommended with transparent background.
                             </p>
                             <Button variant="secondary" onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click(); }}>
                                 Select File
@@ -264,10 +273,10 @@ export default function PrebuiltUploadPage() {
                                                 <span className="flex items-center"><DollarSign className="w-4 h-4 mr-2"/> Price / sq. in.</span>
                                                 <span className="font-mono text-foreground">{pricePerSqInch ? formatCurrency(pricePerSqInch) : 'N/A'}</span>
                                             </div>
-                                            {widthTier === 'wide' && wideFormatDiscount > 0 && (
+                                            {selectedTier.discount > 0 && (
                                                  <div className="flex justify-between items-center text-sm text-primary mt-2 pt-2 border-t border-border">
-                                                    <span className="flex items-center"><Percent className="w-4 h-4 mr-2"/> Wide Discount</span>
-                                                    <span className="font-mono text-foreground">{wideFormatDiscount}%</span>
+                                                    <span className="flex items-center"><Percent className="w-4 h-4 mr-2"/> {selectedTier.label} Discount</span>
+                                                    <span className="font-mono text-foreground">{selectedTier.discount}%</span>
                                                 </div>
                                             )}
                                         </div>
