@@ -278,16 +278,17 @@ export default function CartPage() {
                         };
                     }
                     
+                    let finalPreviewUrl = item.previewUrl;
+                    
                     // Handle both SheetCartItem and DynamicSheetCartItem
                     const isDynamic = item.type === 'dynamic_sheet';
-                    const sheetWidth = isDynamic ? item.width : (item.artworks[0]?.width || item.sheetSize.width);
-                    const sheetHeight = isDynamic ? item.height : (item.artworks[0]?.height || item.sheetSize.height);
+                    const sheetWidth = isDynamic ? item.width : 0;
+                    const sheetHeight = isDynamic ? item.height : 0;
                     const itemName = isDynamic ? item.name : item.sheetSize.name;
                     const itemPrice = isDynamic ? item.price : item.sheetSize.price;
 
                     console.log(` -> Physical item: ${itemName}`);
             
-                    let finalPreviewUrl = item.previewUrl;
                     if (item.previewUrl.startsWith('data:') && currentUser) {
                         console.log(` -> Uploading temporary data URL for item ${item.id}`);
                         const blob = await (await fetch(item.previewUrl)).blob();
@@ -753,3 +754,5 @@ export default function CartPage() {
         </div>
     );
 }
+
+    
