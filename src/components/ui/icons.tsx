@@ -1,3 +1,4 @@
+
 import type { SVGProps } from 'react';
 import NextImage from 'next/image';
 
@@ -10,7 +11,7 @@ export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
 
   return (
     <NextImage
-      src="https://firebasestorage.googleapis.com/v0/b/pxl8-final.appspot.com/o/website-images%2Fpxl8-logo-white.png?alt=media&token=e1132895-12c8-4796-98a0-7117d0961814"
+      src="https://firebasestorage.googleapis.com/v0/b/pxl8-final.appspot.com/o/website-images%2FPXL8%20logo%205%40300x.png?alt=media&token=6e9c6211-4e80-4b03-8ab1-22d5747eda46"
       alt="PXL8 Logo"
       width={Number(width)}
       height={Number(height)}
