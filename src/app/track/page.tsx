@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -13,6 +14,7 @@ import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
+import { textContent } from '@/lib/text-content';
 
 export default function SingleTransferUploadPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
@@ -280,9 +282,9 @@ export default function SingleTransferUploadPage() {
         <div className="min-h-screen pb-12">
             <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="mb-12 text-center">
-                    <h1 className="text-4xl font-bold text-white mb-4">Order Single Transfers</h1>
+                    <h1 className="text-4xl font-bold text-white mb-4">{textContent.single_transfer_title}</h1>
                     <p className="text-zinc-400 max-w-2xl mx-auto">
-                        Upload your design, tell us the size and quantity, and we'll handle the rest. Perfect for ordering multiples of a single artwork.
+                        {textContent.single_transfer_subtitle}
                     </p>
                 </div>
 

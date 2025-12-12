@@ -8,24 +8,25 @@ import { Button } from '@/components/ui/button';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ParallaxImage } from '@/components/ui/parallax-image';
 import { ParallaxContainer } from '@/components/ui/parallax-container';
+import { textContent } from '@/lib/text-content';
 
 const features = [
     {
         icon: <Wand2 className="h-10 w-10 text-cyan-400" />,
-        title: 'AI Design Studio',
-        description: 'Generate stunning, print-ready designs from a simple text prompt. Perfect for sparking new ideas.',
+        title: textContent.home_feature_ai_title,
+        description: textContent.home_feature_ai_desc,
         href: '/ai-designer',
     },
     {
         icon: <Layers className="h-10 w-10 text-cyan-400" />,
-        title: 'Gang Sheet Builder',
-        description: 'Drag, drop, and arrange your artwork on custom-sized gang sheets with our intuitive builder.',
+        title: textContent.home_feature_builder_title,
+        description: textContent.home_feature_builder_desc,
         href: '/build',
     },
     {
         icon: <MousePointer className="h-10 w-10 text-cyan-400" />,
-        title: 'Single Transfer Uploader',
-        description: 'Have a single design ready to go? Upload it, pick your size and quantity, and you\'re done.',
+        title: textContent.home_feature_uploader_title,
+        description: textContent.home_feature_uploader_desc,
         href: '/track',
     },
 ];
@@ -55,10 +56,10 @@ export default function Home() {
                 <div className="absolute inset-0 bg-black/40"></div>
                 <div className="relative z-10 max-w-4xl mx-auto text-white">
                     <h1 className="text-4xl md:text-6xl lg:text-7xl font-extrabold tracking-tighter leading-tight">
-                        The Future of Digital Apparel Decoration
+                        {textContent.home_hero_title}
                     </h1>
                     <p className="mt-6 text-lg md:text-xl text-white/80 max-w-2xl mx-auto">
-                        PXL8 provides the tools and technology for creators and businesses to produce high-quality, on-demand apparel with unparalleled ease and precision.
+                        {textContent.home_hero_subtitle}
                     </p>
                     <div className="mt-10 flex flex-col sm:flex-row justify-center gap-4">
                         <Button asChild size="lg" className="bg-cyan-500 text-black hover:bg-cyan-400 text-lg py-7 px-10">
@@ -75,9 +76,9 @@ export default function Home() {
             <section className="py-20 sm:py-32 bg-secondary/30">
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                     <div className="text-center">
-                        <h2 className="text-base font-semibold text-cyan-500 tracking-wider uppercase">Why PXL8</h2>
+                        <h2 className="text-base font-semibold text-cyan-500 tracking-wider uppercase">{textContent.home_features_eyebrow}</h2>
                         <p className="mt-2 text-3xl sm:text-4xl font-extrabold tracking-tight">
-                            Everything You Need to Print
+                            {textContent.home_features_title}
                         </p>
                     </div>
                     <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -116,10 +117,10 @@ export default function Home() {
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 grid grid-cols-1 md:grid-cols-2 gap-16 items-center">
                     <div>
                         <h2 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                            Unmatched Quality, Built on Precision
+                            {textContent.home_tech_title}
                         </h2>
                         <p className="mt-4 text-lg text-muted-foreground">
-                            Our platform is engineered from the ground up for Direct-to-Film printing. From precise resolution checking to automated sheet generation, we ensure every print is perfect.
+                            {textContent.home_tech_subtitle}
                         </p>
                         <div className="mt-8 space-y-6">
                             <div className="flex items-start gap-4">

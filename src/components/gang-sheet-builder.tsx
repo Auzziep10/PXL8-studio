@@ -19,6 +19,7 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Label } from './ui/label';
 import { Slider } from './ui/slider';
 import { cn } from '@/lib/utils';
+import { textContent } from '@/lib/text-content';
 
 
 // Debounce function to limit how often we save to Firestore
@@ -935,8 +936,8 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
       <div className="max-w-7xl mx-auto px-4 py-8">
         {usage === 'Builder' && (
             <div className="mb-8">
-                <h1 className="text-3xl font-bold text-foreground">Gang Sheet Builder</h1>
-                <p className="mt-2 text-muted-foreground">Upload designs and drag them to arrange.</p>
+                <h1 className="text-3xl font-bold text-foreground">{textContent.builder_title}</h1>
+                <p className="mt-2 text-muted-foreground">{textContent.builder_subtitle}</p>
             </div>
         )}
 
@@ -1008,7 +1009,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                                       >
                                           <div className="flex items-start justify-between">
                                               <div className="flex items-center space-x-3">
-                                                  <div className="w-12 h-12 rounded border border-border overflow-hidden bg-checkerboard-dark flex-shrink-0">
+                                                  <div className="w-12 h-12 rounded border border-border overflow-hidden checkerboard flex-shrink-0">
                                                       {item.imageUrl ? (
                                                         <img src={item.imageUrl} className="w-full h-full object-contain" alt={item.name} />
                                                       ): (

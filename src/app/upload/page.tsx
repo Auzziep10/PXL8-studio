@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -12,6 +13,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { textContent } from '@/lib/text-content';
 
 const uploadTiers = [
     { id: '22', label: 'Standard', maxWidth: 22, discount: 0 },
@@ -176,9 +178,9 @@ export default function PrebuiltUploadPage() {
         <div className="min-h-screen pb-12">
             <div className="max-w-4xl mx-auto px-4 py-8">
                 <div className="mb-12 text-center">
-                    <h1 className="text-4xl font-bold text-foreground mb-4">Upload Ready-to-Print Sheet</h1>
+                    <h1 className="text-4xl font-bold text-foreground mb-4">{textContent.upload_title}</h1>
                     <p className="text-muted-foreground max-w-2xl mx-auto">
-                        Have your gang sheet pre-built? Upload it here. We'll automatically detect the size and calculate the price for you based on the width tier you select.
+                        {textContent.upload_subtitle}
                     </p>
                 </div>
 
@@ -242,7 +244,7 @@ export default function PrebuiltUploadPage() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
                                 {/* Preview Area */}
-                                <div className="flex-grow bg-checkerboard-dark rounded-xl border border-border relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
+                                <div className="flex-grow checkerboard rounded-xl border border-border relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]">
                                     {previewUrl ? (
                                         <img src={previewUrl} alt="Preview" className="max-w-full max-h-[300px] object-contain shadow-2xl" />
                                     ) : (

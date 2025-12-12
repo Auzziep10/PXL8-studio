@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -17,6 +18,7 @@ import { sanitizeFilename } from '@/lib/utils';
 import { Slider } from './ui/slider';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
+import { textContent } from '@/lib/text-content';
 
 
 // --- Dropdown Options ---
@@ -395,7 +397,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const generationFeeText = isLoadingService
         ? 'Loading pricing...'
         : aiDesignFeeProduct
-        ? `Each generation costs ${new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price)}. The fee is added to your cart when you use the design.`
+        ? textContent.ai_designer_fee_text.replace('{price}', new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price))
         : 'AI design pricing not configured.';
 
     // --- Render Logic ---
@@ -406,7 +408,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                     <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
                         <Sparkles className="w-8 h-8 text-primary" />
                     </div>
-                    <CardTitle className="text-2xl font-bold text-white">AI Design Studio</CardTitle>
+                    <CardTitle className="text-2xl font-bold text-white">{textContent.ai_designer_title}</CardTitle>
                     <CardDescription className="text-zinc-400">{generationFeeText}</CardDescription>
                 </CardHeader>
                 <CardContent>
