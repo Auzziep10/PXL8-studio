@@ -11,21 +11,25 @@ import type {ImagePlaceholder} from '@/lib/placeholder-images';
 
 export async function updatePlaceholderImageUrl(id: string, newUrl: string) {
   try {
-    const jsonPath = path.join(process.cwd(), 'src', 'lib', 'placeholder-images.json');
-    const fileContents = await fs.readFile(jsonPath, 'utf8');
-    const data = JSON.parse(fileContents);
+    const filePath = path.join(process.cwd(), 'src', 'lib', 'placeholder-images-data.ts');
+    const fileContents = await fs.readFile(filePath, 'utf8');
+    
+    // This is a bit more complex because we're manipulating a TS file, not JSON
+    // We'll use a regex to find and replace the URL for a specific ID.
+    
+    // Regex to find the imageUrl for a given id. It's a bit fragile but works for this structure.
+    // It looks for: "id": "the_id", ... "imageUrl": "the_url"
+    const regex = new RegExp(`(\"id\":\\s*\"${id}\"[^{]*\"imageUrl\":\\s*\")[^"]*(\")`);
 
-    const imageIndex = data.placeholderImages.findIndex((img: ImagePlaceholder) => img.id === id);
-
-    if (imageIndex === -1) {
-      throw new Error(`Image with id "${id}" not found.`);
+    if (!regex.test(fileContents)) {
+        throw new Error(`Image with id "${id}" not found in the data file.`);
     }
 
-    data.placeholderImages[imageIndex].imageUrl = newUrl;
+    const newFileContents = fileContents.replace(regex, `$1${newUrl}$2`);
 
-    await fs.writeFile(jsonPath, JSON.stringify(data, null, 2));
+    await fs.writeFile(filePath, newFileContents);
 
-    // Revalidate the path to ensure Next.js serves the updated JSON file
+    // Revalidate the path to ensure Next.js serves the updated data
     revalidatePath('/admin/media');
     revalidatePath('/'); // Also revalidate home page in case the image is used there
 

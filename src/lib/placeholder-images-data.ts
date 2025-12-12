@@ -1,5 +1,4 @@
-{
-  "placeholderImages": [
+export const placeholderImagesData = [
     {
       "id": "logo",
       "description": "The main PXL8 logo",
@@ -9,7 +8,7 @@
     {
       "id": "homepageHero",
       "description": "Colorful threads on a printing machine",
-      "imageUrl": "https://images.unsplash.com/photo-1693031630189-a39e6d70bf22?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxwcmludGluZyUyMG1hY2hpbmV8ZW58MHx8fHwxNzY1NDk4MTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765557853710-IMG_3859.JPG?alt=media&token=c2e79130-d7be-423e-a9c0-54580c05913e",
       "imageHint": "printing machine"
     },
     {
@@ -61,4 +60,3 @@
       "imageHint": "print production"
     }
   ]
-}

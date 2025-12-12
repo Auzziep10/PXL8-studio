@@ -1,4 +1,4 @@
-import placeholderData from './placeholder-images.json';
+import { placeholderImagesData } from './placeholder-images-data';
 
 export type ImagePlaceholder = {
   id: string;
@@ -7,5 +7,5 @@ export type ImagePlaceholder = {
   imageHint: string;
 };
 
-// Directly import the JSON data. This works for both client and server components.
-export const PlaceHolderImages: ImagePlaceholder[] = placeholderData.placeholderImages;
+// Directly import the data. This works for both client and server components.
+export const PlaceHolderImages: ImagePlaceholder[] = placeholderImagesData;
