@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -505,7 +504,7 @@ export default function GangSheetBuilder({ usage, newArtworks, onArtworkHandled 
           if (user) {
               toast({ title: "Processing...", description: "Uploading new version of the artwork." });
               const blob = await (await fetch(newDataUrl)).blob();
-              const file = new File([blob], selectedItem.name, { type: 'image/png' });
+              const file = new File([blob], sanitizeFilename(selectedItem.name), { type: 'image/png' });
               const permanentUrl = await uploadFileAndGetURL(file, user.uid);
               updateItem(selectedItem.id, { imageUrl: permanentUrl });
           } else {

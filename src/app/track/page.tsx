@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
@@ -13,6 +12,7 @@ import { collection, query, where } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
 
 export default function SingleTransferUploadPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
@@ -40,6 +40,10 @@ export default function SingleTransferUploadPage() {
     const [dimensions, setDimensions] = useState<{width: string, height: string}>({width: '', height: ''});
     const fileInputRef = useRef<HTMLInputElement>(null);
     
+    // --- Magic Wand State ---
+    const [isRemovingBg, setIsRemovingBg] = useState(false);
+    const [bgRemovalTolerance, setBgRemovalTolerance] = useState(20);
+
     const imageAspectRatio = useRef<number | null>(null);
 
     
@@ -78,6 +82,54 @@ export default function SingleTransferUploadPage() {
         
         // We don't have a real file object, so we create a placeholder name
         setFile({ name: artwork.name } as File);
+    };
+
+    // --- Background Removal ---
+    const handleBackgroundRemoval = async (e: React.MouseEvent<HTMLImageElement>) => {
+        if (!isRemovingBg || !previewUrl) return;
+
+        const img = e.currentTarget;
+        const rect = img.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        const tempCanvas = document.createElement('canvas');
+        const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+        if (!tempCtx) return;
+
+        const sourceImage = new Image();
+        sourceImage.crossOrigin = 'Anonymous';
+        sourceImage.onload = () => {
+            tempCanvas.width = sourceImage.naturalWidth;
+            tempCanvas.height = sourceImage.naturalHeight;
+            tempCtx.drawImage(sourceImage, 0, 0);
+
+            const clickedPixelX = Math.floor(x * (sourceImage.naturalWidth / img.offsetWidth));
+            const clickedPixelY = Math.floor(y * (sourceImage.naturalHeight / img.offsetHeight));
+            const pixelData = tempCtx.getImageData(clickedPixelX, clickedPixelY, 1, 1).data;
+
+            if (pixelData[3] === 0) {
+                toast({ title: "Already Transparent", description: "You clicked on a transparent area." });
+                return;
+            }
+
+            const [r, g, b] = pixelData;
+            const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+            const data = imageData.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const diff = Math.sqrt(Math.pow(data[i] - r, 2) + Math.pow(data[i + 1] - g, 2) + Math.pow(data[i + 2] - b, 2));
+                if (diff < bgRemovalTolerance) {
+                    data[i + 3] = 0;
+                }
+            }
+            tempCtx.putImageData(imageData, 0, 0);
+
+            const newDataUrl = tempCanvas.toDataURL('image/png');
+            setPreviewUrl(newDataUrl);
+            toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
+        };
+        sourceImage.src = previewUrl;
     };
 
 
@@ -231,16 +283,47 @@ export default function SingleTransferUploadPage() {
                         </div>
                     ) : (
                         <div className="w-full h-full flex flex-col">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
                                 {/* Preview Area */}
-                                <div 
-                                    className={cn(
-                                        "flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
-                                    )}
-                                >
-                                    {previewUrl && (
-                                        <img src={previewUrl} alt="Preview" className="max-w-full max-h-[300px] object-contain shadow-2xl" />
-                                    )}
+                                <div className='space-y-4'>
+                                    <div 
+                                        className={cn(
+                                            "flex-grow bg-checkerboard-dark rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
+                                            isRemovingBg && 'cursor-eyedropper'
+                                        )}
+                                    >
+                                        {previewUrl && (
+                                            <img 
+                                                src={previewUrl} 
+                                                alt="Preview" 
+                                                className="max-w-full max-h-[300px] object-contain shadow-2xl"
+                                                onClick={handleBackgroundRemoval}
+                                            />
+                                        )}
+                                    </div>
+                                    <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
+                                        <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                                        <div className="space-y-3 pt-2">
+                                            <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                <Droplet className="w-4 h-4 mr-2" />
+                                                {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                            </Button>
+                                            {isRemovingBg && (
+                                                <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                                    <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
+                                                    <div>
+                                                        <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                        <Slider 
+                                                            value={[bgRemovalTolerance]} 
+                                                            onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                            max={100} 
+                                                            step={1}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                     </div>
                                 </div>
 
                                 {/* Pricing and Actions */}

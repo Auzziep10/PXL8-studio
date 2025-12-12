@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -9,19 +8,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
 import { sanitizeFilename } from '@/lib/utils';
 import { Slider } from './ui/slider';
+import { cn } from '@/lib/utils';
+
 
 // --- Dropdown Options ---
 const styleOptions = ["Minimalist", "Vintage", "Cartoon", "Geometric", "Line Art", "Modern", "Badge", "8-bit Pixel Art", "Art Deco"];
 const colorOptions = ["Black & White", "Vibrant & Neon", "Earth Tones", "Pastel", "Monochromatic Blue", "Primary Colors", "Gradients"];
 const moodOptions = ["Playful", "Serious", "Energetic", "Calm", "Bold", "Elegant", "Futuristic", "Retro"];
 const fontOptions = ["Arial", "Verdana", "Georgia", "Times New Roman", "Courier New", "Impact", "Comic Sans MS"];
+
+
+interface AiDesignGeneratorProps {
+  onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
+}
+
+interface TextItem {
+    id: string;
+    content: string;
+    font: string;
+    fontSize: number;
+    color: string;
+    x: number;
+    y: number;
+}
 
 
 // --- Component ---
@@ -33,9 +49,13 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     // --- State Management ---
     const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({ subject: '', style: '', colors: '', mood: '' });
     const [isLoading, setIsLoading] = useState(false);
-    const [isRemovingBg, setIsRemovingBg] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<HTMLImageElement | null>(null);
+    const [generatedImageDataUri, setGeneratedImageDataUri] = useState<string | null>(null);
     const [view, setView] = useState<'generate' | 'edit'>('generate');
+
+    // --- Magic Wand State ---
+    const [isRemovingBg, setIsRemovingBg] = useState(false);
+    const [bgRemovalTolerance, setBgRemovalTolerance] = useState(20);
 
     // --- Text State ---
     const [textItems, setTextItems] = useState<TextItem[]>([]);
@@ -107,6 +127,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         setIsLoading(true);
         setGeneratedImage(null);
+        setGeneratedImageDataUri(null);
         setTextItems([]);
 
         try {
@@ -116,6 +137,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 img.crossOrigin = "anonymous";
                 img.onload = () => {
                     setGeneratedImage(img);
+                    setGeneratedImageDataUri(result.data!.imageDataUri);
                     setView('edit');
                     toast({ title: 'Design Generated!', description: 'Your new design is ready for edits.' });
                 };
@@ -160,10 +182,61 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         // Reset state
         setView('generate');
         setGeneratedImage(null);
+        setGeneratedImageDataUri(null);
         setTextItems([]);
         setActiveTextId(null);
         setFormData({ subject: '', style: '', colors: '', mood: '' });
     };
+    
+    // --- Background Removal ---
+    const handleCanvasClickForBgRemoval = async (e: React.MouseEvent<HTMLCanvasElement>) => {
+      if (!isRemovingBg || !generatedImage) return;
+
+      const canvas = e.currentTarget;
+      const rect = canvas.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+
+      const tempCanvas = document.createElement('canvas');
+      const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
+      if (!tempCtx) return;
+
+      tempCanvas.width = generatedImage.width;
+      tempCanvas.height = generatedImage.height;
+      tempCtx.drawImage(generatedImage, 0, 0);
+
+      const clickedPixelX = Math.floor(x * (generatedImage.width / canvas.offsetWidth));
+      const clickedPixelY = Math.floor(y * (generatedImage.height / canvas.offsetHeight));
+      const pixelData = tempCtx.getImageData(clickedPixelX, clickedPixelY, 1, 1).data;
+      
+      if (pixelData[3] === 0) {
+          toast({ title: "Already Transparent", description: "You clicked on a transparent area." });
+          return;
+      }
+
+      const [r, g, b] = pixelData;
+      const imageData = tempCtx.getImageData(0, 0, tempCanvas.width, tempCanvas.height);
+      const data = imageData.data;
+      
+      for (let i = 0; i < data.length; i += 4) {
+          const diff = Math.sqrt(Math.pow(data[i] - r, 2) + Math.pow(data[i+1] - g, 2) + Math.pow(data[i+2] - b, 2));
+          if (diff < bgRemovalTolerance) {
+              data[i + 3] = 0;
+          }
+      }
+      tempCtx.putImageData(imageData, 0, 0);
+
+      const newDataUrl = tempCanvas.toDataURL('image/png');
+      const newImg = new Image();
+      newImg.onload = () => {
+          setGeneratedImage(newImg);
+          setGeneratedImageDataUri(newDataUrl);
+      };
+      newImg.src = newDataUrl;
+
+      toast({ title: 'Color Removed!', description: 'The selected color has been made transparent.' });
+    };
+
 
     // --- Text Manipulation ---
     const handleAddText = () => {
@@ -206,6 +279,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     };
 
     const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+        if (isRemovingBg) {
+            handleCanvasClickForBgRemoval(e);
+            return;
+        }
+        
         const coords = getCoords(e);
         if (!coords || !canvasRef.current) return;
         const ctx = canvasRef.current.getContext('2d');
@@ -312,7 +390,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         </div>
                     ) : (
                         <div className="space-y-6">
-                            <div className="bg-checkerboard-dark rounded-xl border border-white/10 p-2 mx-auto aspect-square max-w-lg cursor-move">
+                             <div className={cn("bg-checkerboard-dark rounded-xl border border-white/10 p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : 'cursor-move')}>
                                 <canvas
                                     ref={canvasRef}
                                     width={512}
@@ -362,8 +440,27 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                              </div>
 
                              <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
-                                <Label className="flex items-center gap-2 text-zinc-300"><Scissors className="w-4 h-4"/> Image Tools</Label>
-                                <p className="text-xs text-muted-foreground">Background removal is available in the Gang Sheet Builder after adding the image.</p>
+                                <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                                <div className="space-y-3 pt-2">
+                                    <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                        <Droplet className="w-4 h-4 mr-2" />
+                                        {isRemovingBg ? 'Cancel' : 'Magic Wand Tool'}
+                                    </Button>
+                                    {isRemovingBg && (
+                                        <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                            <p className="text-xs text-muted-foreground">Click a color on the artwork preview to make it transparent.</p>
+                                            <div>
+                                                <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                <Slider 
+                                                    value={[bgRemovalTolerance]} 
+                                                    onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                    max={100} 
+                                                    step={1}
+                                                />
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
                              </div>
 
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
@@ -389,18 +486,4 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             </Card>
         </div>
     );
-}
-
-interface AiDesignGeneratorProps {
-  onDesignGenerated: (artwork: Omit<Artwork, 'id'>, target: 'builder' | 'transfers') => void;
-}
-
-interface TextItem {
-    id: string;
-    content: string;
-    font: string;
-    fontSize: number;
-    color: string;
-    x: number;
-    y: number;
 }
