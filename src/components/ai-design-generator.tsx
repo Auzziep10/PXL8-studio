@@ -11,7 +11,6 @@ import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
-import { removeBackground } from '@/ai/flows/remove-background';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
@@ -129,31 +128,6 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
             toast({ variant: 'destructive', title: 'Generation Failed', description: (error as Error).message });
         } finally {
             setIsLoading(false);
-        }
-    };
-
-    const handleRemoveBackground = async () => {
-        if (!generatedImage) return;
-
-        setIsRemovingBg(true);
-        try {
-            const result = await removeBackground({ imageDataUri: generatedImage.src });
-            if (result && result.imageDataUri) {
-                 const img = new Image();
-                 img.crossOrigin = "anonymous";
-                 img.onload = () => {
-                    setGeneratedImage(img);
-                    toast({ title: 'Background Removed' });
-                 };
-                 img.src = result.imageDataUri;
-            } else {
-                throw new Error('Failed to remove background.');
-            }
-        } catch (error) {
-            console.error('Error removing background:', error);
-            toast({ variant: 'destructive', title: 'Background Removal Failed' });
-        } finally {
-            setIsRemovingBg(false);
         }
     };
 
@@ -389,9 +363,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
                              <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
                                 <Label className="flex items-center gap-2 text-zinc-300"><Scissors className="w-4 h-4"/> Image Tools</Label>
-                                <Button onClick={handleRemoveBackground} variant="outline" className="w-full" disabled={isRemovingBg}>
-                                    {isRemovingBg ? 'Removing...' : 'Remove Background'}
-                                </Button>
+                                <p className="text-xs text-muted-foreground">Background removal is available in the Gang Sheet Builder after adding the image.</p>
                              </div>
 
                             <div className="flex flex-col sm:flex-row justify-center gap-4">
