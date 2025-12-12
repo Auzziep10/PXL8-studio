@@ -48,7 +48,7 @@ export function ParallaxContainer({
     <div ref={containerRef} className={cn('overflow-hidden', className)}>
       <div
         style={{
-          transform: `translateY(${translateY}px)`,
+          transform: `translateY(${translateY}px) scale(1.15)`,
           willChange: 'transform',
           transition: 'transform 0.2s ease-out', // Smooth out the transform
         }}
