@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter, ArrowLeft } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -81,6 +81,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     const fileInputRef = useRef<HTMLInputElement>(null);
 
     // --- State Management ---
+    const [mode, setMode] = useState<'select' | 'upload' | 'ai'>('select');
     const [formData, setFormData] = useState<GenerateDesignFromPromptInput>({ subject: '', style: '', colors: '', mood: '' });
     const [isLoading, setIsLoading] = useState(false);
     const [generatedImage, setGeneratedImage] = useState<HTMLImageElement | null>(null);
@@ -361,6 +362,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
         // Reset state
         setView('generate');
+        setMode('select');
         setGeneratedImage(null);
         setGeneratedImageDataUri(null);
         setTextItems([]);
@@ -562,80 +564,117 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     // --- Render Logic ---
     return (
         <div className="max-w-7xl mx-auto py-8 px-4">
-            <Card className="glass-panel border-white/10">
+            <Card className="glass-panel border-border/10">
                 <CardHeader className="text-center">
                     <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
                         <Sparkles className="w-8 h-8 text-primary" />
                     </div>
-                    <CardTitle className="text-2xl font-bold text-white">{textContent.ai_designer_title}</CardTitle>
-                    <CardDescription className="text-zinc-400">{generationFeeText}</CardDescription>
+                    <CardTitle className="text-2xl font-bold text-foreground">{textContent.ai_designer_title}</CardTitle>
+                    <CardDescription className="text-muted-foreground">{generationFeeText}</CardDescription>
                 </CardHeader>
                 <CardContent>
                     {view === 'generate' ? (
-                         <div className="space-y-4 max-w-2xl mx-auto">
-                            <div className="grid grid-cols-2 gap-4">
-                                <Button onClick={() => fileInputRef.current?.click()} variant="outline" className="h-32 flex-col gap-2">
-                                    <Upload className="w-8 h-8" />
-                                    <span>Upload Your Image</span>
-                                </Button>
-                                <div className="h-32 flex flex-col items-center justify-center text-center">
-                                    <h3 className="font-bold text-lg">... OR ...</h3>
+                         <div className="space-y-6 max-w-2xl mx-auto">
+                            {mode === 'select' && (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center animate-in fade-in">
+                                    <div 
+                                        onClick={() => {
+                                            setMode('upload');
+                                            fileInputRef.current?.click();
+                                        }}
+                                        className="glass-panel p-8 rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-1 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4"
+                                    >
+                                        <Upload className="w-10 h-10 text-primary" />
+                                        <h3 className="text-xl font-bold text-foreground">Upload Your Image</h3>
+                                        <p className="text-sm text-muted-foreground">Bring your own artwork to edit and enhance.</p>
+                                    </div>
+                                    <div 
+                                        onClick={() => setMode('ai')}
+                                        className="glass-panel p-8 rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-1 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4"
+                                    >
+                                        <Wand2 className="w-10 h-10 text-primary" />
+                                        <h3 className="text-xl font-bold text-foreground">Generate with AI</h3>
+                                        <p className="text-sm text-muted-foreground">Create a unique design from a text description.</p>
+                                    </div>
                                 </div>
-                            </div>
+                            )}
+
+                             {mode !== 'select' && (
+                                <Button onClick={() => setMode('select')} variant="ghost" className="mb-4">
+                                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to choices
+                                </Button>
+                             )}
+
                             <input
                                 type="file"
                                 ref={fileInputRef}
                                 className="hidden"
-                                onChange={(e) => e.target.files && handleFileSelect(e.target.files[0])}
+                                onChange={(e) => {
+                                    if (e.target.files) {
+                                        setMode('upload');
+                                        handleFileSelect(e.target.files[0])
+                                    }
+                                }}
                                 accept="image/*"
                             />
-                            {isUserLoading ? (
-                                <div className="h-10 bg-muted rounded-md animate-pulse" />
-                            ) : !user && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col items-center text-center">
-                                    <User className="w-8 h-8 text-yellow-500 mb-2" />
-                                    <p className="text-sm font-medium text-foreground mb-2">Login to Create with AI</p>
-                                    <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate designs with AI.</p>
-                                    <Button asChild size="sm">
-                                        <Link href="/auth/login">Login or Sign Up</Link>
+                            {mode === 'ai' && (
+                                <div className="space-y-4 animate-in fade-in">
+                                    {isUserLoading ? (
+                                        <div className="h-10 bg-muted rounded-md animate-pulse" />
+                                    ) : !user && (
+                                        <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col items-center text-center">
+                                            <User className="w-8 h-8 text-yellow-500 mb-2" />
+                                            <p className="text-sm font-medium text-foreground mb-2">Login to Create with AI</p>
+                                            <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate designs with AI.</p>
+                                            <Button asChild size="sm">
+                                                <Link href="/auth/login">Login or Sign Up</Link>
+                                            </Button>
+                                        </div>
+                                    )}
+                                    <div>
+                                        <Label>Subject (with AI)</Label>
+                                        <Input 
+                                            placeholder="e.g., A robot surfing on a slice of pizza"
+                                            value={formData.subject}
+                                            onChange={(e) => setFormData(p => ({...p, subject: e.target.value}))}
+                                            disabled={isLoading || !user}
+                                        />
+                                    </div>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                        <div>
+                                            <Label>Style</Label>
+                                            <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading || !user}>
+                                                <SelectTrigger><SelectValue placeholder="e.g., Minimalist" /></SelectTrigger>
+                                                <SelectContent>{styleOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label>Color Palette</Label>
+                                            <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading || !user}>
+                                                <SelectTrigger><SelectValue placeholder="e.g., Black & White" /></SelectTrigger>
+                                                <SelectContent>{colorOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                        </div>
+                                        <div>
+                                            <Label>Mood</Label>
+                                            <Select onValueChange={(value) => setFormData(p => ({ ...p, mood: value }))} disabled={isLoading || !user}>
+                                                <SelectTrigger><SelectValue placeholder="e.g., Playful" /></SelectTrigger>
+                                                <SelectContent>{moodOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || (formData.style !== 'Custom' && !aiDesignFeeProduct) || !user} className="w-full mt-4 text-lg py-6">
+                                        {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : <><Wand2 className="w-5 h-5 mr-2" />Generate with AI</>}
                                     </Button>
                                 </div>
                             )}
-                             <div>
-                                <Label>Subject (with AI)</Label>
-                                <Input 
-                                    placeholder="e.g., A robot surfing on a slice of pizza"
-                                    value={formData.subject}
-                                    onChange={(e) => setFormData(p => ({...p, subject: e.target.value}))}
-                                    disabled={isLoading || !user}
-                                />
-                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div>
-                                    <Label>Style</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, style: value }))} disabled={isLoading || !user}>
-                                        <SelectTrigger><SelectValue placeholder="e.g., Minimalist" /></SelectTrigger>
-                                        <SelectContent>{styleOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                    </Select>
+
+                            {mode !== 'select' && (
+                                 <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2 mt-6">
+                                    <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
+                                    <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
                                 </div>
-                                <div>
-                                    <Label>Color Palette</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, colors: value }))} disabled={isLoading || !user}>
-                                        <SelectTrigger><SelectValue placeholder="e.g., Black & White" /></SelectTrigger>
-                                        <SelectContent>{colorOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                                <div>
-                                    <Label>Mood</Label>
-                                    <Select onValueChange={(value) => setFormData(p => ({ ...p, mood: value }))} disabled={isLoading || !user}>
-                                        <SelectTrigger><SelectValue placeholder="e.g., Playful" /></SelectTrigger>
-                                        <SelectContent>{moodOptions.map(o => <SelectItem key={o} value={o}>{o}</SelectItem>)}</SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                            <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || (formData.style !== 'Custom' && !aiDesignFeeProduct) || !user} className="w-full mt-4 text-lg py-6">
-                                {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : <><Wand2 className="w-5 h-5 mr-2" />Generate with AI</>}
-                            </Button>
+                            )}
                         </div>
                     ) : (
                         <div className="grid md:grid-cols-3 gap-8">
@@ -826,7 +865,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         </Button>
                                     </div>
                                     <div className="flex justify-center">
-                                        <Button onClick={() => setView('generate')} variant="ghost" className="text-base">
+                                        <Button onClick={() => { setView('generate'); setMode('select'); }} variant="ghost" className="text-base">
                                             <Wand2 className="w-5 h-5 mr-2" /> Start Over
                                         </Button>
                                     </div>
@@ -834,14 +873,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             </div>
                         </div>
                     )}
-                    <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2 mt-6">
-                        <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                        <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
-                    </div>
                 </CardContent>
             </Card>
         </div>
     );
 }
-
-    
