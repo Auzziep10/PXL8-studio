@@ -33,8 +33,8 @@ function formatPageName(key: string): string {
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
 
-// Define the desired order of tabs
-const orderedPageKeys = ['home', 'about', 'builder', 'upload', 'single', 'ai'];
+// Define the desired order of tabs to match main navigation
+const orderedPageKeys = ['home', 'single', 'builder', 'upload', 'ai', 'about'];
 
 export default function CopyAdminPage() {
   const { toast } = useToast();
