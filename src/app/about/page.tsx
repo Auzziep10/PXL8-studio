@@ -1,3 +1,4 @@
+
 'use client';
 
 import { ArrowRight, Box, Droplet, Layers, MousePointer, Sparkles, Wand2 } from 'lucide-react';
