@@ -563,7 +563,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Render Logic ---
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4 h-[calc(100vh-5rem)] flex flex-col">
+        <div className="h-[calc(100vh-5rem)] flex flex-col">
             <Card className="glass-panel border-border/10 flex-grow flex flex-col">
                 {view === 'generate' && (
                     <CardHeader className="text-center">
@@ -574,7 +574,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         <CardDescription className="text-muted-foreground">{generationFeeText}</CardDescription>
                     </CardHeader>
                 )}
-                <CardContent className="flex-grow flex flex-col">
+                <CardContent className="flex-grow flex flex-col min-h-0">
                     {view === 'generate' ? (
                          <div className="space-y-6 max-w-2xl mx-auto w-full my-auto">
                             {mode === 'select' && (
