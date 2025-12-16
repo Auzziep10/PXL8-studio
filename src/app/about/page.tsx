@@ -7,6 +7,7 @@ import { PlaceHolderImages } from '@/lib/placeholder-images';
 import { ParallaxImage } from '@/components/ui/parallax-image';
 import { ParallaxContainer } from '@/components/ui/parallax-container';
 import { textContent } from '@/lib/text-content';
+import { cn } from '@/lib/utils';
 
 const heroImage = PlaceHolderImages.find(p => p.id === 'aboutHero');
 const processDesign = PlaceHolderImages.find(p => p.id === 'processDesign');
