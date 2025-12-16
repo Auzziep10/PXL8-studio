@@ -1,12 +1,15 @@
+
 'use client';
 
 import { usePathname } from 'next/navigation';
 import Header from '@/components/header';
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/settings');
+  const isDesignStudio = pathname === '/design-studio';
   const showHeader = !isDashboard;
 
   if (isDashboard) {
@@ -15,8 +18,8 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <>
-      <Header />
-      <main className="flex-grow pt-[5rem]">{children}</main>
+      {showHeader && <Header />}
+      <main className={cn('flex-grow', !isDesignStudio && 'pt-[5rem]')}>{children}</main>
     </>
   );
 }
