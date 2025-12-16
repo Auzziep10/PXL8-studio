@@ -203,7 +203,7 @@ export default function CustomerDashboardPage() {
                 {userOrders && userOrders.length > 0 ? userOrders.slice(0, 5).map((order: Order) => (
                   <TableRow key={order.orderId}>
                     <TableCell className="font-medium font-mono">
-                      <Button variant="link" asChild className="p-0 h-auto font-mono">
+                      <Button variant="link" asChild className="p-0 h-auto font-mono text-foreground">
                         <Link href={`/order-details?id=${order.orderId}`}>{order.orderId}</Link>
                       </Button>
                     </TableCell>
