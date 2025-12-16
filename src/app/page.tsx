@@ -15,7 +15,7 @@ const features = [
         icon: <Wand2 className="h-10 w-10 text-cyan-400" />,
         title: textContent.home_feature_ai_title,
         description: textContent.home_feature_ai_desc,
-        href: '/ai-designer',
+        href: '/design-studio',
     },
     {
         icon: <Layers className="h-10 w-10 text-cyan-400" />,
