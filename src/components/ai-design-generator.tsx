@@ -563,18 +563,20 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Render Logic ---
     return (
-        <div className="max-w-7xl mx-auto py-8 px-4">
-            <Card className="glass-panel border-border/10">
-                <CardHeader className="text-center">
-                    <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-                        <Sparkles className="w-8 h-8 text-primary" />
-                    </div>
-                    <CardTitle className="text-2xl font-bold text-foreground">{textContent.ai_designer_title}</CardTitle>
-                    <CardDescription className="text-muted-foreground">{generationFeeText}</CardDescription>
-                </CardHeader>
-                <CardContent>
+        <div className="max-w-7xl mx-auto py-8 px-4 h-[calc(100vh-5rem)] flex flex-col">
+            <Card className="glass-panel border-border/10 flex-grow flex flex-col">
+                {view === 'generate' && (
+                    <CardHeader className="text-center">
+                        <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
+                            <Sparkles className="w-8 h-8 text-primary" />
+                        </div>
+                        <CardTitle className="text-2xl font-bold text-foreground">{textContent.ai_designer_title}</CardTitle>
+                        <CardDescription className="text-muted-foreground">{generationFeeText}</CardDescription>
+                    </CardHeader>
+                )}
+                <CardContent className="flex-grow flex flex-col">
                     {view === 'generate' ? (
-                         <div className="space-y-6 max-w-2xl mx-auto">
+                         <div className="space-y-6 max-w-2xl mx-auto w-full my-auto">
                             {mode === 'select' && (
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center animate-in fade-in">
                                     <div 
@@ -677,9 +679,9 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             )}
                         </div>
                     ) : (
-                        <div className="grid md:grid-cols-3 gap-8">
+                        <div className="grid md:grid-cols-3 gap-8 flex-grow min-h-0">
                             <div className="md:col-span-1 h-full flex flex-col">
-                                <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4">
+                                <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4 builder-scroll">
                                     <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3', 'item-4']} className="w-full">
                                         <AccordionItem value="item-1" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
                                             <AccordionTrigger className="py-3 font-semibold text-foreground [&[data-state=open]>svg]:text-primary">
@@ -844,34 +846,32 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Accordion>
                                 </div>
                             </div>
-                            <div className="md:col-span-2">
-                                <div className="sticky top-6">
-                                    <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
-                                        <canvas
-                                            ref={canvasRef}
-                                            width={512}
-                                            height={512}
-                                            className="w-full h-full object-contain"
-                                            onMouseDown={handleCanvasMouseDown}
-                                            onMouseMove={handleCanvasMouseMove}
-                                            onMouseUp={handleCanvasMouseUp}
-                                            onMouseLeave={handleCanvasMouseUp}
-                                        />
+                            <div className="md:col-span-2 flex flex-col items-center justify-center">
+                                <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg w-full", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
+                                    <canvas
+                                        ref={canvasRef}
+                                        width={512}
+                                        height={512}
+                                        className="w-full h-full object-contain"
+                                        onMouseDown={handleCanvasMouseDown}
+                                        onMouseMove={handleCanvasMouseMove}
+                                        onMouseUp={handleCanvasMouseUp}
+                                        onMouseLeave={handleCanvasMouseUp}
+                                    />
+                                </div>
+                                <div className="space-y-4 mt-6 w-full max-w-lg">
+                                    <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                        <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
+                                            <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
+                                        </Button>
+                                        <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
+                                            <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
+                                        </Button>
                                     </div>
-                                    <div className="space-y-4 mt-6">
-                                        <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                            <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
-                                                <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
-                                            </Button>
-                                            <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
-                                                <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
-                                            </Button>
-                                        </div>
-                                        <div className="flex justify-center">
-                                            <Button onClick={() => { setView('generate'); setMode('select'); }} variant="ghost" className="text-base">
-                                                <Wand2 className="w-5 h-5 mr-2" /> Start Over
-                                            </Button>
-                                        </div>
+                                    <div className="flex justify-center">
+                                        <Button onClick={() => { setView('generate'); setMode('select'); }} variant="ghost" className="text-base">
+                                            <Wand2 className="w-5 h-5 mr-2" /> Start Over
+                                        </Button>
                                     </div>
                                 </div>
                             </div>
