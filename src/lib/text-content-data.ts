@@ -49,7 +49,7 @@ export const textContentData: TextContentItem[] = [
   {
     "id": "home_feature_uploader_title",
     "description": "Title for the Single Transfer Uploader feature card.",
-    "text": "Single Transfer Uploader"
+    "text": "Transfers"
   },
   {
     "id": "home_feature_uploader_desc",

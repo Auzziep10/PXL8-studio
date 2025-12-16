@@ -28,7 +28,7 @@ function formatPageName(key: string): string {
         return 'Design Studio';
     }
     if (key === 'single') {
-        return 'Single Transfer';
+        return 'Transfers';
     }
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
