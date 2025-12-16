@@ -24,12 +24,17 @@ function groupContentByPage(content: TextContentItem[]): Record<string, TextCont
 }
 
 function formatPageName(key: string): string {
-    // Special handling for 'ai' prefix to match "Design Studio"
     if (key === 'ai') {
         return 'Design Studio';
     }
+    if (key === 'single') {
+        return 'Single Transfer';
+    }
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
+
+// Define the desired order of tabs
+const orderedPageKeys = ['home', 'about', 'builder', 'upload', 'single', 'ai'];
 
 export default function CopyAdminPage() {
   const { toast } = useToast();
@@ -43,7 +48,12 @@ export default function CopyAdminPage() {
   });
 
   const groupedContent = useMemo(() => groupContentByPage(AllTextContent), []);
-  const pageKeys = useMemo(() => Object.keys(groupedContent), [groupedContent]);
+  
+  // Use the predefined order, but filter to only show keys that actually exist in the content
+  const pageKeys = useMemo(() => {
+    const existingKeys = Object.keys(groupedContent);
+    return orderedPageKeys.filter(key => existingKeys.includes(key));
+  }, [groupedContent]);
 
   const handleTextChange = (id: string, value: string) => {
     setContent(prev => ({ ...prev, [id]: value }));
