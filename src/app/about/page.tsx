@@ -55,9 +55,9 @@ const processSteps = [
 ];
 
 const teamMembers = [
-    { name: "Alex Johnson", role: "Founder & CEO", image: teamMember1 },
-    { name: "Maria Garcia", role: "Head of Production", image: teamMember2 },
-    { name: "David Chen", role: "Lead Engineer", image: teamMember3 },
+    { name: textContent.about_team_member1_name, role: textContent.about_team_member1_role, image: teamMember1 },
+    { name: textContent.about_team_member2_name, role: textContent.about_team_member2_role, image: teamMember2 },
+    { name: textContent.about_team_member3_name, role: textContent.about_team_member3_role, image: teamMember3 },
 ]
 
 export default function AboutPage() {

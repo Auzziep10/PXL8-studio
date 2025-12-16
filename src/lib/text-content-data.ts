@@ -155,5 +155,35 @@ export const textContentData: TextContentItem[] = [
     "id": "about_diff_automation_desc",
     "description": "Description for the Automation differentiator.",
     "text": "From automated print-file generation with QR-coding to our fulfillment dashboard, we've automated the tedious parts of the process so you can focus on creating."
+  },
+  {
+    "id": "about_team_member1_name",
+    "description": "Name of the first team member on the About page.",
+    "text": "Alex Johnson"
+  },
+  {
+    "id": "about_team_member1_role",
+    "description": "Role/title of the first team member on the About page.",
+    "text": "Founder & CEO"
+  },
+  {
+    "id": "about_team_member2_name",
+    "description": "Name of the second team member on the About page.",
+    "text": "Maria Garcia"
+  },
+  {
+    "id": "about_team_member2_role",
+    "description": "Role/title of the second team member on the About page.",
+    "text": "Head of Production"
+  },
+  {
+    "id": "about_team_member3_name",
+    "description": "Name of the third team member on the About page.",
+    "text": "David Chen"
+  },
+  {
+    "id": "about_team_member3_role",
+    "description": "Role/title of the third team member on the About page.",
+    "text": "Lead Engineer"
   }
 ];
