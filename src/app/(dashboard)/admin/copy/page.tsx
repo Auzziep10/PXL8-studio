@@ -24,9 +24,9 @@ function groupContentByPage(content: TextContentItem[]): Record<string, TextCont
 }
 
 function formatPageName(key: string): string {
-    // Special handling for 'ai' prefix
+    // Special handling for 'ai' prefix to match "Design Studio"
     if (key === 'ai') {
-        return 'AI Designer';
+        return 'Design Studio';
     }
     return key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
 }
