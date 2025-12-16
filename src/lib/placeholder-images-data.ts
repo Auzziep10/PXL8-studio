@@ -58,5 +58,47 @@ export const placeholderImagesData = [
       "description": "A print-ready gang sheet with QR code header.",
       "imageUrl": "https://images.unsplash.com/photo-1503694978374-8a2fa686963a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwcmludCUyMHByb2R1Y3Rpb258ZW58MHx8fHwxNzY1MjMzMzk4fDA&ixlib=rb-4.1.0&q=80&w=1080",
       "imageHint": "print production"
+    },
+    {
+      "id": "aboutHero",
+      "description": "A modern print shop with equipment and apparel.",
+      "imageUrl": "https://images.unsplash.com/photo-1622363645952-30a473a4b08a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwcmludCUyMHNob3B8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "print shop"
+    },
+    {
+      "id": "processDesign",
+      "description": "A designer working on a computer with a color palette.",
+      "imageUrl": "https://images.unsplash.com/photo-1558655146-d09347e92766?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxncmFwaGljJTIwZGVzaWduZXJ8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "graphic designer"
+    },
+    {
+      "id": "processPrint",
+      "description": "A direct-to-film printer in action.",
+      "imageUrl": "https://images.unsplash.com/photo-1611193309522-99938e7d4a99?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxEVEYlMjBwcmludGVyfGVufDB8fHx8MTc2NTYyNDU4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "DTF printer"
+    },
+    {
+      "id": "processShip",
+      "description": "Neatly packaged apparel ready for shipping.",
+      "imageUrl": "https://images.unsplash.com/photo-1622295179093-a563456886e3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGFwcGFyZWx8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "packaged apparel"
+    },
+    {
+      "id": "teamMember1",
+      "description": "Portrait of a smiling man, the founder.",
+      "imageUrl": "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxtYWxlJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "male portrait"
+    },
+    {
+      "id": "teamMember2",
+      "description": "Portrait of a woman in a workshop.",
+      "imageUrl": "https://images.unsplash.com/photo-1494790108377-be9c29b29330?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxmZW1hbGUlMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjU2MjQ1ODR8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "female portrait"
+    },
+    {
+      "id": "teamMember3",
+      "description": "Portrait of a person at a computer.",
+      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtYWxlJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person portrait"
     }
   ]

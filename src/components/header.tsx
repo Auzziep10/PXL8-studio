@@ -20,6 +20,7 @@ const navLinks = [
   { href: '/build', label: 'Builder' },
   { href: '/upload', label: 'Upload' },
   { href: '/design-studio', label: 'Design Studio' },
+  { href: '/about', label: 'About' },
 ];
 
 export default function Header() {
