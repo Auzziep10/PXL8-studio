@@ -62,7 +62,7 @@ export const placeholderImagesData = [
     {
       "id": "aboutHero",
       "description": "A modern print shop with equipment and apparel.",
-      "imageUrl": "https://images.unsplash.com/photo-1622363645952-30a473a4b08a?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw0fHxwcmludCUyMHNob3B8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765913848745-IMG_3861.JPG?alt=media&token=2be558e9-c244-4848-be70-af52908f69cd",
       "imageHint": "print shop"
     },
     {
@@ -74,13 +74,13 @@ export const placeholderImagesData = [
     {
       "id": "processPrint",
       "description": "A direct-to-film printer in action.",
-      "imageUrl": "https://images.unsplash.com/photo-1611193309522-99938e7d4a99?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxEVEYlMjBwcmludGVyfGVufDB8fHx8MTc2NTYyNDU4NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765920828432-IMG_3860.JPG?alt=media&token=1070db5e-9a8f-49e1-9454-0cfee98eb26e",
       "imageHint": "DTF printer"
     },
     {
       "id": "processShip",
       "description": "Neatly packaged apparel ready for shipping.",
-      "imageUrl": "https://images.unsplash.com/photo-1622295179093-a563456886e3?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwYWNrYWdlZCUyMGFwcGFyZWx8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765920822641-Hard%20Light%20Sculpture.png?alt=media&token=297c470c-392d-4200-b18a-62887a5733c9",
       "imageHint": "packaged apparel"
     },
     {
@@ -98,7 +98,7 @@ export const placeholderImagesData = [
     {
       "id": "teamMember3",
       "description": "Portrait of a person at a computer.",
-      "imageUrl": "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtYWxlJTIwcG9ydHJhaXR8ZW58MHx8fHwxNzY1NjI0NTg0fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765920804995-Untitled%20(5).png?alt=media&token=cc61c502-43c6-4c3a-9003-59ecc4022812",
       "imageHint": "person portrait"
     }
   ]
