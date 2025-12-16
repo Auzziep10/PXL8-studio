@@ -12,9 +12,9 @@ export async function updateTextContent(id: string, newText: string) {
     const filePath = path.join(process.cwd(), 'src', 'lib', 'text-content-data.ts');
     const fileContents = await fs.readFile(filePath, 'utf8');
     
-    // Use a regex to find and replace the text for a specific ID.
-    // This is a more robust regex that correctly handles nested content.
-    const regex = new RegExp(`(id":\\s*"${id}"[\\s\\S]*?text":\\s*\`)[^\\\`]*(\`)`);
+    // This more robust regex looks for the object with the matching id, then finds its 'text' property.
+    // It correctly handles nested structures and special characters by lazily matching any character.
+    const regex = new RegExp(`(\\{\\s*"id":\\s*"${id}"(?:[\\s\\S]*?)"text":\\s*\`)([\\s\\S]*?)(\`\\s*\\})`);
 
     if (!regex.test(fileContents)) {
         throw new Error(`Text content with id "${id}" not found in the data file.`);
@@ -23,7 +23,7 @@ export async function updateTextContent(id: string, newText: string) {
     // Escape backticks within the new text to avoid breaking the template literal
     const escapedNewText = newText.replace(/`/g, '\\`');
 
-    const newFileContents = fileContents.replace(regex, `$1${escapedNewText}$2`);
+    const newFileContents = fileContents.replace(regex, `$1${escapedNewText}$3`);
 
     await fs.writeFile(filePath, newFileContents);
 
