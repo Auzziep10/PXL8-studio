@@ -72,6 +72,7 @@ export default function AboutPage() {
                             src={heroImage.imageUrl}
                             alt={heroImage.description}
                             fill
+                            sizes="100vw"
                             className="object-cover"
                             data-ai-hint={heroImage.imageHint}
                             priority
@@ -128,6 +129,7 @@ export default function AboutPage() {
                                             src={step.image.imageUrl}
                                             alt={step.image.description}
                                             data-ai-hint={step.image.imageHint}
+                                            sizes="(max-width: 768px) 100vw, 50vw"
                                             className="aspect-video"
                                        />
                                     )}
@@ -160,6 +162,7 @@ export default function AboutPage() {
                                             src={member.image.imageUrl}
                                             alt={member.image.description}
                                             data-ai-hint={member.image.imageHint}
+                                            sizes="(max-width: 640px) 100vw, (max-width: 768px) 50vw, 33vw"
                                             className="aspect-[4/5]"
                                         />
                                     )}

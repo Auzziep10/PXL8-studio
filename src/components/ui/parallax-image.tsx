@@ -9,10 +9,11 @@ type ParallaxImageProps = {
   src: string;
   alt: string;
   className?: string;
+  sizes: string;
   [key: string]: any; // Allow other props like data-ai-hint
 };
 
-export function ParallaxImage({ src, alt, className, ...props }: ParallaxImageProps) {
+export function ParallaxImage({ src, alt, className, sizes, ...props }: ParallaxImageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [transform, setTransform] = useState<React.CSSProperties>({});
   const [imageTransform, setImageTransform] = useState<React.CSSProperties>({});
@@ -68,6 +69,7 @@ export function ParallaxImage({ src, alt, className, ...props }: ParallaxImagePr
                 src={src}
                 alt={alt}
                 fill
+                sizes={sizes}
                 className="object-cover"
                 style={imageTransform}
                 {...props}

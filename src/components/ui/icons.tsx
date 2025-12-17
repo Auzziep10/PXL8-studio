@@ -21,6 +21,7 @@ export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
       width={Number(width)}
       height={Number(height)}
       className={props.className}
+      style={{ height: 'auto', width: props.className?.includes('w-') ? undefined : Number(width) }}
       priority // Ensures the logo loads quickly as it's likely LCP
     />
   );
