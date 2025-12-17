@@ -4,9 +4,6 @@ import NextImage from 'next/image';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 
 export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
-  // The className is passed down from where the component is used,
-  // which might control the size (e.g., h-8 w-auto).
-  // A default is provided for safety.
   const width = props.width || 110;
   const height = props.height || 40;
 
@@ -21,8 +18,7 @@ export function PXL8Logo(props: SVGProps<SVGSVGElement>) {
       width={Number(width)}
       height={Number(height)}
       className={props.className}
-      style={{ height: 'auto', width: props.className?.includes('w-') ? undefined : Number(width) }}
-      priority // Ensures the logo loads quickly as it's likely LCP
+      priority 
     />
   );
 }
