@@ -307,6 +307,37 @@ export default function ElevatedFlexPage() {
         }
     };
     
+    const getYouTubeEmbedUrl = (url: string | undefined): string | null => {
+        if (!url) return null;
+        try {
+            const urlObj = new URL(url);
+            let videoId: string | null = null;
+    
+            if (urlObj.hostname === 'youtu.be') {
+                videoId = urlObj.pathname.slice(1);
+            } else if (urlObj.hostname.includes('youtube.com')) {
+                if (urlObj.pathname.startsWith('/shorts/')) {
+                    videoId = urlObj.pathname.split('/shorts/')[1];
+                } else if (urlObj.pathname === '/watch') {
+                    videoId = urlObj.searchParams.get('v');
+                }
+            }
+    
+            if (videoId) {
+                // Remove any extra query params from the videoId
+                const cleanVideoId = videoId.split('&')[0];
+                return `https://www.youtube.com/embed/${cleanVideoId}`;
+            }
+    
+            return null; // Not a recognized YouTube URL
+        } catch (error) {
+            console.error("Invalid video URL", error);
+            return null; // Invalid URL format
+        }
+    };
+
+    const youtubeEmbedUrl = getYouTubeEmbedUrl(elevatedFlexVideo?.videoUrl);
+
     return (
         <div className="min-h-screen pb-12">
             <div className="max-w-4xl mx-auto px-4 pt-8">
@@ -494,19 +525,22 @@ export default function ElevatedFlexPage() {
                             {textContent.elevated_flex_video_desc}
                         </p>
                     </div>
-                    {elevatedFlexVideo?.videoUrl && (
-                        <div className="aspect-video bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
-                             <video
-                                controls
-                                poster={elevatedFlexVideo.imageUrl}
-                                className="w-full h-full object-cover"
-                                data-ai-hint={elevatedFlexVideo.imageHint}
-                             >
-                                <source src={elevatedFlexVideo.videoUrl} type="video/mp4" />
-                                Your browser does not support the video tag.
-                             </video>
+                    {youtubeEmbedUrl ? (
+                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
+                            <iframe
+                                className="absolute top-0 left-0 w-full h-full"
+                                src={youtubeEmbedUrl}
+                                title="YouTube video player"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            ></iframe>
                         </div>
-                    )}
+                    ) : elevatedFlexVideo?.videoUrl ? (
+                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 flex items-center justify-center text-center text-muted-foreground p-4">
+                             <p>The provided video link is not a valid YouTube URL.</p>
+                         </div>
+                    ) : null}
                 </div>
             </div>
         </div>

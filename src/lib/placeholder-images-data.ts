@@ -1,4 +1,3 @@
-
 export const placeholderImagesData = [
     {
       "id": "logo",
@@ -123,8 +122,8 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexVideo",
       "description": "Thumbnail for a video showing the application of a vinyl transfer.",
-      "imageUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
-      "videoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
-      "imageHint": "heat press"
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767120456057-PXL8%202_1.png?alt=media&token=e64f66c4-459c-440b-be09-f357496cdf5c",
+      "imageHint": "heat press",
+      "videoUrl": "https://www.youtube.com/shorts/BnUltvpBs6g"
     }
-  ]
+]
