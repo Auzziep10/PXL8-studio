@@ -17,6 +17,7 @@ import type { User as AppUser } from '@/lib/types';
 
 const navLinks = [
   { href: '/track', label: 'Transfers' },
+  { href: '/elevated-flex', label: 'Elevated Flex' },
   { href: '/build', label: 'Builder' },
   { href: '/upload', label: 'Upload' },
   { href: '/design-studio', label: 'Design Studio' },
