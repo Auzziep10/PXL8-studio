@@ -340,14 +340,65 @@ export default function ElevatedFlexPage() {
 
     return (
         <div className="min-h-screen pb-12">
-            <div className="max-w-4xl mx-auto px-4 pt-8">
-                <div className="mb-12 text-center">
+            <div className="max-w-7xl mx-auto px-4 pt-16 pb-16">
+                <div className="text-center mb-16">
                     <h1 className="text-4xl font-bold text-white mb-4">{textContent.elevated_flex_title}</h1>
                     <p className="text-zinc-400 max-w-2xl mx-auto">
                         {textContent.elevated_flex_subtitle}
                     </p>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                    {benefits.map((benefit, index) => (
+                        <div key={index} className="flex flex-col items-center text-center">
+                            <div className="perspective-container w-full aspect-square mb-6">
+                                {benefit.image && (
+                                    <ParallaxImage 
+                                        src={benefit.image.imageUrl} 
+                                        alt={benefit.title} 
+                                        sizes="(max-width: 768px) 100vw, 33vw"
+                                        className="w-full h-full aspect-square"
+                                        data-ai-hint={benefit.image.imageHint} 
+                                    />
+                                )}
+                            </div>
+                            <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+                                {benefit.icon}
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">{benefit.title}</h3>
+                            <p className="text-zinc-400">{benefit.description}</p>
+                        </div>
+                    ))}
+                </div>
+                
+                 {/* Video Section */}
+                <div className="mt-24">
+                     <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_video_title}</h2>
+                        <p className="text-zinc-400 max-w-2xl mx-auto">
+                            {textContent.elevated_flex_video_desc}
+                        </p>
+                    </div>
+                    {youtubeEmbedUrl ? (
+                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
+                            <iframe
+                                className="absolute top-0 left-0 w-full h-full"
+                                src={youtubeEmbedUrl}
+                                title="YouTube video player"
+                                frameBorder="0"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                                allowFullScreen
+                            ></iframe>
+                        </div>
+                    ) : elevatedFlexVideo?.videoUrl ? (
+                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 flex items-center justify-center text-center text-muted-foreground p-4">
+                             <p>The provided video link is not a valid YouTube URL.</p>
+                         </div>
+                    ) : null}
+                </div>
+            </div>
+
+            <div className="max-w-4xl mx-auto px-4">
                 <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
                     {!file ? (
                         <div 
@@ -485,62 +536,6 @@ export default function ElevatedFlexPage() {
                         </div>
                     )}
                     <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg,.svg" />
-                </div>
-            </div>
-
-            {/* Benefits Section */}
-            <div className="max-w-7xl mx-auto px-4 py-24">
-                <div className="text-center mb-16">
-                    <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_benefits_title}</h2>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
-                    {benefits.map((benefit, index) => (
-                        <div key={index} className="flex flex-col items-center text-center">
-                            <div className="perspective-container w-full aspect-square mb-6">
-                                {benefit.image && (
-                                    <ParallaxImage 
-                                        src={benefit.image.imageUrl} 
-                                        alt={benefit.title} 
-                                        sizes="(max-width: 768px) 100vw, 33vw"
-                                        className="w-full h-full aspect-square"
-                                        data-ai-hint={benefit.image.imageHint} 
-                                    />
-                                )}
-                            </div>
-                            <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
-                                {benefit.icon}
-                            </div>
-                            <h3 className="text-xl font-bold text-white mb-2">{benefit.title}</h3>
-                            <p className="text-zinc-400">{benefit.description}</p>
-                        </div>
-                    ))}
-                </div>
-                
-                 {/* Video Section */}
-                <div className="mt-24">
-                     <div className="text-center mb-8">
-                        <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_video_title}</h2>
-                        <p className="text-zinc-400 max-w-2xl mx-auto">
-                            {textContent.elevated_flex_video_desc}
-                        </p>
-                    </div>
-                    {youtubeEmbedUrl ? (
-                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
-                            <iframe
-                                className="absolute top-0 left-0 w-full h-full"
-                                src={youtubeEmbedUrl}
-                                title="YouTube video player"
-                                frameBorder="0"
-                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                                allowFullScreen
-                            ></iframe>
-                        </div>
-                    ) : elevatedFlexVideo?.videoUrl ? (
-                         <div className="aspect-video w-full bg-zinc-900 rounded-2xl border border-zinc-700 flex items-center justify-center text-center text-muted-foreground p-4">
-                             <p>The provided video link is not a valid YouTube URL.</p>
-                         </div>
-                    ) : null}
                 </div>
             </div>
         </div>
