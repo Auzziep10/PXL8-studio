@@ -26,19 +26,19 @@ const elevatedFlexVideo = PlaceHolderImages.find(p => p.id === 'elevatedFlexVide
 
 const benefits = [
     {
-        icon: <Sparkles className="h-6 w-6 text-accent" />,
+        icon: <Sparkles className="h-8 w-8 text-accent" />,
         title: textContent.elevated_flex_benefit1_title,
         description: textContent.elevated_flex_benefit1_desc,
         image: elevatedFlexBenefit1
     },
     {
-        icon: <Star className="h-6 w-6 text-accent" />,
+        icon: <Star className="h-8 w-8 text-accent" />,
         title: textContent.elevated_flex_benefit2_title,
         description: textContent.elevated_flex_benefit2_desc,
         image: elevatedFlexBenefit2
     },
     {
-        icon: <Zap className="h-6 w-6 text-accent" />,
+        icon: <Zap className="h-8 w-8 text-accent" />,
         title: textContent.elevated_flex_benefit3_title,
         description: textContent.elevated_flex_benefit3_desc,
         image: elevatedFlexBenefit3
@@ -350,25 +350,27 @@ export default function ElevatedFlexPage() {
                 
                  <div className="text-center mb-16">
                     <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_benefits_title}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    <div className="mt-20 space-y-24">
                         {benefits.map((benefit, index) => (
-                            <div key={index} className="flex flex-col items-center text-center">
-                                <div className="perspective-container w-full aspect-square mb-6">
+                            <div key={benefit.title} className="grid grid-cols-1 md:grid-cols-2 gap-12 md:gap-16 items-center">
+                                <div className={cn("perspective-container", index % 2 !== 0 && "md:order-2")}>
                                     {benefit.image && (
-                                        <ParallaxImage 
-                                            src={benefit.image.imageUrl} 
-                                            alt={benefit.title} 
-                                            sizes="(max-width: 768px) 100vw, 33vw"
-                                            className="w-full h-full aspect-square"
-                                            data-ai-hint={benefit.image.imageHint} 
-                                        />
+                                       <ParallaxImage 
+                                            src={benefit.image.imageUrl}
+                                            alt={benefit.title}
+                                            data-ai-hint={benefit.image.imageHint}
+                                            sizes="(max-width: 768px) 100vw, 50vw"
+                                            className="aspect-video"
+                                       />
                                     )}
                                 </div>
-                                <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
-                                    {benefit.icon}
+                                <div className={cn("text-left", index % 2 !== 0 && "md:order-1")}>
+                                     <div className="w-16 h-16 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+                                        {benefit.icon}
+                                    </div>
+                                    <h3 className="text-2xl sm:text-3xl font-bold text-foreground">{benefit.title}</h3>
+                                    <p className="mt-4 text-lg text-muted-foreground">{benefit.description}</p>
                                 </div>
-                                <h3 className="text-xl font-bold text-white mb-2">{benefit.title}</h3>
-                                <p className="text-zinc-400">{benefit.description}</p>
                             </div>
                         ))}
                     </div>
