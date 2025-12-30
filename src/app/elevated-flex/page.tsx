@@ -542,7 +542,7 @@ export default function ElevatedFlexPage() {
             </div>
 
             {/* Video Section */}
-            <div className="max-w-7xl mx-auto px-4 mt-24">
+            <div className="max-w-4xl mx-auto px-4 mt-24">
                  <div className="text-center mb-8">
                     <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_video_title}</h2>
                     <p className="text-zinc-400 max-w-2xl mx-auto">

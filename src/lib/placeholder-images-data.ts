@@ -104,7 +104,7 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexHero",
       "description": "Close-up of a textured vinyl print on a t-shirt, for hero section.",
-      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767119631396-PXL8%201.png?alt=media&token=a8569895-b844-4f27-a950-3e97d9abe723",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767124772444-Vinyl%20Cutting.png?alt=media&token=0d800758-6009-4db3-8a7b-4ea8f2d4c5ed",
       "imageHint": "textured print"
     },
     {
