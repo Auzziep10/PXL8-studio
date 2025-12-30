@@ -123,7 +123,8 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexVideo",
       "description": "Thumbnail for a video showing the application of a vinyl transfer.",
-      "imageUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
+      "imageUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/images/BigBuckBunny.jpg",
+      "videoUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
       "imageHint": "heat press"
     }
   ]

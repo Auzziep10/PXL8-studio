@@ -494,7 +494,7 @@ export default function ElevatedFlexPage() {
                             {textContent.elevated_flex_video_desc}
                         </p>
                     </div>
-                    {elevatedFlexVideo && (
+                    {elevatedFlexVideo?.videoUrl && (
                         <div className="aspect-video bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
                              <video
                                 controls
@@ -502,7 +502,7 @@ export default function ElevatedFlexPage() {
                                 className="w-full h-full object-cover"
                                 data-ai-hint={elevatedFlexVideo.imageHint}
                              >
-                                <source src={elevatedFlexVideo.imageUrl} type="video/mp4" />
+                                <source src={elevatedFlexVideo.videoUrl} type="video/mp4" />
                                 Your browser does not support the video tag.
                              </video>
                         </div>

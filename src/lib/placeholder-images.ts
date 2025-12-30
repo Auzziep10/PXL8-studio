@@ -5,6 +5,7 @@ export type ImagePlaceholder = {
   description: string;
   imageUrl: string;
   imageHint: string;
+  videoUrl?: string; // Make videoUrl optional
 };
 
 // Directly import the data. This works for both client and server components.
