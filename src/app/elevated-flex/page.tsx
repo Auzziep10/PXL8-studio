@@ -496,12 +496,16 @@ export default function ElevatedFlexPage() {
                     </div>
                     {elevatedFlexVideo && (
                         <div className="aspect-video bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
-                             <Image src={elevatedFlexVideo.imageUrl} alt={textContent.elevated_flex_video_title} fill className="object-cover" data-ai-hint={elevatedFlexVideo.imageHint} />
-                             <div className="absolute inset-0 flex items-center justify-center">
-                                <button className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors">
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-                                </button>
-                             </div>
+                             <video
+                                controls
+                                poster={elevatedFlexVideo.imageUrl}
+                                className="w-full h-full object-cover"
+                                data-ai-hint={elevatedFlexVideo.imageHint}
+                             >
+                                {/* In a real application, you would replace this with a real video source URL */}
+                                <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
+                                Your browser does not support the video tag.
+                             </video>
                         </div>
                     )}
                 </div>
@@ -509,5 +513,3 @@ export default function ElevatedFlexPage() {
         </div>
     );
 };
-
-    
