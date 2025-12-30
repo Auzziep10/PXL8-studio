@@ -3,7 +3,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DynamicSheetCartItem, ServiceAddOn, Artwork } from '@/lib/types';
-import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet, Undo } from 'lucide-react';
+import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet, Undo, Sparkles, Star, Zap } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,34 @@ import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { textContent } from '@/lib/text-content';
+import { PlaceHolderImages } from '@/lib/placeholder-images';
+import Image from 'next/image';
+
+const elevatedFlexBenefit1 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit1');
+const elevatedFlexBenefit2 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit2');
+const elevatedFlexBenefit3 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit3');
+const elevatedFlexVideo = PlaceHolderImages.find(p => p.id === 'elevatedFlexVideo');
+
+const benefits = [
+    {
+        icon: <Sparkles className="h-6 w-6 text-accent" />,
+        title: textContent.elevated_flex_benefit1_title,
+        description: textContent.elevated_flex_benefit1_desc,
+        image: elevatedFlexBenefit1
+    },
+    {
+        icon: <Star className="h-6 w-6 text-accent" />,
+        title: textContent.elevated_flex_benefit2_title,
+        description: textContent.elevated_flex_benefit2_desc,
+        image: elevatedFlexBenefit2
+    },
+    {
+        icon: <Zap className="h-6 w-6 text-accent" />,
+        title: textContent.elevated_flex_benefit3_title,
+        description: textContent.elevated_flex_benefit3_desc,
+        image: elevatedFlexBenefit3
+    }
+];
 
 export default function ElevatedFlexPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
@@ -280,7 +308,7 @@ export default function ElevatedFlexPage() {
     
     return (
         <div className="min-h-screen pb-12">
-            <div className="max-w-4xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 pt-8">
                 <div className="mb-12 text-center">
                     <h1 className="text-4xl font-bold text-white mb-4">{textContent.elevated_flex_title}</h1>
                     <p className="text-zinc-400 max-w-2xl mx-auto">
@@ -425,6 +453,50 @@ export default function ElevatedFlexPage() {
                         </div>
                     )}
                     <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg,.svg" />
+                </div>
+            </div>
+
+            {/* Benefits Section */}
+            <div className="max-w-7xl mx-auto px-4 py-24">
+                <div className="text-center mb-16">
+                    <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_benefits_title}</h2>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+                    {benefits.map((benefit, index) => (
+                        <div key={index} className="flex flex-col items-center text-center">
+                            {benefit.image && (
+                                <div className="relative w-full aspect-square mb-6">
+                                    <Image src={benefit.image.imageUrl} alt={benefit.title} fill className="object-cover rounded-2xl" data-ai-hint={benefit.image.imageHint} />
+                                </div>
+                            )}
+                            <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
+                                {benefit.icon}
+                            </div>
+                            <h3 className="text-xl font-bold text-white mb-2">{benefit.title}</h3>
+                            <p className="text-zinc-400">{benefit.description}</p>
+                        </div>
+                    ))}
+                </div>
+                
+                 {/* Video Section */}
+                <div className="mt-24">
+                     <div className="text-center mb-8">
+                        <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_video_title}</h2>
+                        <p className="text-zinc-400 max-w-2xl mx-auto">
+                            {textContent.elevated_flex_video_desc}
+                        </p>
+                    </div>
+                    {elevatedFlexVideo && (
+                        <div className="aspect-video bg-zinc-900 rounded-2xl border border-zinc-700 relative overflow-hidden shadow-2xl">
+                             <Image src={elevatedFlexVideo.imageUrl} alt={textContent.elevated_flex_video_title} fill className="object-cover" data-ai-hint={elevatedFlexVideo.imageHint} />
+                             <div className="absolute inset-0 flex items-center justify-center">
+                                <button className="w-20 h-20 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30 transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+                                </button>
+                             </div>
+                        </div>
+                    )}
                 </div>
             </div>
         </div>

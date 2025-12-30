@@ -1,3 +1,4 @@
+
 export const placeholderImagesData = [
     {
       "id": "logo",
@@ -100,5 +101,29 @@ export const placeholderImagesData = [
       "description": "Portrait of a person at a computer.",
       "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1765920804995-Untitled%20(5).png?alt=media&token=cc61c502-43c6-4c3a-9003-59ecc4022812",
       "imageHint": "person portrait"
+    },
+    {
+      "id": "elevatedFlexBenefit1",
+      "description": "Close-up shot of a textured vinyl print on a t-shirt.",
+      "imageUrl": "https://picsum.photos/seed/efb1/600/600",
+      "imageHint": "textured print"
+    },
+    {
+      "id": "elevatedFlexBenefit2",
+      "description": "An image showing a durable, cracked-effect vinyl design on a heavily worn garment.",
+      "imageUrl": "https://picsum.photos/seed/efb2/600/600",
+      "imageHint": "durable apparel"
+    },
+    {
+      "id": "elevatedFlexBenefit3",
+      "description": "A vibrant, single-color design on a dark shirt to show color pop.",
+      "imageUrl": "https://picsum.photos/seed/efb3/600/600",
+      "imageHint": "vibrant color"
+    },
+    {
+      "id": "elevatedFlexVideo",
+      "description": "Thumbnail for a video showing the application of a vinyl transfer.",
+      "imageUrl": "https://picsum.photos/seed/efv1/1280/720",
+      "imageHint": "heat press"
     }
   ]

@@ -107,6 +107,51 @@ export const textContentData: TextContentItem[] = [
     "text": `Upload your vector-ready artwork for our premium vinyl cut transfers. Ideal for bold, single-color designs with a raised texture.`
   },
   {
+    "id": "elevated_flex_benefits_title",
+    "description": `Title for the 'Why Choose' section on the Elevated Flex page.`,
+    "text": `Why Choose Elevated Flex?`
+  },
+  {
+    "id": "elevated_flex_benefit1_title",
+    "description": `Title for the first benefit on the Elevated Flex page.`,
+    "text": `3D Textured Finish`
+  },
+  {
+    "id": "elevated_flex_benefit1_desc",
+    "description": `Description for the first benefit on the Elevated Flex page.`,
+    "text": `The raised, rubber-like texture gives your designs a premium, tactile quality that stands out.`
+  },
+  {
+    "id": "elevated_flex_benefit2_title",
+    "description": `Title for the second benefit on the Elevated Flex page.`,
+    "text": `Extreme Durability`
+  },
+  {
+    "id": "elevated_flex_benefit2_desc",
+    "description": `Description for the second benefit on the Elevated Flex page.`,
+    "text": `Engineered to withstand countless washes without cracking, peeling, or fading. Perfect for workwear and performance gear.`
+  },
+  {
+    "id": "elevated_flex_benefit3_title",
+    "description": `Title for the third benefit on the Elevated Flex page.`,
+    "text": `Vibrant, Bold Colors`
+  },
+  {
+    "id": "elevated_flex_benefit3_desc",
+    "description": `Description for the third benefit on the Elevated Flex page.`,
+    "text": `Achieve super-opaque, solid colors that pop on any color garment, from light to dark.`
+  },
+  {
+    "id": "elevated_flex_video_title",
+    "description": `Title for the video section on the Elevated Flex page.`,
+    "text": `See It In Action`
+  },
+  {
+    "id": "elevated_flex_video_desc",
+    "description": `Description for the video section on the Elevated Flex page.`,
+    "text": `Watch how simple it is to apply an Elevated Flex transfer for a perfect, professional result every time.`
+  },
+  {
     "id": "upload_title",
     "description": `Main title for the pre-built sheet upload page.`,
     "text": `Upload Ready-to-Print Sheet`
