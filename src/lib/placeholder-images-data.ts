@@ -105,7 +105,7 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexBenefit1",
       "description": "Close-up shot of a textured vinyl print on a t-shirt.",
-      "imageUrl": "https://picsum.photos/seed/efb1/600/600",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767119631396-PXL8%201.png?alt=media&token=a8569895-b844-4f27-a950-3e97d9abe723",
       "imageHint": "textured print"
     },
     {
@@ -123,7 +123,7 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexVideo",
       "description": "Thumbnail for a video showing the application of a vinyl transfer.",
-      "imageUrl": "https://picsum.photos/seed/efv1/1280/720",
+      "imageUrl": "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4",
       "imageHint": "heat press"
     }
   ]

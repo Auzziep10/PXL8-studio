@@ -502,8 +502,7 @@ export default function ElevatedFlexPage() {
                                 className="w-full h-full object-cover"
                                 data-ai-hint={elevatedFlexVideo.imageHint}
                              >
-                                {/* In a real application, you would replace this with a real video source URL */}
-                                <source src="https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4" />
+                                <source src={elevatedFlexVideo.imageUrl} type="video/mp4" />
                                 Your browser does not support the video tag.
                              </video>
                         </div>
