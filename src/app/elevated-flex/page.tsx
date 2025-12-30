@@ -17,6 +17,7 @@ import { Slider } from '@/components/ui/slider';
 import { textContent } from '@/lib/text-content';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
+import { ParallaxImage } from '@/components/ui/parallax-image';
 
 const elevatedFlexBenefit1 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit1');
 const elevatedFlexBenefit2 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit2');
@@ -465,11 +466,17 @@ export default function ElevatedFlexPage() {
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
                     {benefits.map((benefit, index) => (
                         <div key={index} className="flex flex-col items-center text-center">
-                            {benefit.image && (
-                                <div className="relative w-full aspect-square mb-6">
-                                    <Image src={benefit.image.imageUrl} alt={benefit.title} fill className="object-cover rounded-2xl" data-ai-hint={benefit.image.imageHint} />
-                                </div>
-                            )}
+                            <div className="perspective-container w-full aspect-square mb-6">
+                                {benefit.image && (
+                                    <ParallaxImage 
+                                        src={benefit.image.imageUrl} 
+                                        alt={benefit.title} 
+                                        sizes="(max-width: 768px) 100vw, 33vw"
+                                        className="w-full h-full aspect-square"
+                                        data-ai-hint={benefit.image.imageHint} 
+                                    />
+                                )}
+                            </div>
                             <div className="w-12 h-12 rounded-full bg-accent/10 border border-accent/20 flex items-center justify-center mb-4">
                                 {benefit.icon}
                             </div>
@@ -502,3 +509,5 @@ export default function ElevatedFlexPage() {
         </div>
     );
 };
+
+    
