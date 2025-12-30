@@ -18,7 +18,9 @@ import { textContent } from '@/lib/text-content';
 import { PlaceHolderImages } from '@/lib/placeholder-images';
 import Image from 'next/image';
 import { ParallaxImage } from '@/components/ui/parallax-image';
+import { ParallaxContainer } from '@/components/ui/parallax-container';
 
+const elevatedFlexHero = PlaceHolderImages.find(p => p.id === 'elevatedFlexHero');
 const elevatedFlexBenefit1 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit1');
 const elevatedFlexBenefit2 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit2');
 const elevatedFlexBenefit3 = PlaceHolderImages.find(p => p.id === 'elevatedFlexBenefit3');
@@ -339,15 +341,31 @@ export default function ElevatedFlexPage() {
     const youtubeEmbedUrl = getYouTubeEmbedUrl(elevatedFlexVideo?.videoUrl);
 
     return (
-        <div className="min-h-screen pb-12">
-            <div className="max-w-7xl mx-auto px-4 pt-16">
-                <div className="text-center mb-12">
-                    <h1 className="text-4xl font-bold text-white mb-4">{textContent.elevated_flex_title}</h1>
-                    <p className="text-zinc-400 max-w-2xl mx-auto">
-                        {textContent.elevated_flex_subtitle}
-                    </p>
+        <div className="min-h-screen pb-12 bg-background text-foreground">
+             {/* Hero Section */}
+            <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
+                <ParallaxContainer className="absolute inset-0" speed={0.3}>
+                    {elevatedFlexHero && (
+                        <Image
+                            src={elevatedFlexHero.imageUrl}
+                            alt={elevatedFlexHero.description}
+                            fill
+                            sizes="100vw"
+                            className="object-cover"
+                            data-ai-hint={elevatedFlexHero.imageHint}
+                            priority
+                        />
+                    )}
+                </ParallaxContainer>
+                <div className="absolute inset-0 bg-black/50"></div>
+                <div className="relative z-10 max-w-4xl mx-auto text-white">
+                    <h1 className="text-4xl md:text-6xl font-extrabold tracking-tighter leading-tight">
+                        {textContent.elevated_flex_title}
+                    </h1>
                 </div>
-                
+            </section>
+
+            <div className="max-w-7xl mx-auto px-4 pt-20">
                  <div className="text-center mb-16">
                     <h2 className="text-3xl font-bold text-white mb-4">{textContent.elevated_flex_benefits_title}</h2>
                     <div className="mt-20 space-y-24">
@@ -378,6 +396,11 @@ export default function ElevatedFlexPage() {
             </div>
 
             <div className="max-w-4xl mx-auto px-4">
+                 <div className="text-center mb-8">
+                    <p className="text-muted-foreground max-w-2xl mx-auto">
+                        {textContent.elevated_flex_subtitle}
+                    </p>
+                </div>
                 <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[400px] flex flex-col items-center justify-center">
                     {!file ? (
                         <div 
