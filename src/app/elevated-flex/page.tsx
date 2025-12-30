@@ -343,7 +343,7 @@ export default function ElevatedFlexPage() {
     return (
         <div className="min-h-screen pb-12 bg-background text-foreground">
              {/* Hero Section */}
-            <section className="relative h-[60vh] min-h-[400px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
+            <section className="relative h-[80vh] min-h-[600px] flex items-center justify-center text-center px-4 sm:px-6 lg:px-8 overflow-hidden">
                 <ParallaxContainer className="absolute inset-0" speed={0.3}>
                     {elevatedFlexHero && (
                         <Image
