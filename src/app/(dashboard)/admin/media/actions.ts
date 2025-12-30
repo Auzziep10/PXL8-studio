@@ -1,41 +1,59 @@
+
 'use server';
 
 import {promises as fs} from 'fs';
 import path from 'path';
 import {revalidatePath} from 'next/cache';
-import type {ImagePlaceholder} from '@/lib/placeholder-images';
+import { placeholderImagesData } from '@/lib/placeholder-images-data';
+import type { ImagePlaceholder } from '@/lib/placeholder-images';
 
-// This is a server-side action to update the JSON file.
-// It's not directly callable from the client in a way that would expose the file system.
-// Next.js creates a secure endpoint for this function.
-
-export async function updatePlaceholderImageUrl(id: string, newUrl: string) {
+export async function updatePlaceholderMediaUrls(id: string, newImageUrl: string, newVideoUrl?: string) {
   try {
-    const filePath = path.join(process.cwd(), 'src', 'lib', 'placeholder-images-data.ts');
-    const fileContents = await fs.readFile(filePath, 'utf8');
-    
-    // This is a bit more complex because we're manipulating a TS file, not JSON
-    // We'll use a regex to find and replace the URL for a specific ID.
-    
-    // Regex to find the imageUrl for a given id. It's a bit fragile but works for this structure.
-    // It looks for: "id": "the_id", ... "imageUrl": "the_url"
-    const regex = new RegExp(`(\"id\":\\s*\"${id}\"[^{]*\"imageUrl\":\\s*\")[^"]*(\")`);
+    const itemIndex = placeholderImagesData.findIndex(item => item.id === id);
 
-    if (!regex.test(fileContents)) {
-        throw new Error(`Image with id "${id}" not found in the data file.`);
+    if (itemIndex === -1) {
+      throw new Error(`Media item with id "${id}" not found.`);
     }
 
-    const newFileContents = fileContents.replace(regex, `$1${newUrl}$2`);
+    const updatedData = [...placeholderImagesData];
+    const currentItem = updatedData[itemIndex];
+    
+    updatedData[itemIndex] = {
+      ...currentItem,
+      imageUrl: newImageUrl,
+      // Only update videoUrl if it was originally present, maintaining the data structure
+      ...(currentItem.videoUrl !== undefined && { videoUrl: newVideoUrl || '' }),
+    };
 
-    await fs.writeFile(filePath, newFileContents);
+    // Helper function to safely serialize strings for inclusion in a TS file
+    const serializeString = (str: string | undefined) => {
+        if (str === undefined) return 'undefined';
+        // Basic escaping for quotes and backslashes
+        return `"${str.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    };
+    
+    // Re-create the file content from the updated data array
+    const newFileContents = `
+export const placeholderImagesData = [
+${updatedData.map(item => `    {
+      "id": ${serializeString(item.id)},
+      "description": ${serializeString(item.description)},
+      "imageUrl": ${serializeString(item.imageUrl)},
+      "imageHint": ${serializeString(item.imageHint)}${item.videoUrl !== undefined ? `,\n      "videoUrl": ${serializeString(item.videoUrl)}` : ''}
+    }`).join(',\n')}
+]
+`.trim();
 
-    // Revalidate the path to ensure Next.js serves the updated data
-    revalidatePath('/admin/media');
-    revalidatePath('/'); // Also revalidate home page in case the image is used there
+    const filePath = path.join(process.cwd(), 'src', 'lib', 'placeholder-images-data.ts');
+    await fs.writeFile(filePath, newFileContents, 'utf-8');
+
+    // Revalidate paths to ensure Next.js serves the updated data
+    revalidatePath('/admin/media', 'page');
+    revalidatePath('/', 'layout'); // Revalidate everything
 
     return {success: true};
   } catch (error) {
-    console.error('Failed to update placeholder image URL:', error);
+    console.error('Failed to update placeholder media URLs:', error);
     const message = error instanceof Error ? error.message : 'An unknown error occurred.';
     return {success: false, error: message};
   }

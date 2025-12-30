@@ -111,7 +111,7 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexBenefit2",
       "description": "An image showing a durable, cracked-effect vinyl design on a heavily worn garment.",
-      "imageUrl": "https://picsum.photos/seed/efb2/600/600",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767120344357-PXL8%202.png?alt=media&token=797b7c9e-7b57-4878-aa47-88907bef44cb",
       "imageHint": "durable apparel"
     },
     {
