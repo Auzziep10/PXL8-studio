@@ -4,7 +4,7 @@
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import { PXL8Logo } from '@/components/ui/icons';
-import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles } from 'lucide-react';
+import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles, ChevronDown } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { useCart } from '@/hooks/use-cart.tsx';
@@ -13,16 +13,25 @@ import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
 import { useEffect, useState } from 'react';
 import type { User as AppUser } from '@/lib/types';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 
 const navLinks = [
-  { href: '/track', label: 'Transfers' },
-  { href: '/elevated-flex', label: 'Elevated Flex' },
   { href: '/build', label: 'Builder' },
   { href: '/upload', label: 'Upload' },
   { href: '/design-studio', label: 'Design Studio' },
   { href: '/about', label: 'About' },
 ];
+
+const transferLinks = [
+    { href: '/track', label: 'DTF Transfers' },
+    { href: '/elevated-flex', label: 'Elevated Flex Transfers' },
+]
 
 export default function Header() {
   const pathname = usePathname();
@@ -88,6 +97,24 @@ export default function Header() {
           <PXL8Logo className="h-8 w-auto" />
         </Link>
         <nav className="hidden md:flex items-center gap-2 text-sm">
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                     <Button variant="ghost" className={cn(
+                        'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md flex items-center gap-1',
+                        (pathname === '/track' || pathname === '/elevated-flex') ? 'font-medium text-foreground' : 'text-foreground/80'
+                    )}>
+                        Transfers <ChevronDown className="w-4 h-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                    {transferLinks.map(link => (
+                        <DropdownMenuItem key={link.href} asChild>
+                            <Link href={link.href}>{link.label}</Link>
+                        </DropdownMenuItem>
+                    ))}
+                </DropdownMenuContent>
+            </DropdownMenu>
+
           {navLinks.map((link) => (
             <Link
               key={link.href}

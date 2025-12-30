@@ -116,7 +116,7 @@ export const placeholderImagesData = [
     {
       "id": "elevatedFlexBenefit3",
       "description": "A vibrant, single-color design on a dark shirt to show color pop.",
-      "imageUrl": "https://picsum.photos/seed/efb3/600/600",
+      "imageUrl": "https://firebasestorage.googleapis.com/v0/b/pxl8-final.firebasestorage.app/o/users%2FRd7pFmT98eh8uXI1OhkXPihjf6j1%2Fimages%2F1767121260381-PXL8%203.png?alt=media&token=0ece6ee7-ddb1-4779-9594-1e8cf95149fe",
       "imageHint": "vibrant color"
     },
     {
