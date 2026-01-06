@@ -1,13 +1,14 @@
+
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
-    // Match any file in a user-specific folder.
+    // Match any file within a user-specific folder.
     // The {userId} wildcard captures the user's unique ID from the path.
     match /users/{userId}/{allPaths=**} {
-      // Allow read and write operations only if the requesting user's UID
-      // matches the {userId} in the path. This ensures users can only
-      // access their own files.
+      // Allow read, write, and delete operations only if the requesting user is authenticated
+      // and their UID matches the {userId} in the path. This is the core of our
+      // user-ownership security model.
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
   }
