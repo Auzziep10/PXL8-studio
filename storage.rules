@@ -11,5 +11,16 @@ service firebase.storage {
       // user-ownership security model.
       allow read, write: if request.auth != null && request.auth.uid == userId;
     }
+
+    // Rules for temporary mobile uploads
+    match /upload_sessions/{sessionId}/{allPaths=**} {
+      // Allow anyone to write a file here. This is safe because the sessionID
+      // is a long, unguessable UID, acting as a temporary secret upload folder.
+      // We also add a size limit to prevent abuse.
+      allow write: if request.resource.size < 10 * 1024 * 1024;
+      
+      // Only the session owner can read the file they just uploaded.
+      allow read: if request.auth != null && request.auth.uid == sessionId;
+    }
   }
 }
