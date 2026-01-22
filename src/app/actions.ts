@@ -9,14 +9,16 @@ import type { ShippingAddress, ShippingRate, OrderItem } from '@/lib/types';
 
 export async function getPublicOrigin(): Promise<string> {
   const headersList = headers();
-  const host = headersList.get('host');
-  // In the specific cloud workstation environment, the host header should be correctly set.
-  // We default to localhost for local development as a fallback.
+  // In a proxied environment (like the one we're in), the x-forwarded-* headers
+  // contain the original information from the client request.
+  const protocol = headersList.get('x-forwarded-proto') ?? 'http';
+  const host = headersList.get('x-forwarded-host') ?? headersList.get('host');
+
   if (!host) {
+    // Fallback for local development when not in a proxied environment
     return 'http://localhost:9002';
   }
-  // Assume https for any production-like hostname.
-  const protocol = host.includes('localhost') ? 'http' : 'https';
+
   return `${protocol}://${host}`;
 }
 
