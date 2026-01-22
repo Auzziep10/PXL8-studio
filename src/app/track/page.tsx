@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { textContent } from '@/lib/text-content';
 import QRCode from 'qrcode';
+import { getPublicOrigin } from '@/app/actions';
 
 export default function SingleTransferUploadPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
@@ -24,6 +25,7 @@ export default function SingleTransferUploadPage() {
     const firestore = useFirestore();
 
     const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
+    const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
 
     const addOnsQuery = useMemoFirebase(
         () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
@@ -54,10 +56,23 @@ export default function SingleTransferUploadPage() {
 
     const imageAspectRatio = useRef<number | null>(null);
 
+    // --- Get Public URL for QR Code ---
+    useEffect(() => {
+        getPublicOrigin().then(origin => {
+            setPublicOrigin(origin);
+        }).catch(err => {
+            console.error("Failed to get public origin:", err);
+            // Fallback for safety, though it might not work in the target environment
+            if (typeof window !== 'undefined') {
+                setPublicOrigin(window.location.origin);
+            }
+        });
+    }, []);
+
      // --- QR Code Generation ---
     useEffect(() => {
-        if (user?.uid && typeof window !== 'undefined') {
-            const url = `${window.location.origin}/mobile-upload?session=${user.uid}`;
+        if (user?.uid && publicOrigin) {
+            const url = `${publicOrigin}/mobile-upload?session=${user.uid}`;
             QRCode.toDataURL(url, {
                 width: 256,
                 margin: 2,
@@ -69,7 +84,7 @@ export default function SingleTransferUploadPage() {
                 .then(setQrCodeDataUrl)
                 .catch(console.error);
         }
-    }, [user]);
+    }, [user, publicOrigin]);
 
     // --- Firestore Listener for Mobile Uploads ---
     const sessionDocRef = useMemoFirebase(() => {

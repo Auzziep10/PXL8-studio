@@ -1,10 +1,24 @@
 
 'use server';
 
+import { headers } from 'next/headers';
 import { improveArtworkPrintability, ImproveArtworkPrintabilityInput } from '@/ai/flows/improve-artwork-printability';
 import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
 import type { ShippingAddress, ShippingRate, OrderItem } from '@/lib/types';
 
+
+export async function getPublicOrigin(): Promise<string> {
+  const headersList = headers();
+  const host = headersList.get('host');
+  // In the specific cloud workstation environment, the host header should be correctly set.
+  // We default to localhost for local development as a fallback.
+  if (!host) {
+    return 'http://localhost:9002';
+  }
+  // Assume https for any production-like hostname.
+  const protocol = host.includes('localhost') ? 'http' : 'https';
+  return `${protocol}://${host}`;
+}
 
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
   try {
