@@ -62,7 +62,6 @@ export default function SingleTransferUploadPage() {
             setPublicOrigin(origin);
         }).catch(err => {
             console.error("Failed to get public origin:", err);
-            // Fallback for safety, though it might not work in the target environment
             if (typeof window !== 'undefined') {
                 setPublicOrigin(window.location.origin);
             }
@@ -72,7 +71,7 @@ export default function SingleTransferUploadPage() {
      // --- QR Code Generation ---
     useEffect(() => {
         if (user?.uid && publicOrigin) {
-            const url = `${publicOrigin}/mobile-upload?session=${user.uid}`;
+            const url = `${publicOrigin}/mobile-upload.html?session=${user.uid}`;
             QRCode.toDataURL(url, {
                 width: 256,
                 margin: 2,

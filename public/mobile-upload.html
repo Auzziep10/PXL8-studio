@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Upload File</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; display: flex; align-items: center; justify-content: center; min-h: 100vh; margin: 0; background-color: #09090b; color: #fafafa; }
+        .card { background-color: #18181b; border: 1px solid #27272a; border-radius: 0.75rem; padding: 2rem; text-align: center; max-width: 90%; width: 400px; }
+        h1 { font-size: 1.5rem; font-weight: 600; margin-top: 0; }
+        p { color: #a1a1aa; }
+        button { background-color: #27272a; color: #fafafa; border: 1px solid #3f3f46; border-radius: 0.5rem; font-size: 1rem; padding: 0.75rem 1.5rem; cursor: pointer; transition: background-color 0.2s; width: 100%; height: 6rem; display:flex; align-items:center; justify-content:center; }
+        button:hover { background-color: #3f3f46; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        .icon { width: 2.5rem; height: 2.5rem; margin: 0 auto 1rem; }
+        .hidden { display: none; }
+        .success { color: #4ade80; }
+        .error { color: #f87171; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+    </style>
+</head>
+<body>
+
+    <div class="card">
+        <div id="initial-view">
+            <h1>Upload from Phone</h1>
+            <p id="description">Select an image to send it to your computer.</p>
+            <input type="file" id="file-input" class="hidden" accept="image/*">
+            <button id="upload-button">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+            </button>
+        </div>
+        <div id="loading-view" class="hidden">
+             <svg class="icon animate-spin" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-6.219-8.56"/></svg>
+            <p>Uploading...</p>
+        </div>
+        <div id="success-view" class="hidden">
+            <svg class="icon success" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+            <h1 class="success">Upload Successful!</h1>
+            <p>You can now close this window and return to your computer.</p>
+        </div>
+        <div id="error-view" class="hidden">
+             <svg class="icon error" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
+            <h1 class="error">Upload Failed</h1>
+            <p id="error-message"></p>
+        </div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-firestore-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.1/firebase-storage-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            "projectId": "pxl8-final",
+            "appId": "1:1052987187294:web:6b684f33782eee16d1d4cf",
+            "storageBucket": "pxl8-final.firebasestorage.app",
+            "apiKey": "AIzaSyDCupluD0NchkXYmmazuJY-NnUMZtyy5BA",
+            "authDomain": "pxl8-final.firebaseapp.com",
+            "measurementId": "G-MEASUREMENT_ID"
+        };
+        
+        const initialView = document.getElementById('initial-view');
+        const loadingView = document.getElementById('loading-view');
+        const successView = document.getElementById('success-view');
+        const errorView = document.getElementById('error-view');
+        const errorMessage = document.getElementById('error-message');
+        const uploadButton = document.getElementById('upload-button');
+        const fileInput = document.getElementById('file-input');
+
+        function showView(view) {
+            [initialView, loadingView, successView, errorView].forEach(v => v.classList.add('hidden'));
+            view.classList.remove('hidden');
+        }
+
+        try {
+            const urlParams = new URLSearchParams(window.location.search);
+            const session = urlParams.get('session');
+
+            if (!session) {
+                throw new Error("Invalid session. Please re-scan the QR code.");
+            }
+
+            firebase.initializeApp(firebaseConfig);
+            const firestore = firebase.firestore();
+            const storage = firebase.storage();
+
+            uploadButton.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', async (event) => {
+                const file = event.target.files?.[0];
+                if (!file) return;
+
+                showView(loadingView);
+
+                try {
+                    const storageRef = storage.ref(`upload_sessions/${session}/${Date.now()}-${file.name}`);
+                    await storageRef.put(file);
+                    const downloadURL = await storageRef.getDownloadURL();
+
+                    const sessionDocRef = firestore.collection('upload_sessions').doc(session);
+                    await sessionDocRef.set({
+                        imageUrl: downloadURL,
+                        fileName: file.name,
+                        uploadedAt: firebase.firestore.FieldValue.serverTimestamp()
+                    }, { merge: true });
+
+                    showView(successView);
+
+                } catch (err) {
+                    console.error(err);
+                    errorMessage.textContent = "Upload failed. Please check your connection and try again.";
+                    showView(errorView);
+                }
+            });
+        } catch (err) {
+            errorMessage.textContent = err.message;
+            showView(errorView);
+        }
+    </script>
+</body>
+</html>
