@@ -164,20 +164,6 @@ service cloud.firestore {
         allow read, list: if true;
         allow write: if isSignedIn();
     }
-    
-    //-----------------------------------------------------------------------//
-    // Collection: upload_sessions (for mobile QR code uploads)
-    //-----------------------------------------------------------------------//
-    match /upload_sessions/{sessionId} {
-      // Only the user who owns the session can read it (their desktop browser)
-      allow read: if isOwner(sessionId);
-      
-      // Anyone can write to a session doc. This is safe because:
-      // 1. The sessionId is a long, unguessable UID.
-      // 2. The phone user doesn't need to be authenticated.
-      // 3. The data written is minimal (URL, filename).
-      allow write: if true;
-    }
 
 
     //-------------------------------------------------------------------------//

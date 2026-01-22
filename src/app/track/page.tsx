@@ -1,31 +1,25 @@
-
 'use client';
 
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { DynamicSheetCartItem, ServiceAddOn, Artwork } from '@/lib/types';
-import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet, Undo, QrCode as QrCodeIcon } from 'lucide-react';
+import { Upload, FileText, ArrowRight, Trash2, ShieldCheck, Ruler, DollarSign, Percent, AlertTriangle, Droplet, Undo } from 'lucide-react';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { useFirestore, useCollection, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, doc, setDoc } from 'firebase/firestore';
+import { useFirestore, useCollection, useMemoFirebase } from '@/firebase';
+import { collection, query, where } from 'firebase/firestore';
 import { formatCurrency } from '@/lib/utils';
 import { cn } from '@/lib/utils';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { textContent } from '@/lib/text-content';
-import QRCode from 'qrcode';
-import { getPublicOrigin } from '@/app/actions';
 
+// Simplified version of the elevated-flex page uploader
 export default function SingleTransferUploadPage() {
     const { addItem: onAddToCart, tempArtwork, clearTempArtwork } = useCart();
     const { toast } = useToast();
-    const { user, isUserLoading } = useUser();
     const firestore = useFirestore();
-
-    const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string | null>(null);
-    const [publicOrigin, setPublicOrigin] = useState<string | null>(null);
 
     const addOnsQuery = useMemoFirebase(
         () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
@@ -55,61 +49,11 @@ export default function SingleTransferUploadPage() {
 
 
     const imageAspectRatio = useRef<number | null>(null);
-
-    // --- Get Public URL for QR Code ---
-    useEffect(() => {
-        getPublicOrigin().then(origin => {
-            setPublicOrigin(origin);
-        }).catch(err => {
-            console.error("Failed to get public origin:", err);
-            if (typeof window !== 'undefined') {
-                setPublicOrigin(window.location.origin);
-            }
-        });
-    }, []);
-
-     // --- QR Code Generation ---
-    useEffect(() => {
-        if (user?.uid && publicOrigin) {
-            const url = `${publicOrigin}/mobile-upload.html?session=${user.uid}`;
-            QRCode.toDataURL(url, {
-                width: 256,
-                margin: 2,
-                color: {
-                    dark: '#FFFFFF', // White dots
-                    light: '#00000000' // Transparent background
-                }
-            })
-                .then(setQrCodeDataUrl)
-                .catch(console.error);
-        }
-    }, [user, publicOrigin]);
-
-    // --- Firestore Listener for Mobile Uploads ---
-    const sessionDocRef = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
-        return doc(firestore, 'upload_sessions', user.uid);
-    }, [firestore, user]);
-
-    const { data: sessionData } = useDoc<{ imageUrl: string, fileName: string }>(sessionDocRef);
-
-    useEffect(() => {
-        if (sessionData?.imageUrl && firestore && sessionDocRef) {
-            // New image detected from mobile upload
-            handleIncomingArtwork(sessionData.imageUrl, sessionData.fileName || 'mobile-upload.png');
-            
-            // Clear the document to prevent re-triggering
-            setDoc(sessionDocRef, { imageUrl: null, fileName: null }, { merge: true });
-        }
-    // handleIncomingArtwork is memoized with useCallback in the original file
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [sessionData, firestore, sessionDocRef]);
-
-
+    
     // Effect to handle temporary artwork from AI generator
     useEffect(() => {
         if (tempArtwork) {
-            handleIncomingArtwork(tempArtwork.imageUrl, tempArtwork.name);
+            handleIncomingArtwork(tempArtwork);
             clearTempArtwork();
         }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -129,23 +73,19 @@ export default function SingleTransferUploadPage() {
         }
     }, [dimensions, quantity, pricePerSqInch]);
 
-    const handleIncomingArtwork = (imageUrl: string, fileName: string) => {
-        setPreviewUrl(imageUrl);
-        setImageHistory([imageUrl]);
-        
+    const handleIncomingArtwork = (artwork: Omit<Artwork, 'id'>) => {
+        setPreviewUrl(artwork.imageUrl);
+        setImageHistory([artwork.imageUrl]);
+        setDimensions({ width: artwork.width.toString(), height: artwork.height.toString() });
+
         const img = new Image();
         img.onload = () => {
              imageAspectRatio.current = img.naturalWidth / img.naturalHeight;
-             // Auto-populate width to a default of 5 inches, height adjusts automatically
-             const defaultWidth = 5;
-             const correspondingHeight = defaultWidth / imageAspectRatio.current;
-             setDimensions({ width: String(defaultWidth), height: correspondingHeight.toFixed(2) });
         };
-        img.src = imageUrl;
+        img.src = artwork.imageUrl;
         
         // We don't have a real file object, so we create a placeholder name
-        setFile({ name: fileName } as File);
-        toast({ title: "Image Received!", description: "The image from your phone is ready." });
+        setFile({ name: artwork.name } as File);
     };
 
     // --- Background Removal ---
@@ -339,7 +279,7 @@ export default function SingleTransferUploadPage() {
     
     return (
         <div className="min-h-screen pb-12">
-            <div className="max-w-7xl mx-auto px-4 py-8">
+            <div className="max-w-4xl mx-auto px-4 py-8">
                  <div className="mb-12 text-center">
                     <h1 className="text-4xl font-bold text-white mb-4">{textContent.single_transfer_title}</h1>
                     <p className="text-zinc-400 max-w-2xl mx-auto">
@@ -347,165 +287,143 @@ export default function SingleTransferUploadPage() {
                     </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                    {/* Column 1: Direct Upload */}
-                    <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[550px] flex flex-col items-center justify-center">
-                        {!file ? (
-                            <div 
-                                onClick={() => fileInputRef.current?.click()}
-                                className="text-center cursor-pointer w-full h-full flex flex-col items-center justify-center"
-                            >
-                                <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6 group hover:scale-110 transition-transform duration-300">
-                                    <Upload className="w-10 h-10 text-zinc-400 group-hover:text-accent transition-colors" />
-                                </div>
-                                <h3 className="text-xl font-medium text-white mb-2">Click to upload your design</h3>
-                                <p className="text-zinc-500 text-sm">PNG, JPG, or SVG. 300 DPI recommended.</p>
+                <div className="glass-panel rounded-2xl p-8 border-dashed border-2 border-zinc-700 hover:border-zinc-500 transition-colors relative min-h-[550px] flex flex-col items-center justify-center">
+                    {!file ? (
+                        <div 
+                            onClick={() => fileInputRef.current?.click()}
+                            className="text-center cursor-pointer w-full h-full flex flex-col items-center justify-center"
+                        >
+                            <div className="w-20 h-20 bg-zinc-800/50 rounded-full flex items-center justify-center mb-6 group hover:scale-110 transition-transform duration-300">
+                                <Upload className="w-10 h-10 text-zinc-400 group-hover:text-accent transition-colors" />
                             </div>
-                        ) : (
-                            <div className="w-full h-full flex flex-col">
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
-                                    {/* Preview Area */}
-                                    <div className='space-y-4'>
-                                        <div 
-                                            className={cn(
-                                                "flex-grow checkerboard rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
-                                                isRemovingBg && 'cursor-eyedropper'
-                                            )}
-                                        >
-                                            {previewUrl && (
-                                                <img 
-                                                    src={previewUrl} 
-                                                    alt="Preview" 
-                                                    className="max-w-full max-h-[300px] object-contain shadow-2xl"
-                                                    onClick={handleBackgroundRemoval}
-                                                />
-                                            )}
-                                        </div>
-                                        <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
-                                            <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
-                                            <div className="space-y-3 pt-2">
-                                                <div className="flex items-center gap-2">
-                                                    <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
-                                                        <Droplet className="w-4 h-4 mr-2" />
-                                                        {isRemovingBg ? 'Cancel' : 'Magic Wand'}
-                                                    </Button>
-                                                    <Button 
-                                                        variant="ghost" 
-                                                        size="icon"
-                                                        onClick={handleUndo} 
-                                                        disabled={imageHistory.length <= 1}
-                                                        title="Undo last background removal"
-                                                    >
-                                                        <Undo className="w-4 h-4"/>
-                                                    </Button>
-                                                </div>
-                                                {isRemovingBg && (
-                                                    <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
-                                                        <p className="text-xs text-muted-foreground">Click a color on the artwork to make it transparent.</p>
-                                                        <div>
-                                                            <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
-                                                            <Slider 
-                                                                value={[bgRemovalTolerance]} 
-                                                                onValueChange={([val]) => setBgRemovalTolerance(val)}
-                                                                max={100} 
-                                                                step={1}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                         </div>
+                            <h3 className="text-xl font-medium text-white mb-2">Click to upload your design</h3>
+                            <p className="text-zinc-500 text-sm">PNG, JPG, or SVG. 300 DPI recommended.</p>
+                        </div>
+                    ) : (
+                        <div className="w-full h-full flex flex-col">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 items-start">
+                                {/* Preview Area */}
+                                <div className='space-y-4'>
+                                    <div 
+                                        className={cn(
+                                            "flex-grow checkerboard rounded-xl border border-white/10 relative overflow-hidden flex items-center justify-center p-4 min-h-[300px]",
+                                            isRemovingBg && 'cursor-eyedropper'
+                                        )}
+                                    >
+                                        {previewUrl && (
+                                            <img 
+                                                src={previewUrl} 
+                                                alt="Preview" 
+                                                className="max-w-full max-h-[300px] object-contain shadow-2xl"
+                                                onClick={handleBackgroundRemoval}
+                                            />
+                                        )}
                                     </div>
-
-                                    {/* Pricing and Actions */}
-                                    <div className="space-y-6">
-                                        <div className="bg-zinc-900/80 p-4 rounded-xl border border-white/10">
-                                            <div className="flex items-center overflow-hidden">
-                                                <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center mr-3 flex-shrink-0 text-accent">
-                                                    <FileText />
-                                                </div>
-                                                <div className="truncate">
-                                                    <p className="text-white font-medium truncate">{file.name}</p>
-                                                    {file.size > 0 && <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
-                                                </div>
+                                    <div className="bg-zinc-900/50 rounded-xl border border-white/10 p-4 space-y-4">
+                                        <Label className="flex items-center gap-2 text-zinc-300"><Droplet className="w-4 h-4"/> Image Tools</Label>
+                                        <div className="space-y-3 pt-2">
+                                            <div className="flex items-center gap-2">
+                                                <Button variant={isRemovingBg ? "destructive" : "outline"} onClick={() => setIsRemovingBg(!isRemovingBg)}>
+                                                    <Droplet className="w-4 h-4 mr-2" />
+                                                    {isRemovingBg ? 'Cancel' : 'Magic Wand'}
+                                                </Button>
                                                 <Button 
-                                                    variant="ghost"
+                                                    variant="ghost" 
                                                     size="icon"
-                                                    onClick={resetState}
-                                                    className="hover:bg-red-500/10 hover:text-red-500 text-zinc-500 ml-auto"
+                                                    onClick={handleUndo} 
+                                                    disabled={imageHistory.length <= 1}
+                                                    title="Undo last background removal"
                                                 >
-                                                    <Trash2 className="w-5 h-5" />
+                                                    <Undo className="w-4 h-4"/>
                                                 </Button>
                                             </div>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <Label className="flex items-center mb-1 text-zinc-400 text-xs"><Ruler className="w-3 h-3 mr-1"/> Dimensions (in)</Label>
-                                                <div className="flex gap-2">
-                                                    <Input name="width" value={dimensions.width} onChange={handleDimensionChange} placeholder="W" type="number" />
-                                                    <Input name="height" value={dimensions.height} onChange={handleDimensionChange} placeholder="H" type="number" />
+                                            {isRemovingBg && (
+                                                <div className="bg-secondary/50 p-3 rounded-lg space-y-2 animate-in fade-in">
+                                                    <p className="text-xs text-muted-foreground">Click a color on the artwork to make it transparent.</p>
+                                                    <div>
+                                                        <Label className="text-xs">Tolerance: {bgRemovalTolerance}</Label>
+                                                        <Slider 
+                                                            value={[bgRemovalTolerance]} 
+                                                            onValueChange={([val]) => setBgRemovalTolerance(val)}
+                                                            max={100} 
+                                                            step={1}
+                                                        />
+                                                    </div>
                                                 </div>
+                                            )}
+                                        </div>
+                                     </div>
+                                </div>
+
+                                {/* Pricing and Actions */}
+                                <div className="space-y-6">
+                                    <div className="bg-zinc-900/80 p-4 rounded-xl border border-white/10">
+                                        <div className="flex items-center overflow-hidden">
+                                            <div className="w-10 h-10 rounded bg-zinc-800 flex items-center justify-center mr-3 flex-shrink-0 text-accent">
+                                                <FileText />
                                             </div>
-                                            <div>
-                                                 <Label className="block mb-1 text-zinc-400 text-xs">Quantity</Label>
-                                                 <Input 
-                                                    type="number" 
-                                                    min="1" 
-                                                    value={quantity}
-                                                    onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
-                                                 />
+                                            <div className="truncate">
+                                                <p className="text-white font-medium truncate">{file.name}</p>
+                                                {file.size > 0 && <p className="text-xs text-zinc-500">{(file.size / 1024 / 1024).toFixed(2)} MB</p>}
+                                            </div>
+                                            <Button 
+                                                variant="ghost"
+                                                size="icon"
+                                                onClick={resetState}
+                                                className="hover:bg-red-500/10 hover:text-red-500 text-zinc-500 ml-auto"
+                                            >
+                                                <Trash2 className="w-5 h-5" />
+                                            </Button>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <Label className="flex items-center mb-1 text-zinc-400 text-xs"><Ruler className="w-3 h-3 mr-1"/> Dimensions (in)</Label>
+                                            <div className="flex gap-2">
+                                                <Input name="width" value={dimensions.width} onChange={handleDimensionChange} placeholder="W" type="number" />
+                                                <Input name="height" value={dimensions.height} onChange={handleDimensionChange} placeholder="H" type="number" />
                                             </div>
                                         </div>
-                                        
-                                        {(isLoadingPrice || pricePerSqInch === null) ? (
-                                             <p className="text-center text-sm text-zinc-500">Loading pricing...</p>
-                                        ) : (
-                                            <div className="text-center bg-zinc-900/50 p-4 rounded-xl border border-white/10">
-                                                <p className="text-zinc-400 text-sm">Total Price</p>
-                                                <p className="text-4xl font-bold text-white">{calculatedPrice !== null ? formatCurrency(calculatedPrice) : '...'}</p>
-                                            </div>
-                                        )}
-
-                                        <Button 
-                                            onClick={handleAddToCart}
-                                            disabled={isProcessing || calculatedPrice === null}
-                                            className="w-full text-lg h-12"
-                                        >
-                                            {isProcessing ? (
-                                                <span className="flex items-center">
-                                                    <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
-                                                    Processing...
-                                                </span>
-                                            ) : (
-                                                <>Add to Cart <ArrowRight className="ml-2 w-5 h-5" /></>
-                                            )}
-                                        </Button>
+                                        <div>
+                                             <Label className="block mb-1 text-zinc-400 text-xs">Quantity</Label>
+                                             <Input 
+                                                type="number" 
+                                                min="1" 
+                                                value={quantity}
+                                                onChange={(e) => setQuantity(parseInt(e.target.value) || 1)}
+                                             />
+                                        </div>
                                     </div>
+                                    
+                                    {(isLoadingPrice || pricePerSqInch === null) ? (
+                                         <p className="text-center text-sm text-zinc-500">Loading pricing...</p>
+                                    ) : (
+                                        <div className="text-center bg-zinc-900/50 p-4 rounded-xl border border-white/10">
+                                            <p className="text-zinc-400 text-sm">Total Price</p>
+                                            <p className="text-4xl font-bold text-white">{calculatedPrice !== null ? formatCurrency(calculatedPrice) : '...'}</p>
+                                        </div>
+                                    )}
+
+                                    <Button 
+                                        onClick={handleAddToCart}
+                                        disabled={isProcessing || calculatedPrice === null}
+                                        className="w-full text-lg h-12"
+                                    >
+                                        {isProcessing ? (
+                                            <span className="flex items-center">
+                                                <div className="w-5 h-5 border-2 border-black border-t-transparent rounded-full animate-spin mr-2"></div>
+                                                Processing...
+                                            </span>
+                                        ) : (
+                                            <>Add to Cart <ArrowRight className="ml-2 w-5 h-5" /></>
+                                        )}
+                                    </Button>
                                 </div>
                             </div>
-                        )}
-                        <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg,.svg" />
-                    </div>
-
-                     {/* Column 2: QR Code Upload */}
-                     <div className="glass-panel rounded-2xl p-8 border-border relative min-h-[550px] flex flex-col items-center justify-center text-center">
-                        <div className="w-16 h-16 bg-zinc-800/50 rounded-full flex items-center justify-center mb-4">
-                            <QrCodeIcon className="w-8 h-8 text-accent" />
                         </div>
-                        <h3 className="text-xl font-bold text-white mb-2">Upload from Phone</h3>
-                        <p className="text-zinc-400 mb-6 max-w-xs">Scan this code with your phone's camera to upload a design directly to this session.</p>
-
-                        <div className="w-64 h-64 bg-zinc-900/50 rounded-xl flex items-center justify-center p-2 border border-zinc-700">
-                             {qrCodeDataUrl ? (
-                                <img src={qrCodeDataUrl} alt="QR code for mobile upload" />
-                             ) : (
-                                 <p className="text-zinc-500 text-sm p-4">
-                                    {isUserLoading ? "Generating QR Code..." : "Please log in to enable phone uploads."}
-                                 </p>
-                             )}
-                        </div>
-                    </div>
+                    )}
+                    <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileChange} accept=".png,.jpg,.jpeg,.svg" />
                 </div>
             </div>
         </div>

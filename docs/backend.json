@@ -240,28 +240,6 @@
         }
       },
       "required": ["id", "name", "description", "price"]
-    },
-    "UploadSession": {
-        "$schema": "http://json-schema.org/draft-07/schema#",
-        "title": "UploadSession",
-        "type": "object",
-        "description": "A temporary document to bridge a mobile upload session to a desktop session.",
-        "properties": {
-            "imageUrl": {
-                "type": "string",
-                "description": "The Firebase Storage URL of the uploaded image."
-            },
-            "fileName": {
-                "type": "string",
-                "description": "The original name of the uploaded file."
-            },
-            "uploadedAt": {
-                "type": "string",
-                "description": "Timestamp of when the upload occurred.",
-                "format": "date-time"
-            }
-        },
-        "required": ["imageUrl", "fileName", "uploadedAt"]
     }
   },
   "auth": {
@@ -356,22 +334,6 @@
             {
               "name": "addOnId",
               "description": "The unique identifier for the service add-on."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/upload_sessions/{sessionId}",
-        "definition": {
-          "entityName": "UploadSession",
-          "schema": {
-            "$ref": "#/backend/entities/UploadSession"
-          },
-          "description": "Stores temporary information for a mobile-to-desktop upload session, linked by the user's UID.",
-          "params": [
-            {
-              "name": "sessionId",
-              "description": "The user's UID, acting as a unique session identifier."
             }
           ]
         }

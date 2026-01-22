@@ -7,21 +7,6 @@ import { generateDesignFromPrompt, GenerateDesignFromPromptInput } from '@/ai/fl
 import type { ShippingAddress, ShippingRate, OrderItem } from '@/lib/types';
 
 
-export async function getPublicOrigin(): Promise<string> {
-  const headersList = headers();
-  // In a proxied environment (like the one we're in), the x-forwarded-* headers
-  // contain the original information from the client request.
-  const protocol = headersList.get('x-forwarded-proto') ?? 'http';
-  const host = headersList.get('x-forwarded-host') ?? headersList.get('host');
-
-  if (!host) {
-    // Fallback for local development when not in a proxied environment
-    return 'http://localhost:9002';
-  }
-
-  return `${protocol}://${host}`;
-}
-
 export async function analyzeArtwork(input: ImproveArtworkPrintabilityInput) {
   try {
     const result = await improveArtworkPrintability(input);
