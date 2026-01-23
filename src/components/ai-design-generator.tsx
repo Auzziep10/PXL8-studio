@@ -563,7 +563,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Render Logic ---
     return (
-        <div className="h-[calc(100vh-5rem)] flex flex-col">
+        <div className="h-full flex flex-col">
             <Card className="glass-panel border-border/10 flex-grow flex flex-col">
                 {view === 'generate' && (
                     <CardHeader className="text-center">

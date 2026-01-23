@@ -9,7 +9,6 @@ import { cn } from '@/lib/utils';
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isDashboard = pathname.startsWith('/admin') || pathname.startsWith('/dashboard') || pathname.startsWith('/settings');
-  const isDesignStudio = pathname === '/design-studio';
   const showHeader = !isDashboard;
 
   if (isDashboard) {
@@ -19,7 +18,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   return (
     <>
       {showHeader && <Header />}
-      <main className={cn('flex-grow', !isDesignStudio && 'pt-[5rem]')}>{children}</main>
+      <main className={cn('flex-grow', showHeader && 'pt-[5rem]')}>{children}</main>
     </>
   );
 }
