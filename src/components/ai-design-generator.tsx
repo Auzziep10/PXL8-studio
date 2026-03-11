@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
@@ -9,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
 import { useToast } from '@/hooks/use-toast';
-import { ImagePlus, Wand2, Sparkles, AlertTriangle, Scissors, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter, ArrowLeft } from 'lucide-react';
+import { ImagePlus, Wand2, Sparkles, AlertTriangle, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter, ArrowLeft } from 'lucide-react';
 import { Artwork, ServiceAddOn } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
@@ -563,8 +562,8 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
     // --- Render Logic ---
     return (
-        <div className="h-full flex flex-col">
-            <Card className="glass-panel border-border/10 flex-grow flex flex-col">
+        <div className="h-[calc(100vh-5rem)] flex flex-col overflow-hidden">
+            <Card className="glass-panel border-border/10 flex-grow flex flex-col min-h-0">
                 {view === 'generate' && (
                     <CardHeader className="text-center">
                         <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
@@ -846,7 +845,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Accordion>
                                 </div>
                             </div>
-                            <div className="md:col-span-2 flex flex-col items-center justify-center">
+                            <div className="md:col-span-2 flex flex-col items-center justify-center min-h-0">
                                 <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg w-full", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
                                     <canvas
                                         ref={canvasRef}
@@ -859,7 +858,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         onMouseLeave={handleCanvasMouseUp}
                                     />
                                 </div>
-                                <div className="space-y-4 mt-6 w-full max-w-lg">
+                                <div className="space-y-4 mt-6 w-full max-w-lg shrink-0">
                                     <div className="flex flex-col sm:flex-row justify-center gap-4">
                                         <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
                                             <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
