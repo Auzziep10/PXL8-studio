@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, Suspense } from 'react';
+import { useEffect, Suspense, useRef } from 'react';
 import { useCart } from '@/hooks/use-cart';
 import { CheckCircle2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,10 +12,12 @@ function SuccessContent() {
     const searchParams = useSearchParams();
     const sessionId = searchParams.get('session_id');
 
+    const hasCleared = useRef(false);
+
     useEffect(() => {
-        if (sessionId) {
-            // Only clear cart if we came from a successful stripe session
+        if (sessionId && !hasCleared.current) {
             clearCart();
+            hasCleared.current = true;
         }
     }, [sessionId, clearCart]);
 
