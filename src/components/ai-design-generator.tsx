@@ -679,7 +679,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                         </div>
                     ) : (
                         <div className="grid md:grid-cols-3 gap-8 flex-grow min-h-0">
-                            <div className="md:col-span-1 h-full flex flex-col">
+                            <div className="md:col-span-1 h-full flex flex-col min-h-0">
                                 <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4 builder-scroll">
                                     <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3', 'item-4']} className="w-full">
                                         <AccordionItem value="item-1" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
