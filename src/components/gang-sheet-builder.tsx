@@ -973,7 +973,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                                             <span className="ml-3 font-medium text-foreground">{config.name} - {config.width}" x {config.height}"</span>
                                             </div>
                                             <div className="flex flex-col items-end relative z-10">
-                                                <span className="font-bold text-accent">{formatCurrency(finalPrice)}</span>
+                                                <span className="font-bold text-foreground">{formatCurrency(finalPrice)}</span>
                                                 {config.discount > 0 && 
                                                     <span className="text-xs text-red-500 flex items-center gap-1">
                                                         <Percent className="w-3 h-3" /> {config.discount}% Off
