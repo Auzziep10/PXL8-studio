@@ -8,13 +8,13 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
   apiVersion: '2025-02-24.acacia',
 });
 
-export async function createCheckoutSession(cartItems: CartItem[], total: number): Promise<{ success: boolean; sessionId?: string; url?: string; error?: string }> {
+export async function createCheckoutSession(cartItems: CartItem[], shippingCost: number = 0, tax: number = 0): Promise<{ success: boolean; sessionId?: string; url?: string; error?: string }> {
   try {
     const headersList = await headers();
     const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
     
     // Map cart items to Stripe line items
-    const lineItems = cartItems.map(item => ({
+    const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = cartItems.map(item => ({
       price_data: {
         currency: 'usd',
         product_data: {
@@ -25,6 +25,28 @@ export async function createCheckoutSession(cartItems: CartItem[], total: number
       },
       quantity: item.quantity,
     }));
+
+    if (shippingCost > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Shipping' },
+          unit_amount: Math.round(shippingCost * 100),
+        },
+        quantity: 1,
+      });
+    }
+
+    if (tax > 0) {
+      lineItems.push({
+        price_data: {
+          currency: 'usd',
+          product_data: { name: 'Estimated Tax' },
+          unit_amount: Math.round(tax * 100),
+        },
+        quantity: 1,
+      });
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],

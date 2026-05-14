@@ -346,7 +346,7 @@ export default function CartPage() {
                     quantity: item.quantity,
                 } as CartItem));
 
-                const result = await createCheckoutSession(lightweightItems, total);
+                const result = await createCheckoutSession(lightweightItems, shippingCost, tax);
                 if (result.success && result.url) {
                     window.location.href = result.url;
                     return; // Stop execution here so we don't route to success yet
