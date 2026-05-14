@@ -260,33 +260,40 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
   const displayHeight = (sheetConfig?.height || 0) * PPI * scale;
 
   // --- Auto-Positioning Algorithm ---
-  const findOpenPosition = (width: number, height: number, existingItems: ArtworkOnCanvas[]): {x: number, y: number} => {
-    if (!sheetConfig) return { x: 0, y: 0 };
+  const placeItemSmartly = useCallback((width: number, height: number, existingItems: ArtworkOnCanvas[], currentSizeId: string | null): { pos: { x: number, y: number }, newSizeId: string | null } => {
+    if (!sortedSheetSizes || sortedSheetSizes.length === 0) return { pos: { x: 0, y: 0 }, newSizeId: currentSizeId };
+
+    let startIndex = sortedSheetSizes.findIndex(s => s.id === currentSizeId);
+    if (startIndex === -1) startIndex = 0;
+
     const margin = 0.25; // inch margin
     const step = 0.5; // check every half inch
 
-    // Simple scan: Top to bottom, left to right
-    for (let y = margin; y < sheetConfig.height - height; y += step) {
-        for (let x = margin; x < sheetConfig.width - width; x += step) {
-            
-            // Check collision with all existing items at this position
-            const collision = existingItems.some(item => {
-                return !(
-                    x + width + margin <= item.x ||    // New is to left of Existing
-                    x >= item.x + item.width + margin || // New is to right of Existing
-                    y + height + margin <= item.y ||   // New is above Existing
-                    y >= item.y + item.height + margin   // New is below Existing
-                );
-            });
+    for (let i = startIndex; i < sortedSheetSizes.length; i++) {
+        const sheet = sortedSheetSizes[i];
 
-            if (!collision) {
-                return { x, y };
+        for (let y = margin; y < sheet.height - height; y += step) {
+            for (let x = margin; x < sheet.width - width; x += step) {
+                
+                // Check collision with all existing items at this position
+                const collision = existingItems.some(item => {
+                    return !(
+                        x + width + margin <= item.x ||    // New is to left of Existing
+                        x >= item.x + item.width + margin || // New is to right of Existing
+                        y + height + margin <= item.y ||   // New is above Existing
+                        y >= item.y + item.height + margin   // New is below Existing
+                    );
+                });
+
+                if (!collision) {
+                    return { pos: { x, y }, newSizeId: sheet.id };
+                }
             }
         }
     }
-    // Fallback: Place at 0,0 (Overlap will be visually flagged)
-    return { x: 0, y: 0 };
-  };
+    // Fallback: Place at 0,0 on the current sheet
+    return { pos: { x: 0, y: 0 }, newSizeId: currentSizeId };
+  }, [sortedSheetSizes]);
 
   const handleImageLoad = useCallback((imageUrl: string, fileName: string, isFromUpload: boolean, existingArtwork?: Omit<Artwork, 'id'>) => {
     const isPermanent = !imageUrl.startsWith('data:');
@@ -309,7 +316,11 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                 h = parseFloat((img.height / dpi).toFixed(2));
             }
 
-            const pos = findOpenPosition(w, h, items);
+            const { pos, newSizeId } = placeItemSmartly(w, h, items, selectedSizeId);
+            if (newSizeId && newSizeId !== selectedSizeId) {
+                setSelectedSizeId(newSizeId);
+                toast({ title: 'Sheet Resized', description: 'Upgraded sheet size to fit your uploaded design.' });
+            }
 
             const newItem: ArtworkOnCanvas = {
                 id: `art-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`,
@@ -372,7 +383,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
         // Guest user, or already have a permanent URL
         placeImageOnCanvas(imageUrl);
     }
-  }, [items, sheetConfig, toast, user]);
+  }, [items, selectedSizeId, placeItemSmartly, toast, user]);
 
 
    // Effect to handle temporary artwork from the useCart hook
@@ -549,9 +560,15 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
       // We must check against both original items AND the newly added duplicates 
       // so they don't stack on top of each other.
       let currentItemsForCheck = [...items];
+      let currentSizeId = selectedSizeId;
+      let sizeChanged = false;
 
       for (let i = 0; i < count; i++) {
-          const pos = findOpenPosition(itemToClone.width, itemToClone.height, currentItemsForCheck);
+          const { pos, newSizeId } = placeItemSmartly(itemToClone.width, itemToClone.height, currentItemsForCheck, currentSizeId);
+          if (newSizeId !== currentSizeId) {
+              currentSizeId = newSizeId;
+              sizeChanged = true;
+          }
           
           const newItem: Omit<ArtworkOnCanvas, 'analysis' | 'analysisLoading' | 'history'> & { analysis?: any, history?: string[] } = {
               ...itemToClone,
@@ -567,6 +584,10 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
           currentItemsForCheck.push(newItem as ArtworkOnCanvas);
       }
       setItems(prev => [...prev, ...newItems]);
+      if (sizeChanged && currentSizeId) {
+          setSelectedSizeId(currentSizeId);
+          toast({ title: 'Sheet Resized', description: 'Upgraded sheet size to fit your designs.' });
+      }
       setDuplicateCount(1); // Reset after adding
   };
 
@@ -920,6 +941,19 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
   };
 
 
+  const groupedItems = useMemo(() => {
+      const groups: Record<string, { first: ArtworkOnCanvas, allIds: string[], count: number }> = {};
+      items.forEach(item => {
+          const key = `${item.name}_${item.history?.[0] || item.imageUrl}_${item.width}_${item.height}`;
+          if (!groups[key]) {
+              groups[key] = { first: item, allIds: [], count: 0 };
+          }
+          groups[key].allIds.push(item.id);
+          groups[key].count++;
+      });
+      return Object.values(groups);
+  }, [items]);
+
   if (isUserLoading || !isLoaded || isLoadingSizes || isLoadingPrice) {
     return (
         <div className="flex items-center justify-center min-h-[60vh]">
@@ -1001,11 +1035,14 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                                 <p className="text-center text-sm text-muted-foreground py-4">No designs uploaded.</p>
                               ) : (
                                 <div className="space-y-2 max-h-[300px] overflow-y-auto pr-2 builder-scroll">
-                                  {items.map((item) => (
+                                  {groupedItems.map((group) => {
+                                      const item = group.first;
+                                      const isSelected = group.allIds.includes(selectedItemId || '');
+                                      return (
                                       <div 
                                         key={item.id} 
                                         onClick={() => setSelectedItemId(item.id)}
-                                        className={`p-3 rounded-xl border transition-all cursor-pointer ${selectedItemId === item.id ? 'bg-secondary border-primary ring-1 ring-primary/20' : 'bg-background/50 border-border hover:bg-secondary'}`}
+                                        className={`p-3 rounded-xl border transition-all cursor-pointer ${isSelected ? 'bg-secondary border-primary ring-1 ring-primary/20' : 'bg-background/50 border-border hover:bg-secondary'}`}
                                       >
                                           <div className="flex items-start justify-between">
                                               <div className="flex items-center space-x-3">
@@ -1021,25 +1058,32 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                                                       <p className="text-xs text-muted-foreground">{item.width}" x {item.height}"</p>
                                                   </div>
                                               </div>
-                                              <div className="flex items-center">
+                                              <div className="flex flex-col items-end space-y-2">
+                                                <div className="flex items-center">
+                                                    <span className="text-xs font-bold text-muted-foreground bg-background px-2 py-1 rounded border mr-2">x{group.count}</span>
+                                                    <button 
+                                                        onClick={(e) => { 
+                                                            e.stopPropagation(); 
+                                                            setItems(prev => prev.filter(i => !group.allIds.includes(i.id)));
+                                                            if (selectedItemId && group.allIds.includes(selectedItemId)) setSelectedItemId(null);
+                                                        }}
+                                                        className="text-muted-foreground hover:text-red-500 transition-colors p-1"
+                                                        title="Remove All Copies"
+                                                    >
+                                                        <Trash2 className="w-4 h-4" />
+                                                    </button>
+                                                </div>
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); handleBulkDuplicate(item, 1); }}
-                                                    className="text-muted-foreground hover:text-primary transition-colors p-1"
-                                                    title="Duplicate Artwork"
+                                                    className="text-[10px] bg-primary text-primary-foreground hover:bg-primary/90 transition-colors px-2 py-1 rounded font-medium flex items-center"
                                                 >
-                                                    <Copy className="w-4 h-4" />
-                                                </button>
-                                                <button 
-                                                    onClick={(e) => { e.stopPropagation(); removeItem(item.id); }}
-                                                    className="text-muted-foreground hover:text-red-500 transition-colors p-1"
-                                                    title="Remove Artwork"
-                                                >
-                                                    <Trash2 className="w-4 h-4" />
+                                                    <Copy className="w-3 h-3 mr-1" /> Duplicate
                                                 </button>
                                               </div>
                                           </div>
                                       </div>
-                                  ))}
+                                      )
+                                  })}
                                 </div>
                               )}
                         </AccordionContent>
