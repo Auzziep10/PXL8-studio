@@ -1,22 +1,42 @@
 'use server';
 
 import { CartItem } from "@/lib/types";
+import Stripe from 'stripe';
+import { headers } from 'next/headers';
 
-// Mock function to simulate creating a Stripe Checkout session
-export async function createCheckoutSession(cartItems: CartItem[], total: number): Promise<{ success: boolean; sessionId?: string }> {
-  console.log("Simulating Stripe checkout session creation...");
-  console.log("Cart Items:", cartItems);
-  console.log("Total:", total);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || 'sk_test_mock', {
+  apiVersion: '2025-02-24.acacia',
+});
 
-  // In a real application, you would use the Stripe Node.js library here
-  // to create a session and return the session ID to redirect the user to Stripe's checkout page.
-  
-  // Simulate a network delay
-  await new Promise(resolve => setTimeout(resolve, 1500));
+export async function createCheckoutSession(cartItems: CartItem[], total: number): Promise<{ success: boolean; sessionId?: string; url?: string; error?: string }> {
+  try {
+    const headersList = await headers();
+    const origin = headersList.get('origin') || process.env.NEXT_PUBLIC_SITE_URL || 'http://localhost:9002';
+    
+    // Map cart items to Stripe line items
+    const lineItems = cartItems.map(item => ({
+      price_data: {
+        currency: 'usd',
+        product_data: {
+          name: item.name,
+          images: item.type === 'product' && item.artwork?.imageUrl ? [item.artwork.imageUrl] : undefined,
+        },
+        unit_amount: Math.round(item.price * 100), // Stripe expects cents
+      },
+      quantity: item.quantity,
+    }));
 
-  // Simulate a successful checkout session creation
-  const mockSessionId = `cs_test_${Date.now()}`;
-  console.log("Mock session created:", mockSessionId);
-  
-  return { success: true, sessionId: mockSessionId };
+    const session = await stripe.checkout.sessions.create({
+      payment_method_types: ['card'],
+      line_items: lineItems,
+      mode: 'payment',
+      success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${origin}/cart`,
+    });
+
+    return { success: true, sessionId: session.id, url: session.url! };
+  } catch (error: any) {
+    console.error('Error creating Stripe session:', error);
+    return { success: false, error: error.message || 'Failed to create Stripe session' };
+  }
 }

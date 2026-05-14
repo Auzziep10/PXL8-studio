@@ -346,7 +346,13 @@ export default function CartPage() {
                     quantity: item.quantity,
                 } as CartItem));
 
-                await createCheckoutSession(lightweightItems, total);
+                const result = await createCheckoutSession(lightweightItems, total);
+                if (result.success && result.url) {
+                    window.location.href = result.url;
+                    return; // Stop execution here so we don't route to success yet
+                } else {
+                    throw new Error(result.error || "Failed to initialize payment gateway");
+                }
             } else {
                 console.log(" -> Test order, skipping payment.");
             }
