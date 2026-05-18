@@ -15,7 +15,7 @@ import {
   SidebarInset,
   SidebarFooter,
 } from '@/components/ui/sidebar';
-import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon, Sparkles, Image as ImageIcon, Pilcrow } from 'lucide-react';
+import { Home, LayoutGrid, User, Settings, LogOut, DollarSign, Upload, Wand2, Search as SearchIcon, Sparkles, Image as ImageIcon, Pilcrow, Users } from 'lucide-react';
 import { PXL8Logo } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { useUser, useAuth, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
@@ -78,6 +78,7 @@ export default function DashboardLayout({
 
   const adminNavItems = [
     { href: '/dashboard', label: 'Overview', icon: Home, roles: ['customer', 'admin'] },
+    { href: '/admin/users', label: 'Users', icon: Users, roles: ['admin'] },
     { href: '/admin', label: 'Fulfillment', icon: LayoutGrid, roles: ['admin'] },
     { href: '/admin/pricing', label: 'Pricing', icon: DollarSign, roles: ['admin'] },
     { href: '/admin/media', label: 'Logo & Photos', icon: ImageIcon, roles: ['admin'] },

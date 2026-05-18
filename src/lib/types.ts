@@ -2,7 +2,7 @@
 import type { ImproveArtworkPrintabilityOutput } from '@/ai/flows/improve-artwork-printability';
 import type { User as FirebaseUser } from 'firebase/auth';
 
-export type UserRole = 'customer' | 'admin';
+export type UserRole = 'customer' | 'admin' | 'printer';
 
 export interface User {
   id: string;
