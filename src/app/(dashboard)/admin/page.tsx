@@ -37,23 +37,62 @@ type SortKey = 'date' | 'totalPrice' | 'status';
 type SortDirection = 'asc' | 'desc';
 
 // Utility to draw solid black Graphtec Type 1 registration marks (L-marks) in the 4 corners of the sheet's printable area
+// If drawBackground is true, it prints solid white squares behind the marks to provide contrast for the plotter sensor on transparent film.
 const drawGraphtecRegistrationMarks = (
     ctx: CanvasRenderingContext2D,
     width: number,
     height: number,
-    topOffset: number
+    topOffset: number,
+    drawBackground: boolean = false
 ) => {
     const BASE_DPI = 300;
     const margin = 0.5 * BASE_DPI; // 150px (0.5 inch safety margin)
     const markLength = 0.5 * BASE_DPI; // 150px (12.7 mm mark line length)
     const thickness = 0.04 * BASE_DPI; // 12px (approx 1.0 mm line thickness)
-
-    ctx.fillStyle = 'black';
+    const padding = 0.15 * BASE_DPI; // 45px (0.15 inch padding for the white background squares)
 
     const xLeft = margin;
     const xRight = width - margin;
     const yTop = topOffset;
     const yBottom = height - margin;
+
+    if (drawBackground) {
+        ctx.fillStyle = 'white';
+        
+        // 1. Top-Left White Background
+        ctx.fillRect(
+            xLeft - padding,
+            yTop - padding,
+            markLength + (2 * padding),
+            markLength + (2 * padding)
+        );
+
+        // 2. Top-Right White Background
+        ctx.fillRect(
+            xRight - markLength - padding,
+            yTop - padding,
+            markLength + (2 * padding),
+            markLength + (2 * padding)
+        );
+
+        // 3. Bottom-Left White Background
+        ctx.fillRect(
+            xLeft - padding,
+            yBottom - markLength - padding,
+            markLength + (2 * padding),
+            markLength + (2 * padding)
+        );
+
+        // 4. Bottom-Right White Background
+        ctx.fillRect(
+            xRight - markLength - padding,
+            yBottom - markLength - padding,
+            markLength + (2 * padding),
+            markLength + (2 * padding)
+        );
+    }
+
+    ctx.fillStyle = 'black';
 
     // 1. Top-Left L-Mark (Corner pointing down-right)
     ctx.fillRect(xLeft, yTop, markLength, thickness);
@@ -407,9 +446,10 @@ const generateFinalSheetsForPrintAndCut = async (
     drawHeader(printCtx, false);
 
     // --- Draw Graphtec Registration Marks ---
-    // Position top marks at 0.5 inches (150px) from top edge so they are printed above the QR code/header
-    drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI);
-    drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI);
+    // Position top marks at 0.5 inches (150px) from top edge so they are printed above the QR code/header.
+    // On the print canvas, we draw a solid white background square under the black marks to provide contrast on transparent film.
+    drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI, true);
+    drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI, false);
 
     return {
         printDataUrl: printCanvas.toDataURL('image/png'),
