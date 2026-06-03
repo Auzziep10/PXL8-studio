@@ -138,7 +138,8 @@ const generateFinalSheetsForPrintAndCut = async (
     
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI; // 300px
     const MARGIN_PX = MARGIN_INCHES * BASE_DPI; // 300px
-    const yOffset = HEADER_HEIGHT_PX + MARGIN_PX; // 600px
+    const HEADER_TO_DESIGN_GAP = 0.5 * BASE_DPI; // 150px (0.5 inch safety margin to separate header from design cut lines)
+    const yOffset = HEADER_HEIGHT_PX + MARGIN_PX + HEADER_TO_DESIGN_GAP; // 750px
 
     const isVinyl = isVinylItem(orderItem);
 
@@ -161,9 +162,9 @@ const generateFinalSheetsForPrintAndCut = async (
         sheetContentHeightInches = orderItem.sheetHeight;
     }
     
-    // Add 1" margin to the left and right, and top and bottom of the design area
+    // Add 1" margin to the left and right, and top and bottom of the design area, plus the header gap
     const finalCanvasWidth = (designWidthInches + (2 * MARGIN_INCHES)) * BASE_DPI; // e.g., 24" wide for a 22" sheet
-    const finalCanvasHeight = (sheetContentHeightInches * BASE_DPI) + HEADER_HEIGHT_PX + (2 * MARGIN_PX);
+    const finalCanvasHeight = (sheetContentHeightInches * BASE_DPI) + HEADER_HEIGHT_PX + (2 * MARGIN_PX) + HEADER_TO_DESIGN_GAP;
 
     // Load the primary user image layout
     const sourceImage = new window.Image();
@@ -362,15 +363,21 @@ const generateFinalSheetsForPrintAndCut = async (
         ctx.fillStyle = 'white';
         ctx.fillRect(0, headerY, finalCanvasWidth, HEADER_HEIGHT_PX);
         
+        // Graphtec registration marks are at x = 150px with a mark length of 150px (ends at 300px).
+        // Position header contents at x = 350px to ensure a clean 50px margin inside the top-left mark.
+        const contentStartX = (0.5 * BASE_DPI) + (0.5 * BASE_DPI) + 50; 
+        
         if (!isCut) {
-            ctx.drawImage(qrImg, 10, headerY + 10);
+            ctx.drawImage(qrImg, contentStartX, headerY + 10);
         }
 
         ctx.fillStyle = 'black';
         ctx.textAlign = 'left';
         ctx.textBaseline = 'top';
 
-        const textX = isCut ? 20 : HEADER_HEIGHT_PX;
+        // If printing, place text to the right of the QR code (350px + 280px width + 20px gap = 650px).
+        // For the cut file (no QR code), start the text directly at contentStartX (350px) to keep it inside the marks.
+        const textX = isCut ? contentStartX : contentStartX + (HEADER_HEIGHT_PX - 20) + 20;
 
         let textY = headerY + 15;
         ctx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
