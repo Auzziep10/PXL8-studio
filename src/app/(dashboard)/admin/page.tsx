@@ -358,11 +358,12 @@ const generateFinalSheetsForPrintAndCut = async (
     const FONT_SIZE_SMALL = BASE_DPI / 8;
 
     const drawHeader = (ctx: CanvasRenderingContext2D, isCut: boolean) => {
+        const headerY = 1.0 * BASE_DPI; // 300px (1 inch from top)
         ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, finalCanvasWidth, HEADER_HEIGHT_PX);
+        ctx.fillRect(0, headerY, finalCanvasWidth, HEADER_HEIGHT_PX);
         
         if (!isCut) {
-            ctx.drawImage(qrImg, 10, 10);
+            ctx.drawImage(qrImg, 10, headerY + 10);
         }
 
         ctx.fillStyle = 'black';
@@ -371,7 +372,7 @@ const generateFinalSheetsForPrintAndCut = async (
 
         const textX = isCut ? 20 : HEADER_HEIGHT_PX;
 
-        let textY = 15;
+        let textY = headerY + 15;
         ctx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
         ctx.fillText(`Order: ${orderId}`, textX, textY);
         textY += FONT_SIZE_LARGE + 15;
@@ -395,8 +396,9 @@ const generateFinalSheetsForPrintAndCut = async (
     drawHeader(cutCtx, true);
 
     // --- Draw Graphtec Registration Marks ---
-    drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, HEADER_HEIGHT_PX + (0.5 * BASE_DPI));
-    drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, HEADER_HEIGHT_PX + (0.5 * BASE_DPI));
+    // Position top marks at 0.5 inches (150px) from top edge so they are printed above the QR code/header
+    drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI);
+    drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI);
 
     return {
         printDataUrl: printCanvas.toDataURL('image/png'),
