@@ -242,46 +242,14 @@ export default function CustomerPathWizard() {
             const rows = Math.ceil(quantity / cols);
             const sheetHeight = rows * height + (rows - 1) * gap;
 
-            setGenerationProgress(30);
+            setGenerationProgress(70);
 
-            // Create Canvas
-            const canvas = document.createElement('canvas');
-            canvas.width = rollWidth * dpi;
-            canvas.height = sheetHeight * dpi;
-            const ctx = canvas.getContext('2d');
-            if (!ctx) throw new Error("Could not construct 2D context");
-
-            // Draw clean background
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-            setGenerationProgress(50);
-
-            // Load original image
-            const img = new window.Image();
-            img.crossOrigin = 'Anonymous';
-            await new Promise<void>((resolve, reject) => {
-                img.onload = () => resolve();
-                img.onerror = () => reject(new Error("Failed to load source image"));
-                img.src = previewUrl;
-            });
-
-            setGenerationProgress(75);
-
-            // Draw grid copies onto the canvas
             const artworksList: ArtworkOnCanvas[] = [];
             for (let i = 0; i < quantity; i++) {
                 const col = i % cols;
                 const row = Math.floor(i / cols);
                 const xInches = col * (width + gap);
                 const yInches = row * (height + gap);
-
-                ctx.drawImage(
-                    img,
-                    xInches * dpi,
-                    yInches * dpi,
-                    width * dpi,
-                    height * dpi
-                );
 
                 artworksList.push({
                     id: `art-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
@@ -299,10 +267,9 @@ export default function CustomerPathWizard() {
                 });
             }
 
-            setGenerationProgress(90);
+            setGenerationProgress(95);
 
-            // Export as PNG
-            const finalSheetPreviewUrl = canvas.toDataURL('image/png');
+            const finalSheetPreviewUrl = previewUrl;
 
             const cartItem: SheetCartItem = {
                 id: `GNG-AUTO-${Date.now()}`,
@@ -707,7 +674,7 @@ export default function CustomerPathWizard() {
                                                     disabled={!file || !dimensions.width || !dimensions.height || calculatedPrice === 0}
                                                     className="w-full text-xs h-10 bg-zinc-900 hover:bg-zinc-800 text-white rounded-full font-semibold uppercase tracking-wider flex items-center justify-center gap-2 mt-4"
                                                 >
-                                                    Generate Gang Sheet & Checkout <ArrowRight className="w-4 h-4" />
+                                                    Add to Cart & Checkout <ArrowRight className="w-4 h-4" />
                                                 </Button>
                                             </div>
                                         </div>
