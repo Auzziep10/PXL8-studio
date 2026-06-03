@@ -248,23 +248,54 @@ const generateFinalSheetsForPrintAndCut = async (
         }
     } else {
         // --- Standard Gang Sheet ---
-        // Draw primary artwork to PRINT canvas
-        printCtx.drawImage(
-            sourceImage, 
-            MARGIN_PX, 
-            yOffset, 
-            designWidthInches * BASE_DPI, 
-            orderItem.sheetHeight * BASE_DPI
-        );
+        const isAutoLayout = (orderItem.sheetSizeName || '').toLowerCase().includes('auto-layout');
+        const artworks = orderItem.artworks || [];
 
-        // Draw to design offscreen canvas
-        designCtx.drawImage(
-            sourceImage,
-            0,
-            0,
-            designWidthInches * BASE_DPI,
-            orderItem.sheetHeight * BASE_DPI
-        );
+        if (isAutoLayout && artworks.length > 0) {
+            // Reconstruct the auto-layout sheet from individual artworks coordinates
+            artworks.forEach(art => {
+                const artX = art.x * BASE_DPI;
+                const artY = art.y * BASE_DPI;
+                const artW = art.width * BASE_DPI;
+                const artH = art.height * BASE_DPI;
+
+                // Draw to PRINT canvas with margins
+                printCtx.drawImage(
+                    sourceImage,
+                    artX + MARGIN_PX,
+                    artY + yOffset,
+                    artW,
+                    artH
+                );
+
+                // Draw to design offscreen canvas (relative to content area)
+                designCtx.drawImage(
+                    sourceImage,
+                    artX,
+                    artY,
+                    artW,
+                    artH
+                );
+            });
+        } else {
+            // Draw primary artwork to PRINT canvas (Standard Gang Sheet from builder)
+            printCtx.drawImage(
+                sourceImage, 
+                MARGIN_PX, 
+                yOffset, 
+                designWidthInches * BASE_DPI, 
+                orderItem.sheetHeight * BASE_DPI
+            );
+
+            // Draw to design offscreen canvas
+            designCtx.drawImage(
+                sourceImage,
+                0,
+                0,
+                designWidthInches * BASE_DPI,
+                orderItem.sheetHeight * BASE_DPI
+            );
+        }
 
         if (!isVinyl) {
             // Draw cut outlines to CUT canvas (only for DTF)

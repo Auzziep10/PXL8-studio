@@ -205,29 +205,13 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
             setBeginnerProgress(50);
 
-            // Construct Auto Layout Sheet
-            const canvasElement = document.createElement('canvas');
-            canvasElement.width = rollWidth * dpi;
-            canvasElement.height = sheetHeight * dpi;
-            const ctx = canvasElement.getContext('2d');
-            if (!ctx) throw new Error("Could not create canvas 2D context");
-
-            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
-
-            setBeginnerProgress(70);
-
             // Load composite editor artwork from the main editor canvas
             const canvasSource = canvasRef.current;
             if (!canvasSource) throw new Error("Editor canvas element not found");
 
-            const tempImg = new Image();
-            await new Promise<void>((resolve, reject) => {
-                tempImg.onload = () => resolve();
-                tempImg.onerror = () => reject(new Error("Failed to load editor composite image"));
-                tempImg.src = canvasSource.toDataURL('image/png');
-            });
+            const tempImgSrc = canvasSource.toDataURL('image/png');
 
-            setBeginnerProgress(85);
+            setBeginnerProgress(75);
 
             const artworksList: ArtworkOnCanvas[] = [];
             for (let i = 0; i < beginnerQty; i++) {
@@ -236,18 +220,10 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 const xInches = col * (width + gap);
                 const yInches = row * (height + gap);
 
-                ctx.drawImage(
-                    tempImg,
-                    xInches * dpi,
-                    yInches * dpi,
-                    width * dpi,
-                    height * dpi
-                );
-
                 artworksList.push({
                     id: `art-ds-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
                     name: sanitizeFilename(`${formData.subject || 'ai-design'}`),
-                    imageUrl: tempImg.src,
+                    imageUrl: tempImgSrc,
                     width: width,
                     height: height,
                     dpi: dpi,
@@ -262,7 +238,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
 
             setBeginnerProgress(95);
 
-            const finalSheetPreviewUrl = canvasElement.toDataURL('image/png');
+            const finalSheetPreviewUrl = tempImgSrc;
 
             const isAiGenerated = formData.style !== 'Custom';
             if (isAiGenerated && aiDesignFeeProduct) {
