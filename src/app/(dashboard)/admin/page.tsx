@@ -120,6 +120,11 @@ const calculateSafePadding = (
     return safePadding;
 };
 
+const isVinylItem = (item: OrderItem): boolean => {
+    const name = (item.sheetSizeName || '').toLowerCase();
+    return name.includes('(vinyl)') || name.includes('elevated flex');
+};
+
 // Generates both print-ready sheet (artworks + marks + header) and cut-ready sheet (cut paths + marks + header)
 const generateFinalSheetsForPrintAndCut = async (
     orderItem: OrderItem,
@@ -134,6 +139,8 @@ const generateFinalSheetsForPrintAndCut = async (
     const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI; // 300px
     const MARGIN_PX = MARGIN_INCHES * BASE_DPI; // 300px
     const yOffset = HEADER_HEIGHT_PX + MARGIN_PX; // 600px
+
+    const isVinyl = isVinylItem(orderItem);
 
     let sourceImageUrl = orderItem.originalSheetUrl;
     let isSingleTransferLayout = orderItem.sheetSizeName === 'Single Design Transfer';
@@ -181,9 +188,12 @@ const generateFinalSheetsForPrintAndCut = async (
     const cutCtx = cutCanvas.getContext('2d');
     if (!cutCtx) throw new Error('No cut context');
 
-    // Fill cut canvas background with solid white
-    cutCtx.fillStyle = 'white';
-    cutCtx.fillRect(0, 0, finalCanvasWidth, finalCanvasHeight);
+    // Create transparent offscreen canvas for designs (to apply composite silhouette operations for vinyl)
+    const designCanvas = document.createElement('canvas');
+    designCanvas.width = designWidthInches * BASE_DPI;
+    designCanvas.height = sheetContentHeightInches * BASE_DPI;
+    const designCtx = designCanvas.getContext('2d');
+    if (!designCtx) throw new Error('No design context');
 
     // --- Draw Main Content ---
     if (isSingleTransferLayout) {
@@ -211,16 +221,27 @@ const generateFinalSheetsForPrintAndCut = async (
                 itemHeightInches * BASE_DPI
             );
 
-            // Draw black square cut line on CUT sheet
-            cutCtx.strokeStyle = 'black';
-            cutCtx.lineWidth = 6;
-            const paddingPx = 0.08 * BASE_DPI; // 24px (~2mm) margin from the design
-            cutCtx.strokeRect(
-                currentX - paddingPx,
-                currentY - paddingPx,
-                (itemWidthInches * BASE_DPI) + (2 * paddingPx),
-                (itemHeightInches * BASE_DPI) + (2 * paddingPx)
+            // Draw on design offscreen canvas
+            designCtx.drawImage(
+                sourceImage,
+                currentX - MARGIN_PX,
+                currentY - yOffset,
+                itemWidthInches * BASE_DPI,
+                itemHeightInches * BASE_DPI
             );
+
+            if (!isVinyl) {
+                // Draw black square cut line on CUT sheet (only for DTF)
+                cutCtx.strokeStyle = 'black';
+                cutCtx.lineWidth = 6;
+                const paddingPx = 0.08 * BASE_DPI; // 24px (~2mm) margin from the design
+                cutCtx.strokeRect(
+                    currentX - paddingPx,
+                    currentY - paddingPx,
+                    (itemWidthInches * BASE_DPI) + (2 * paddingPx),
+                    (itemHeightInches * BASE_DPI) + (2 * paddingPx)
+                );
+            }
 
             currentX += (itemWidthInches + SPACING_INCHES) * BASE_DPI;
             placedItems++;
@@ -236,40 +257,61 @@ const generateFinalSheetsForPrintAndCut = async (
             orderItem.sheetHeight * BASE_DPI
         );
 
-        // Draw cut outlines to CUT canvas
-        cutCtx.strokeStyle = 'black';
-        cutCtx.lineWidth = 6;
+        // Draw to design offscreen canvas
+        designCtx.drawImage(
+            sourceImage,
+            0,
+            0,
+            designWidthInches * BASE_DPI,
+            orderItem.sheetHeight * BASE_DPI
+        );
 
-        const artworks = orderItem.artworks || [];
-        if (artworks.length > 0) {
-            artworks.forEach(art => {
-                const centerX = (art.x + art.width / 2) * BASE_DPI + MARGIN_PX;
-                const centerY = (art.y + art.height / 2) * BASE_DPI + yOffset;
+        if (!isVinyl) {
+            // Draw cut outlines to CUT canvas (only for DTF)
+            cutCtx.strokeStyle = 'black';
+            cutCtx.lineWidth = 6;
 
-                const targetPadding = 0.08 * BASE_DPI; // 24px (~2mm) target margin from design
-                const safePadding = calculateSafePadding(art, artworks, targetPadding);
+            const artworks = orderItem.artworks || [];
+            if (artworks.length > 0) {
+                artworks.forEach(art => {
+                    const centerX = (art.x + art.width / 2) * BASE_DPI + MARGIN_PX;
+                    const centerY = (art.y + art.height / 2) * BASE_DPI + yOffset;
 
-                cutCtx.save();
-                cutCtx.translate(centerX, centerY);
-                cutCtx.rotate((art.rotation || 0) * Math.PI / 180);
+                    const targetPadding = 0.08 * BASE_DPI; // 24px (~2mm) target margin from design
+                    const safePadding = calculateSafePadding(art, artworks, targetPadding);
 
-                const wPx = art.width * BASE_DPI + (2 * safePadding);
-                const hPx = art.height * BASE_DPI + (2 * safePadding);
-                // Draw outline around bounds
-                cutCtx.strokeRect(-wPx / 2, -hPx / 2, wPx, hPx);
+                    cutCtx.save();
+                    cutCtx.translate(centerX, centerY);
+                    cutCtx.rotate((art.rotation || 0) * Math.PI / 180);
 
-                cutCtx.restore();
-            });
-        } else {
-            // Fallback: draw border around entire content bounds
-            const contentMargin = 0.25 * BASE_DPI;
-            cutCtx.strokeRect(
-                MARGIN_PX + contentMargin,
-                yOffset + contentMargin,
-                (designWidthInches * BASE_DPI) - (contentMargin * 2),
-                (orderItem.sheetHeight * BASE_DPI) - (contentMargin * 2)
-            );
+                    const wPx = art.width * BASE_DPI + (2 * safePadding);
+                    const hPx = art.height * BASE_DPI + (2 * safePadding);
+                    // Draw outline around bounds
+                    cutCtx.strokeRect(-wPx / 2, -hPx / 2, wPx, hPx);
+
+                    cutCtx.restore();
+                });
+            } else {
+                // Fallback: draw border around entire content bounds
+                const contentMargin = 0.25 * BASE_DPI;
+                cutCtx.strokeRect(
+                    MARGIN_PX + contentMargin,
+                    yOffset + contentMargin,
+                    (designWidthInches * BASE_DPI) - (contentMargin * 2),
+                    (orderItem.sheetHeight * BASE_DPI) - (contentMargin * 2)
+                );
+            }
         }
+    }
+
+    // If it is a vinyl item, render the exact silhouette shapes of the designs
+    if (isVinyl) {
+        designCtx.globalCompositeOperation = 'source-in';
+        designCtx.fillStyle = 'black';
+        designCtx.fillRect(0, 0, designCanvas.width, designCanvas.height);
+
+        // Draw the black silhouettes onto the cut canvas
+        cutCtx.drawImage(designCanvas, MARGIN_PX, yOffset);
     }
 
     // --- Draw Headers and QR Codes ---
@@ -364,9 +406,10 @@ const AssetCard: React.FC<{
   onRegenerate: (item: OrderItem, index: number) => void;
   isGenerating: boolean;
 }> = ({ item, index, order, onPreview, onRegenerate, isGenerating }) => {
-  const [previewType, setPreviewType] = useState<'print' | 'cut'>('print');
+  const isVinyl = isVinylItem(item);
+  const [previewType, setPreviewType] = useState<'print' | 'cut'>(isVinyl ? 'cut' : 'print');
   const displayUrl = previewType === 'cut' && item.cutReadyUrl ? item.cutReadyUrl : (item.printReadyUrl || item.originalSheetUrl);
-  const isPrintReady = !!item.printReadyUrl;
+  const isProcessed = isVinyl ? !!item.cutReadyUrl : (!!item.printReadyUrl && !!item.cutReadyUrl);
 
   return (
     <div className="bg-zinc-900 rounded-xl border border-white/10 overflow-hidden shadow-sm hover:border-white/20 transition-colors">
@@ -398,7 +441,7 @@ const AssetCard: React.FC<{
 
         <div className="flex items-center gap-4">
             {/* Toggle print and cut previews */}
-            {isPrintReady && item.cutReadyUrl && (
+            {!isVinyl && isProcessed && item.cutReadyUrl && (
                 <div className="bg-zinc-950 p-0.5 rounded-lg border border-white/10 flex">
                     <button
                         onClick={(e) => { e.stopPropagation(); setPreviewType('print'); }}
@@ -424,28 +467,30 @@ const AssetCard: React.FC<{
             )}
 
             <div className="flex items-center gap-2">
-                {!isPrintReady ? (
+                {!isProcessed ? (
                     <button
                         onClick={() => onRegenerate(item, index)}
                         disabled={isGenerating}
                         className="flex items-center px-3 py-1.5 bg-accent text-black text-xs font-bold rounded-lg hover:bg-white transition-colors cursor-pointer"
                     >
                         <Wand2 className={`w-3 h-3 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                        {isGenerating ? 'Generating...' : 'Generate Print & Cut Files'}
+                        {isGenerating ? 'Generating...' : (isVinyl ? 'Generate Cut File' : 'Generate Print & Cut Files')}
                     </button>
                 ) : (
                     <div className="flex items-center gap-2">
-                        <a
-                            href={item.printReadyUrl}
-                            download={`print-sheet-${order.orderId}-${index + 1}.png`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
-                            onClick={(e) => e.stopPropagation()}
-                        >
-                            <Download className="w-3 h-3 mr-1.5" />
-                            Print File
-                        </a>
+                        {!isVinyl && item.printReadyUrl && (
+                            <a
+                                href={item.printReadyUrl}
+                                download={`print-sheet-${order.orderId}-${index + 1}.png`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Download className="w-3 h-3 mr-1.5" />
+                                Print File
+                            </a>
+                        )}
                         {item.cutReadyUrl && (
                             <a
                                 href={item.cutReadyUrl}
@@ -489,9 +534,9 @@ const AssetCard: React.FC<{
         )}
 
         <div className="absolute top-4 left-4 flex gap-2">
-          {isPrintReady ? (
+          {isProcessed ? (
             <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black animate-in fade-in">
-                {previewType === 'cut' ? 'Cut File Preview' : 'Print Ready (QR)'}
+                {previewType === 'cut' ? 'Cut File Preview' : (isVinyl ? 'Cut File (Silhouette)' : 'Print Ready (QR)')}
             </span>
           ) : (
             <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-yellow-500/80 text-black">
@@ -576,9 +621,11 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     const handleGeneratePrintFile = useCallback(async (item: OrderItem, itemIndex: number) => {
         if (!selectedOrder) return;
         setIsGeneratingPrintFile(true);
-        toast({ title: "Generating Production Files...", description: "Constructing print and cut canvases, please wait." });
+        toast({ title: "Generating Production Files...", description: "Constructing print and/cut canvases, please wait." });
 
         try {
+            const isVinyl = isVinylItem(item);
+
             const { printDataUrl, cutDataUrl } = await generateFinalSheetsForPrintAndCut(
                 item, // Pass the full OrderItem with layout coordinates
                 selectedOrder.orderId,
@@ -586,10 +633,13 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                 selectedOrder.shippingAddress
             );
             
-            // 1. Upload Print File
-            const printReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-print.png`);
-            const printReadySnapshot = await uploadString(printReadyStorageRef, printDataUrl, 'data_url');
-            const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+            let printReadyDownloadURL = '';
+            if (!isVinyl) {
+                // 1. Upload Print File
+                const printReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-print.png`);
+                const printReadySnapshot = await uploadString(printReadyStorageRef, printDataUrl, 'data_url');
+                printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+            }
 
             // 2. Upload Cut File
             const cutReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-cut.png`);
@@ -777,7 +827,7 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     const handleDownloadAllZip = async (targetOrder: Order) => {
         if (!targetOrder) return;
         
-        const itemsToDownload = targetOrder.items.filter(item => item.printReadyUrl);
+        const itemsToDownload = targetOrder.items.filter(item => item.printReadyUrl || item.cutReadyUrl);
         if(itemsToDownload.length === 0){
             toast({variant: 'destructive', title: "No Files Ready", description: "Please generate print and cut files before downloading."})
             return;
@@ -1272,21 +1322,23 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                       <div className="p-4 bg-background/20">
                         <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
                           {Array.isArray(order.items) &&
-                            order.items.map((item: OrderItem, idx: number) => (
-                              <div
-                                key={idx}
-                                className="relative aspect-square checkerboard rounded-lg border border-border overflow-hidden group cursor-zoom-in"
-                                onClick={() =>
-                                  setPreviewImage(item.printReadyUrl || item.originalSheetUrl)
-                                }
-                              >
-                                <img
-                                  src={item.printReadyUrl || item.originalSheetUrl}
-                                  className="w-full h-full object-contain"
-                                  alt=""
-                                />
-                              </div>
-                            ))}
+                            order.items.map((item: OrderItem, idx: number) => {
+                              const isVinyl = isVinylItem(item);
+                              const previewSrc = isVinyl ? (item.cutReadyUrl || item.originalSheetUrl) : (item.printReadyUrl || item.originalSheetUrl);
+                              return (
+                                <div
+                                  key={idx}
+                                  className="relative aspect-square checkerboard rounded-lg border border-border overflow-hidden group cursor-zoom-in"
+                                  onClick={() => setPreviewImage(previewSrc)}
+                                >
+                                  <img
+                                    src={previewSrc}
+                                    className="w-full h-full object-contain"
+                                    alt=""
+                                  />
+                                </div>
+                              );
+                            })}
                         </div>
                       </div>
                     </div>
