@@ -7,7 +7,7 @@ import { PXL8Logo } from '@/components/ui/icons';
 import { LayoutGrid, LogOut, ShoppingCart, User, Upload, Wand2, Search as SearchIcon, Sparkles, ChevronDown } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { useCart } from '@/hooks/use-cart.tsx';
+import { useCart } from '@/hooks/use-cart';
 import { useAuth, useUser, useFirestore, useDoc, useMemoFirebase } from '@/firebase';
 import { signOut } from 'firebase/auth';
 import { doc } from 'firebase/firestore';
@@ -43,6 +43,17 @@ export default function Header() {
 
   const [isAdmin, setIsAdmin] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
+  const [time, setTime] = useState('');
+
+  useEffect(() => {
+    const updateClock = () => {
+      const now = new Date();
+      setTime(now.toLocaleTimeString('en-US', { hour12: false }));
+    };
+    updateClock();
+    const interval = setInterval(updateClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -91,74 +102,53 @@ export default function Header() {
   return (
     <header className={cn(
         "fixed top-0 z-50 w-full transition-all duration-300",
-        isScrolled ? 'bg-background/60 backdrop-blur-lg border-b border-border/10' : 'bg-transparent'
+        isScrolled ? 'bg-background/90 backdrop-blur-md border-b border-zinc-200/50' : 'bg-transparent'
     )}>
-      <div className="flex h-20 items-center px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="mr-6 flex items-center space-x-2">
-          <PXL8Logo className="h-8 w-auto" />
+      <div className="flex h-20 items-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+        <Link href="/" className="mr-6 flex items-center space-x-3">
+          <span className="font-serif text-2xl font-bold text-zinc-900 tracking-tight">PXL8</span>
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-sans font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 tracking-wider">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            DESIGN PORTALS OPEN
+          </span>
         </Link>
-        <nav className="hidden md:flex items-center gap-2 text-sm">
-            <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                     <Button variant="ghost" className={cn(
-                        'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md flex items-center gap-1',
-                        (pathname === '/track' || pathname === '/elevated-flex') ? 'font-medium text-foreground' : 'text-foreground/80'
-                    )}>
-                        Transfers <ChevronDown className="w-4 h-4" />
-                    </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent>
-                    {transferLinks.map(link => (
-                        <DropdownMenuItem key={link.href} asChild>
-                            <Link href={link.href}>{link.label}</Link>
-                        </DropdownMenuItem>
-                    ))}
-                </DropdownMenuContent>
-            </DropdownMenu>
+        <div className="flex-grow flex justify-end items-center space-x-6">
+          <div className="hidden md:flex flex-col items-end text-right font-mono pr-2">
+            <span className="text-[8px] text-zinc-400 tracking-widest uppercase">Local Time</span>
+            <span className="text-xs font-semibold text-zinc-800">{time}</span>
+          </div>
 
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className={cn(
-                'transition-colors hover:text-foreground/80 px-3 py-1.5 rounded-md',
-                pathname === link.href ? 'font-medium text-foreground' : 'text-foreground/80'
-              )}
-            >
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex flex-1 items-center justify-end space-x-2">
-           {(isUserLoading || isProfileLoading) ? (
-            <div className='w-24 h-8 bg-black/10 rounded-md animate-pulse' />
-          ) : isAuthenticated ? (
-            <>
-              <Button variant="ghost" asChild className={cn('hover:bg-black/10', isScrolled ? 'text-foreground' : 'text-foreground/80 hover:text-foreground')}>
-                <Link href="/dashboard">Dashboard</Link>
-              </Button>
-              <Button onClick={handleLogout} size="sm">
-                <LogOut className="mr-2 h-4 w-4" />
-                Logout
-              </Button>
-            </>
-          ) : (
-             <Button asChild>
+          <div className="flex items-center space-x-2">
+            {(isUserLoading || isProfileLoading) ? (
+              <div className='w-24 h-9 bg-zinc-200 rounded-full animate-pulse' />
+            ) : isAuthenticated ? (
+              <>
+                <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-800 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
+                  <Link href="/dashboard">Dashboard</Link>
+                </Button>
+                <Button variant="outline" onClick={handleLogout} className="rounded-full border-zinc-300 text-zinc-800 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
+                  <LogOut className="mr-1.5 h-3.5 w-3.5" />
+                  Logout
+                </Button>
+              </>
+            ) : (
+              <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-800 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
                 <Link href="/auth/login">Login</Link>
-            </Button>
-          )}
+              </Button>
+            )}
 
-           <Button variant="ghost" size="icon" asChild className={cn('hover:bg-black/10 relative', isScrolled ? 'text-foreground' : 'text-foreground/80 hover:text-foreground')}>
-            <Link href="/cart">
-                <ShoppingCart className="h-5 w-5" />
+            <Button variant="outline" size="icon" asChild className="rounded-full border-zinc-300 text-zinc-800 bg-white hover:bg-zinc-50 relative w-9 h-9">
+              <Link href="/cart">
+                <ShoppingCart className="h-4 w-4" />
                 {cartItemCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-cyan-500 text-xs font-bold text-black">
-                        {cartItemCount}
-                    </span>
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-900 text-[9px] font-bold text-white">
+                    {cartItemCount}
+                  </span>
                 )}
                 <span className="sr-only">Cart</span>
-            </Link>
-          </Button>
+              </Link>
+            </Button>
+          </div>
         </div>
       </div>
     </header>

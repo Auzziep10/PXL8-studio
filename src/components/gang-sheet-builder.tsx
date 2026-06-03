@@ -355,7 +355,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
 
     if (user && !isPermanent) {
         // Logged-in user with a temporary data URL
-        toast({ title: 'Saving AI Design...', description: 'Uploading to your secure storage in the background.' });
+        toast({ title: 'Saving Design...', description: 'Uploading to your secure storage in the background.' });
         placeImageOnCanvas(imageUrl); // Place immediately for UX
 
         fetch(imageUrl)
@@ -376,7 +376,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
             toast({
               variant: 'destructive',
               title: 'Save Failed',
-              description: 'Could not save AI design. It will remain on your sheet temporarily.',
+              description: 'Could not save design. It will remain on your sheet temporarily.',
             });
           });
     } else {
@@ -570,15 +570,15 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
               sizeChanged = true;
           }
           
-          const newItem: Omit<ArtworkOnCanvas, 'analysis' | 'analysisLoading' | 'history'> & { analysis?: any, history?: string[] } = {
+          const newItem = {
               ...itemToClone,
               id: `${Date.now()}-${Math.random().toString(36).substr(2, 9)}-${i}`,
               x: pos.x,
               y: pos.y,
               history: [itemToClone.imageUrl]
           };
-          delete newItem.analysis;
-          delete newItem.analysisLoading;
+          delete (newItem as any).analysis;
+          delete (newItem as any).analysisLoading;
 
           newItems.push(newItem as ArtworkOnCanvas);
           currentItemsForCheck.push(newItem as ArtworkOnCanvas);
@@ -867,7 +867,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
         if (user) {
             const itemsToUpload = items.filter(item => item.imageUrl.startsWith('data:'));
             if (itemsToUpload.length > 0) {
-                toast({ title: 'Saving Artwork', description: 'Uploading AI-generated designs to your account...' });
+                toast({ title: 'Saving Artwork', description: 'Uploading generated designs to your account...' });
                 const uploadPromises = itemsToUpload.map(async item => {
                     const blob = await (await fetch(item.imageUrl)).blob();
                     const file = new File([blob], sanitizeFilename(item.name), { type: 'image/png' });
@@ -889,7 +889,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
             toast({
                 variant: "destructive",
                 title: "Login Required",
-                description: "Please log in to save and checkout AI-generated designs."
+                description: "Please log in to save and checkout generated designs."
             });
             setIsGenerating(false);
             return;

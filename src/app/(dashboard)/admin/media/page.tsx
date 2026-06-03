@@ -189,7 +189,7 @@ export default function MediaAdminPage() {
                 </Button>
                 <input
                   type="file"
-                  ref={(el) => (fileInputRefs.current[image.id] = el)}
+                  ref={(el) => { fileInputRefs.current[image.id] = el; }}
                   className="hidden"
                   onChange={(e) => handleFileChange(e, image.id)}
                   accept="image/png, image/jpeg, image/gif, image/svg+xml"

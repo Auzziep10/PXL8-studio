@@ -7,11 +7,11 @@ const gangSheet2 = PlaceHolderImages.find(img => img.id === 'gangSheet2')?.image
 export const mockUsers: User[] = [];
 
 export const mockSheetSizes: SheetSize[] = [
-    { name: '22" x 24"', width: 22, height: 24, price: 24.00 },
-    { name: '22" x 36"', width: 22, height: 36, price: 36.00 },
-    { name: '22" x 60"', width: 22, height: 60, price: 55.00 },
-    { name: '22" x 120"', width: 22, height: 120, price: 100.00 },
-    { name: '22" x 240"', width: 22, height: 240, price: 180.00 },
+    { id: '1', name: '22" x 24"', width: 22, height: 24, price: 24.00, usage: 'Builder', discount: 0 },
+    { id: '2', name: '22" x 36"', width: 22, height: 36, price: 36.00, usage: 'Builder', discount: 0 },
+    { id: '3', name: '22" x 60"', width: 22, height: 60, price: 55.00, usage: 'Builder', discount: 0 },
+    { id: '4', name: '22" x 120"', width: 22, height: 120, price: 100.00, usage: 'Builder', discount: 0 },
+    { id: '5', name: '22" x 240"', width: 22, height: 240, price: 180.00, usage: 'Builder', discount: 0 },
 ];
 
 export const mockOrders: Order[] = [];

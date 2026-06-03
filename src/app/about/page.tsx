@@ -40,7 +40,7 @@ const processSteps = [
     {
         image: processDesign,
         title: "1. Design & Upload",
-        description: "Use our AI Design Studio to create something new, arrange your artwork on a gang sheet with our builder, or simply upload your print-ready file. Our tools automatically check for low resolution to ensure quality."
+        description: "Use our Design Studio to create something new, arrange your artwork on a gang sheet with our builder, or simply upload your print-ready file. Our tools automatically check for low resolution to ensure quality."
     },
     {
         image: processPrint,

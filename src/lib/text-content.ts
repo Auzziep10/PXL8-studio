@@ -30,6 +30,7 @@ export const textContent = new Proxy(textContentMap, {
     }
     return ''; // Return an empty string in production for missing keys
   },
-});
+}) as unknown as Record<string, string>;
 
 export const AllTextContent: TextContentItem[] = textContentData;
+export type { TextContentItem };

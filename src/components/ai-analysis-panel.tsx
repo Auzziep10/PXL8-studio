@@ -23,12 +23,12 @@ export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAn
               <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Wand2 className="text-primary" />
-                    AI Artwork Analysis
+                    Artwork Quality Analysis
                   </CardTitle>
               </CardHeader>
               <CardContent className="text-center">
                   <p className="text-sm text-muted-foreground mb-4">
-                      Please log in to use AI-powered artwork analysis.
+                      Please log in to use automated artwork analysis.
                   </p>
                   <Button disabled>Log in to Analyze</Button>
               </CardContent>
@@ -42,7 +42,7 @@ export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAn
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wand2 className="text-primary" />
-            AI Artwork Analysis
+            Artwork Quality Analysis
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center">
@@ -63,7 +63,7 @@ export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAn
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Wand2 className="text-primary" />
-            AI Artwork Analysis
+            Artwork Quality Analysis
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center">
@@ -82,7 +82,7 @@ export default function AiAnalysisPanel({ artwork, onAnalyze, isLoggedIn }: AiAn
 
   return (
     <div className="space-y-4">
-      <h3 className="font-semibold text-lg">AI Analysis Results</h3>
+      <h3 className="font-semibold text-lg">Artwork Analysis Results</h3>
       
       <div className="space-y-2">
         <div className="flex justify-between items-baseline">

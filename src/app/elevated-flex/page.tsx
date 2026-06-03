@@ -110,7 +110,7 @@ export default function ElevatedFlexPage() {
         setImageHistory([artwork.imageUrl]);
         setDimensions({ width: artwork.width.toString(), height: artwork.height.toString() });
 
-        const img = new Image();
+        const img = new window.Image();
         img.onload = () => {
              imageAspectRatio.current = img.naturalWidth / img.naturalHeight;
         };
@@ -133,7 +133,7 @@ export default function ElevatedFlexPage() {
         const tempCtx = tempCanvas.getContext('2d', { willReadFrequently: true });
         if (!tempCtx) return;
 
-        const sourceImage = new Image();
+        const sourceImage = new window.Image();
         sourceImage.crossOrigin = 'Anonymous';
         sourceImage.onload = () => {
             tempCanvas.width = sourceImage.naturalWidth;
@@ -198,7 +198,7 @@ export default function ElevatedFlexPage() {
                 setPreviewUrl(result);
                 setImageHistory([result]);
 
-                const img = new Image();
+                const img = new window.Image();
                 img.onload = () => {
                     imageAspectRatio.current = img.naturalWidth / img.naturalHeight;
                     // Auto-populate width to a default of 5 inches, height adjusts automatically
@@ -268,7 +268,7 @@ export default function ElevatedFlexPage() {
             const ctx = canvas.getContext('2d');
             if (!ctx) throw new Error("Could not create canvas context");
             
-            const img = new Image();
+            const img = new window.Image();
             await new Promise((resolve, reject) => {
                 img.onload = resolve;
                 img.onerror = reject;

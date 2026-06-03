@@ -83,8 +83,8 @@ export const textContentData: TextContentItem[] = [
   },
   {
     "id": "ai_designer_fee_text",
-    "description": `Text describing the fee for AI design generations.`,
-    "text": `A small fee of {price} is added to your cart for each AI generation used in an order.`
+    "description": `Text describing the fee for design generations.`,
+    "text": `A small fee of {price} is added to your cart for each design generation used in an order.`
   },
   {
     "id": "single_transfer_title",
@@ -188,8 +188,8 @@ export const textContentData: TextContentItem[] = [
   },
   {
     "id": "about_diff_ai_desc",
-    "description": `Description for the AI Tools differentiator.`,
-    "text": `Our AI Design Studio and analysis tools help you create better artwork, faster. Overcome creative blocks and ensure every design is perfectly optimized for print.`
+    "description": `Description for the creative tools differentiator.`,
+    "text": `Our Design Studio and analysis tools help you create better artwork, faster. Overcome creative blocks and ensure every design is perfectly optimized for print.`
   },
   {
     "id": "about_diff_builder_title",

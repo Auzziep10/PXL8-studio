@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Order, User as AppUser, OrderItem, ShippingAddress } from '@/lib/types';
+import { Order, User as AppUser, OrderItem, ShippingAddress, ArtworkOnCanvas } from '@/lib/types';
 import {
   Printer,
   Search,
@@ -33,83 +33,177 @@ import { useToast } from '@/hooks/use-toast';
 import { getStorage, ref, uploadString, getDownloadURL } from 'firebase/storage';
 import QRCode from 'qrcode';
 
+type SortKey = 'date' | 'totalPrice' | 'status';
+type SortDirection = 'asc' | 'desc';
 
-// This function is now a client-side utility
-const generateFinalSheetForPrint = async (
+// Utility to draw solid black Graphtec Type 1 registration marks (L-marks) in the 4 corners of the sheet's printable area
+const drawGraphtecRegistrationMarks = (
+    ctx: CanvasRenderingContext2D,
+    width: number,
+    height: number,
+    topOffset: number
+) => {
+    const BASE_DPI = 300;
+    const margin = 0.5 * BASE_DPI; // 150px (0.5 inch safety margin)
+    const markLength = 0.5 * BASE_DPI; // 150px (12.7 mm mark line length)
+    const thickness = 0.04 * BASE_DPI; // 12px (approx 1.0 mm line thickness)
+
+    ctx.fillStyle = 'black';
+
+    const xLeft = margin;
+    const xRight = width - margin;
+    const yTop = topOffset;
+    const yBottom = height - margin;
+
+    // 1. Top-Left L-Mark (Corner pointing down-right)
+    ctx.fillRect(xLeft, yTop, markLength, thickness);
+    ctx.fillRect(xLeft, yTop, thickness, markLength);
+
+    // 2. Top-Right L-Mark (Corner pointing down-left)
+    ctx.fillRect(xRight - markLength, yTop, markLength, thickness);
+    ctx.fillRect(xRight - thickness, yTop, thickness, markLength);
+
+    // 3. Bottom-Left L-Mark (Corner pointing up-right)
+    ctx.fillRect(xLeft, yBottom - thickness, markLength, thickness);
+    ctx.fillRect(xLeft, yBottom - markLength, thickness, markLength);
+
+    // 4. Bottom-Right L-Mark (Corner pointing up-left)
+    ctx.fillRect(xRight - markLength, yBottom - thickness, markLength, thickness);
+    ctx.fillRect(xRight - thickness, yBottom - markLength, thickness, markLength);
+};
+
+// Calculates a safe padding margin around an artwork that prevents it from overlapping adjacent cut lines
+const calculateSafePadding = (
+    currentArt: ArtworkOnCanvas,
+    allArtworks: ArtworkOnCanvas[],
+    targetPadding: number
+): number => {
+    let safePadding = targetPadding;
+
+    const currentCenterX = currentArt.x + currentArt.width / 2;
+    const currentCenterY = currentArt.y + currentArt.height / 2;
+
+    for (const other of allArtworks) {
+        if (other.id === currentArt.id) continue;
+
+        const otherCenterX = other.x + other.width / 2;
+        const otherCenterY = other.y + other.height / 2;
+
+        const dx = Math.abs(currentCenterX - otherCenterX);
+        const dy = Math.abs(currentCenterY - otherCenterY);
+
+        const gapX = dx - (currentArt.width + other.width) / 2;
+        const gapY = dy - (currentArt.height + other.height) / 2;
+
+        let distance = 0;
+        if (gapX > 0 && gapY > 0) {
+            distance = Math.sqrt(gapX * gapX + gapY * gapY);
+        } else if (gapX > 0) {
+            distance = gapX;
+        } else if (gapY > 0) {
+            distance = gapY;
+        } else {
+            distance = 0;
+        }
+
+        const distancePx = distance * 300; // 300 DPI
+        
+        // If they are closer than 2 * targetPadding, cap the padding to half the distance (with 12px physical cut line safety gap)
+        if (distancePx < 2 * targetPadding) {
+            const halfDist = Math.max(0, (distancePx - 12) / 2);
+            if (halfDist < safePadding) {
+                safePadding = halfDist;
+            }
+        }
+    }
+
+    return safePadding;
+};
+
+// Generates both print-ready sheet (artworks + marks + header) and cut-ready sheet (cut paths + marks + header)
+const generateFinalSheetsForPrintAndCut = async (
     orderItem: OrderItem,
     orderId: string,
     customerName: string,
     shippingAddress: ShippingAddress,
-): Promise<string> => {
+): Promise<{ printDataUrl: string; cutDataUrl: string }> => {
     const BASE_DPI = 300;
     const HEADER_HEIGHT_INCHES = 1;
-    const BUFFER_INCHES = 0.5; // New buffer
-    const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI;
-    const BUFFER_PX = BUFFER_INCHES * BASE_DPI;
+    const MARGIN_INCHES = 1.0; // 1 inch margin on all sides of the design area to hold Graphtec registration marks
+    
+    const HEADER_HEIGHT_PX = HEADER_HEIGHT_INCHES * BASE_DPI; // 300px
+    const MARGIN_PX = MARGIN_INCHES * BASE_DPI; // 300px
+    const yOffset = HEADER_HEIGHT_PX + MARGIN_PX; // 600px
 
     let sourceImageUrl = orderItem.originalSheetUrl;
     let isSingleTransferLayout = orderItem.sheetSizeName === 'Single Design Transfer';
     
-    let finalCanvasWidth: number;
-    let finalCanvasHeight: number;
+    let designWidthInches = isSingleTransferLayout ? 22 : orderItem.sheetWidth;
     let sheetContentHeightInches: number;
 
-
     if (isSingleTransferLayout) {
-        const SHEET_WIDTH_INCHES = 22;
         const SPACING_INCHES = 0.25;
-
         const itemWidthInches = orderItem.sheetWidth;
         const itemHeightInches = orderItem.sheetHeight;
 
-        const itemsPerRow = Math.floor((SHEET_WIDTH_INCHES + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
+        const itemsPerRow = Math.floor((22 + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
         const numRows = Math.ceil(orderItem.quantity / itemsPerRow);
 
         sheetContentHeightInches = (itemHeightInches * numRows) + (SPACING_INCHES * (numRows + 1));
-        
-        finalCanvasWidth = SHEET_WIDTH_INCHES * BASE_DPI;
     } else {
         sheetContentHeightInches = orderItem.sheetHeight;
-        finalCanvasWidth = orderItem.sheetWidth * BASE_DPI;
     }
     
-    // Calculate total canvas height including header and buffer
-    finalCanvasHeight = (sheetContentHeightInches * BASE_DPI) + HEADER_HEIGHT_PX + BUFFER_PX;
+    // Add 1" margin to the left and right, and top and bottom of the design area
+    const finalCanvasWidth = (designWidthInches + (2 * MARGIN_INCHES)) * BASE_DPI; // e.g., 24" wide for a 22" sheet
+    const finalCanvasHeight = (sheetContentHeightInches * BASE_DPI) + HEADER_HEIGHT_PX + (2 * MARGIN_PX);
 
-    // Use a dynamically created canvas element in the browser
-    const finalCanvas = document.createElement('canvas');
-    finalCanvas.width = finalCanvasWidth;
-    finalCanvas.height = finalCanvasHeight;
-    const finalCtx = finalCanvas.getContext('2d');
-    if (!finalCtx) throw new Error('No final context');
-    
-    // --- Load the primary image resource ---
-    const sourceImage = new Image();
-    sourceImage.crossOrigin = 'anonymous'; // Important for cross-origin images
+    // Load the primary user image layout
+    const sourceImage = new window.Image();
+    sourceImage.crossOrigin = 'anonymous';
     await new Promise((resolve, reject) => {
         sourceImage.onload = resolve;
         sourceImage.onerror = reject;
         sourceImage.src = sourceImageUrl;
     });
 
+    // 1. Create PRINT Canvas (artworks + marks)
+    const printCanvas = document.createElement('canvas');
+    printCanvas.width = finalCanvasWidth;
+    printCanvas.height = finalCanvasHeight;
+    const printCtx = printCanvas.getContext('2d');
+    if (!printCtx) throw new Error('No print context');
 
+    // 2. Create CUT Canvas (outline vectors + marks)
+    const cutCanvas = document.createElement('canvas');
+    cutCanvas.width = finalCanvasWidth;
+    cutCanvas.height = finalCanvasHeight;
+    const cutCtx = cutCanvas.getContext('2d');
+    if (!cutCtx) throw new Error('No cut context');
+
+    // Fill cut canvas background with solid white
+    cutCtx.fillStyle = 'white';
+    cutCtx.fillRect(0, 0, finalCanvasWidth, finalCanvasHeight);
+
+    // --- Draw Main Content ---
     if (isSingleTransferLayout) {
         const SPACING_INCHES = 0.25;
         const itemWidthInches = orderItem.sheetWidth;
         const itemHeightInches = orderItem.sheetHeight;
         const itemsPerRow = Math.floor((22 + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
 
-        let currentX = SPACING_INCHES * BASE_DPI;
-        let currentY = HEADER_HEIGHT_PX + BUFFER_PX + (SPACING_INCHES * BASE_DPI); // Start Y after header and buffer
+        let currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
+        let currentY = yOffset + (SPACING_INCHES * BASE_DPI);
         let placedItems = 0;
 
         for (let i = 0; i < orderItem.quantity; i++) {
             if (placedItems > 0 && placedItems % itemsPerRow === 0) {
-                currentX = SPACING_INCHES * BASE_DPI;
+                currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
                 currentY += (itemHeightInches + SPACING_INCHES) * BASE_DPI;
             }
 
-            finalCtx.drawImage(
+            // Draw image on PRINT sheet
+            printCtx.drawImage(
                 sourceImage,
                 currentX,
                 currentY,
@@ -117,56 +211,124 @@ const generateFinalSheetForPrint = async (
                 itemHeightInches * BASE_DPI
             );
 
+            // Draw black square cut line on CUT sheet
+            cutCtx.strokeStyle = 'black';
+            cutCtx.lineWidth = 6;
+            const paddingPx = 0.08 * BASE_DPI; // 24px (~2mm) margin from the design
+            cutCtx.strokeRect(
+                currentX - paddingPx,
+                currentY - paddingPx,
+                (itemWidthInches * BASE_DPI) + (2 * paddingPx),
+                (itemHeightInches * BASE_DPI) + (2 * paddingPx)
+            );
+
             currentX += (itemWidthInches + SPACING_INCHES) * BASE_DPI;
             placedItems++;
         }
     } else {
-        // --- Standard Gang Sheet (already laid out) ---
-        // Draw the main artwork after the header and buffer
-        finalCtx.drawImage(sourceImage, 0, HEADER_HEIGHT_PX + BUFFER_PX, finalCanvasWidth, orderItem.sheetHeight * BASE_DPI);
-    }
-    
-    // Draw the white header over the top
-    finalCtx.fillStyle = 'white';
-    finalCtx.fillRect(0, 0, finalCanvasWidth, HEADER_HEIGHT_PX);
+        // --- Standard Gang Sheet ---
+        // Draw primary artwork to PRINT canvas
+        printCtx.drawImage(
+            sourceImage, 
+            MARGIN_PX, 
+            yOffset, 
+            designWidthInches * BASE_DPI, 
+            orderItem.sheetHeight * BASE_DPI
+        );
 
-    // Generate and draw QR Code
+        // Draw cut outlines to CUT canvas
+        cutCtx.strokeStyle = 'black';
+        cutCtx.lineWidth = 6;
+
+        const artworks = orderItem.artworks || [];
+        if (artworks.length > 0) {
+            artworks.forEach(art => {
+                const centerX = (art.x + art.width / 2) * BASE_DPI + MARGIN_PX;
+                const centerY = (art.y + art.height / 2) * BASE_DPI + yOffset;
+
+                const targetPadding = 0.08 * BASE_DPI; // 24px (~2mm) target margin from design
+                const safePadding = calculateSafePadding(art, artworks, targetPadding);
+
+                cutCtx.save();
+                cutCtx.translate(centerX, centerY);
+                cutCtx.rotate((art.rotation || 0) * Math.PI / 180);
+
+                const wPx = art.width * BASE_DPI + (2 * safePadding);
+                const hPx = art.height * BASE_DPI + (2 * safePadding);
+                // Draw outline around bounds
+                cutCtx.strokeRect(-wPx / 2, -hPx / 2, wPx, hPx);
+
+                cutCtx.restore();
+            });
+        } else {
+            // Fallback: draw border around entire content bounds
+            const contentMargin = 0.25 * BASE_DPI;
+            cutCtx.strokeRect(
+                MARGIN_PX + contentMargin,
+                yOffset + contentMargin,
+                (designWidthInches * BASE_DPI) - (contentMargin * 2),
+                (orderItem.sheetHeight * BASE_DPI) - (contentMargin * 2)
+            );
+        }
+    }
+
+    // --- Draw Headers and QR Codes ---
     const origin = window.location.origin;
     const qrUrl = `${origin}/admin?orderId=${orderId}`;
     const qrCodeDataUrl = await QRCode.toDataURL(qrUrl, { width: HEADER_HEIGHT_PX - 20, margin: 1 });
     
-    const qrImg = new Image();
+    const qrImg = new window.Image();
     await new Promise(resolve => { qrImg.onload = resolve; qrImg.src = qrCodeDataUrl; });
-    finalCtx.drawImage(qrImg, 10, 10);
 
-    // Draw Header Text
-    finalCtx.fillStyle = 'black';
-    finalCtx.textAlign = 'left';
-    finalCtx.textBaseline = 'top';
-    const FONT_SIZE_LARGE = BASE_DPI / 4; // approx 75pt
-    const FONT_SIZE_MEDIUM = BASE_DPI / 6; // approx 50pt
-    const FONT_SIZE_SMALL = BASE_DPI / 8; // approx 37.5pt
+    const FONT_SIZE_LARGE = BASE_DPI / 4;
+    const FONT_SIZE_MEDIUM = BASE_DPI / 6;
+    const FONT_SIZE_SMALL = BASE_DPI / 8;
 
-    let textY = 15;
-    finalCtx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
-    finalCtx.fillText(`Order: ${orderId}`, HEADER_HEIGHT_PX, textY);
-    textY += FONT_SIZE_LARGE + 15;
-    
-    finalCtx.font = `bold ${FONT_SIZE_MEDIUM}px Arial`;
-    finalCtx.fillText(`To: ${customerName}`, HEADER_HEIGHT_PX, textY);
-    textY += FONT_SIZE_MEDIUM + 10;
-    
-    finalCtx.font = `${FONT_SIZE_SMALL}px Arial`;
-    const fullAddress = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}`;
-    finalCtx.fillText(`Ship To: ${fullAddress}`, HEADER_HEIGHT_PX, textY);
-    textY += FONT_SIZE_SMALL + 15;
-    
-    const sheetDescription = isSingleTransferLayout
-        ? `${orderItem.quantity} x (${orderItem.sheetWidth}" x ${orderItem.sheetHeight}")`
-        : `${orderItem.sheetWidth}" x ${orderItem.sheetHeight}" Sheet`;
-    finalCtx.fillText(`Sheet: ${sheetDescription}`, HEADER_HEIGHT_PX, textY);
+    const drawHeader = (ctx: CanvasRenderingContext2D, isCut: boolean) => {
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, finalCanvasWidth, HEADER_HEIGHT_PX);
+        
+        if (!isCut) {
+            ctx.drawImage(qrImg, 10, 10);
+        }
 
-    return finalCanvas.toDataURL('image/png');
+        ctx.fillStyle = 'black';
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+
+        const textX = isCut ? 20 : HEADER_HEIGHT_PX;
+
+        let textY = 15;
+        ctx.font = `bold ${FONT_SIZE_LARGE}px Arial`;
+        ctx.fillText(`Order: ${orderId}`, textX, textY);
+        textY += FONT_SIZE_LARGE + 15;
+        
+        ctx.font = `bold ${FONT_SIZE_MEDIUM}px Arial`;
+        ctx.fillText(`To: ${customerName}`, textX, textY);
+        textY += FONT_SIZE_MEDIUM + 10;
+        
+        ctx.font = `${FONT_SIZE_SMALL}px Arial`;
+        const fullAddress = `${shippingAddress.street}, ${shippingAddress.city}, ${shippingAddress.state} ${shippingAddress.zip}`;
+        ctx.fillText(`Ship To: ${fullAddress}`, textX, textY);
+        textY += FONT_SIZE_SMALL + 15;
+        
+        const sheetDescription = isSingleTransferLayout
+            ? `${orderItem.quantity} x (${orderItem.sheetWidth}" x ${orderItem.sheetHeight}")`
+            : `${orderItem.sheetWidth}" x ${orderItem.sheetHeight}" Sheet`;
+        ctx.fillText(`Sheet: ${sheetDescription}`, textX, textY);
+    };
+
+    drawHeader(printCtx, false);
+    drawHeader(cutCtx, true);
+
+    // --- Draw Graphtec Registration Marks ---
+    drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, HEADER_HEIGHT_PX + (0.5 * BASE_DPI));
+    drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, HEADER_HEIGHT_PX + (0.5 * BASE_DPI));
+
+    return {
+        printDataUrl: printCanvas.toDataURL('image/png'),
+        cutDataUrl: cutCanvas.toDataURL('image/png')
+    };
 };
 
 
@@ -202,7 +364,8 @@ const AssetCard: React.FC<{
   onRegenerate: (item: OrderItem, index: number) => void;
   isGenerating: boolean;
 }> = ({ item, index, order, onPreview, onRegenerate, isGenerating }) => {
-  const displayUrl = item.printReadyUrl || item.originalSheetUrl;
+  const [previewType, setPreviewType] = useState<'print' | 'cut'>('print');
+  const displayUrl = previewType === 'cut' && item.cutReadyUrl ? item.cutReadyUrl : (item.printReadyUrl || item.originalSheetUrl);
   const isPrintReady = !!item.printReadyUrl;
 
   return (
@@ -233,29 +396,72 @@ const AssetCard: React.FC<{
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-            {!isPrintReady ? (
-                <button
-                    onClick={() => onRegenerate(item, index)}
-                    disabled={isGenerating}
-                    className="flex items-center px-3 py-1.5 bg-accent text-black text-xs font-bold rounded-lg hover:bg-white transition-colors cursor-pointer"
-                >
-                    <Wand2 className={`w-3 h-3 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
-                    {isGenerating ? 'Generating...' : 'Generate Print File'}
-                </button>
-            ) : (
-                <a
-                    href={displayUrl}
-                    download={`sheet-${order.orderId}-${index + 1}.png`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
-                    onClick={(e) => e.stopPropagation()}
-                >
-                    <Download className="w-3 h-3 mr-1.5" />
-                    Download
-                </a>
+        <div className="flex items-center gap-4">
+            {/* Toggle print and cut previews */}
+            {isPrintReady && item.cutReadyUrl && (
+                <div className="bg-zinc-950 p-0.5 rounded-lg border border-white/10 flex">
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setPreviewType('print'); }}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
+                            previewType === 'print'
+                                ? 'bg-zinc-800 text-white shadow'
+                                : 'text-zinc-400 hover:text-white'
+                        }`}
+                    >
+                        Print
+                    </button>
+                    <button
+                        onClick={(e) => { e.stopPropagation(); setPreviewType('cut'); }}
+                        className={`px-2.5 py-1 rounded-md text-[10px] font-medium transition-all ${
+                            previewType === 'cut'
+                                ? 'bg-zinc-800 text-white shadow'
+                                : 'text-zinc-400 hover:text-white'
+                        }`}
+                    >
+                        Cut lines
+                    </button>
+                </div>
             )}
+
+            <div className="flex items-center gap-2">
+                {!isPrintReady ? (
+                    <button
+                        onClick={() => onRegenerate(item, index)}
+                        disabled={isGenerating}
+                        className="flex items-center px-3 py-1.5 bg-accent text-black text-xs font-bold rounded-lg hover:bg-white transition-colors cursor-pointer"
+                    >
+                        <Wand2 className={`w-3 h-3 mr-1.5 ${isGenerating ? 'animate-spin' : ''}`} />
+                        {isGenerating ? 'Generating...' : 'Generate Print & Cut Files'}
+                    </button>
+                ) : (
+                    <div className="flex items-center gap-2">
+                        <a
+                            href={item.printReadyUrl}
+                            download={`print-sheet-${order.orderId}-${index + 1}.png`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center px-3 py-1.5 bg-white text-black text-xs font-bold rounded-lg hover:bg-zinc-200 transition-colors cursor-pointer"
+                            onClick={(e) => e.stopPropagation()}
+                        >
+                            <Download className="w-3 h-3 mr-1.5" />
+                            Print File
+                        </a>
+                        {item.cutReadyUrl && (
+                            <a
+                                href={item.cutReadyUrl}
+                                download={`cut-sheet-${order.orderId}-${index + 1}.png`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg hover:bg-zinc-700 transition-colors border border-white/10 cursor-pointer"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <Download className="w-3 h-3 mr-1.5" />
+                                Cut File
+                            </a>
+                        )}
+                    </div>
+                )}
+            </div>
         </div>
       </div>
 
@@ -284,8 +490,8 @@ const AssetCard: React.FC<{
 
         <div className="absolute top-4 left-4 flex gap-2">
           {isPrintReady ? (
-            <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black">
-                Print Ready (QR)
+            <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-primary/80 text-black animate-in fade-in">
+                {previewType === 'cut' ? 'Cut File Preview' : 'Print Ready (QR)'}
             </span>
           ) : (
             <span className="px-2 py-1 rounded text-xs font-medium backdrop-blur-md border border-white/10 shadow-lg bg-yellow-500/80 text-black">
@@ -370,23 +576,33 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
     const handleGeneratePrintFile = useCallback(async (item: OrderItem, itemIndex: number) => {
         if (!selectedOrder) return;
         setIsGeneratingPrintFile(true);
-        toast({ title: "Generating Print File...", description: "Please wait, this may take a moment." });
+        toast({ title: "Generating Production Files...", description: "Constructing print and cut canvases, please wait." });
 
         try {
-            const finalPrintReadyDataUrl = await generateFinalSheetForPrint(
-                item, // Pass the full OrderItem
+            const { printDataUrl, cutDataUrl } = await generateFinalSheetsForPrintAndCut(
+                item, // Pass the full OrderItem with layout coordinates
                 selectedOrder.orderId,
                 selectedOrder.customerName,
                 selectedOrder.shippingAddress
             );
             
+            // 1. Upload Print File
             const printReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-print.png`);
-            const printReadySnapshot = await uploadString(printReadyStorageRef, finalPrintReadyDataUrl, 'data_url');
+            const printReadySnapshot = await uploadString(printReadyStorageRef, printDataUrl, 'data_url');
             const printReadyDownloadURL = await getDownloadURL(printReadySnapshot.ref);
+
+            // 2. Upload Cut File
+            const cutReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-cut.png`);
+            const cutReadySnapshot = await uploadString(cutReadyStorageRef, cutDataUrl, 'data_url');
+            const cutReadyDownloadURL = await getDownloadURL(cutReadySnapshot.ref);
 
             // Update the specific item in the order's items array
             const updatedItems = [...selectedOrder.items];
-            updatedItems[itemIndex] = { ...item, printReadyUrl: printReadyDownloadURL };
+            updatedItems[itemIndex] = { 
+                ...item, 
+                printReadyUrl: printReadyDownloadURL,
+                cutReadyUrl: cutReadyDownloadURL
+            };
             
             const orderDocRef = doc(firestore, 'orders', selectedOrder.id);
             await updateDoc(orderDocRef, { items: updatedItems });
@@ -398,10 +614,10 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                 await updateDoc(userOrderDocRef, { items: updatedItems });
              }
 
-            toast({ title: "Success!", description: "Print-ready file has been generated and saved." });
+            toast({ title: "Success!", description: "Print and Cut production assets have been generated and saved." });
 
         } catch (error) {
-            console.error("Failed to generate print file:", error);
+            console.error("Failed to generate production files:", error);
             toast({ variant: "destructive", title: "Generation Failed", description: (error as Error).message });
         } finally {
             setIsGeneratingPrintFile(false);
@@ -563,7 +779,7 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
         
         const itemsToDownload = targetOrder.items.filter(item => item.printReadyUrl);
         if(itemsToDownload.length === 0){
-            toast({variant: 'destructive', title: "No Files Ready", description: "Please generate print-ready files before downloading."})
+            toast({variant: 'destructive', title: "No Files Ready", description: "Please generate print and cut files before downloading."})
             return;
         }
 
@@ -577,14 +793,23 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
 
             if (item.printReadyUrl) {
                 try {
-                const response = await fetch(item.printReadyUrl);
-                const blob = await response.blob();
-                const fileName = `Sheet-${i + 1}-${
-                    targetOrder.orderId || 'NoID'
-                }.png`;
-                folder?.file(fileName, blob);
+                    const response = await fetch(item.printReadyUrl);
+                    const blob = await response.blob();
+                    const fileName = `Print-Sheet-${i + 1}-${targetOrder.orderId}.png`;
+                    folder?.file(fileName, blob);
                 } catch (e) {
-                console.warn('Could not fetch asset for zipping', item.printReadyUrl);
+                    console.warn('Could not fetch print asset for zipping', item.printReadyUrl);
+                }
+            }
+
+            if (item.cutReadyUrl) {
+                try {
+                    const response = await fetch(item.cutReadyUrl);
+                    const blob = await response.blob();
+                    const fileName = `Cut-Sheet-${i + 1}-${targetOrder.orderId}.png`;
+                    folder?.file(fileName, blob);
+                } catch (e) {
+                    console.warn('Could not fetch cut asset for zipping', item.cutReadyUrl);
                 }
             }
         }
@@ -997,9 +1222,9 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
             </div>
 
             <div className="flex-grow overflow-y-auto space-y-4 pr-2 builder-scroll">
-              {allOrders?.filter(
+              {(allOrders?.filter(
                 (o) => o.customerId === selectedCustomerForArchive
-              ).length > 0 ? (
+              )?.length ?? 0) > 0 ? (
                 allOrders
                   ?.filter((o) => o.customerId === selectedCustomerForArchive)
                   .map((order: Order) => (

@@ -1,19 +1,21 @@
 'use client';
 
 import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { generateDesign, GenerateDesignFromPromptInput } from '@/app/actions';
+import { generateDesign } from '@/app/actions';
+import type { GenerateDesignFromPromptInput } from '@/ai/flows/generate-design-from-prompt';
 import { useToast } from '@/hooks/use-toast';
 import { ImagePlus, Wand2, Sparkles, AlertTriangle, ArrowRight, CaseSensitive, RefreshCw, Droplet, User, Undo, ZoomIn, Move, RotateCw, Upload, Bold, Baseline, Paintbrush, Spline, Filter, ArrowLeft } from 'lucide-react';
-import { Artwork, ServiceAddOn } from '@/lib/types';
+import { Artwork, ServiceAddOn, ArtworkOnCanvas, SheetCartItem } from '@/lib/types';
 import { useCart } from '@/hooks/use-cart';
 import { useFirestore, useCollection, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where } from 'firebase/firestore';
-import { sanitizeFilename } from '@/lib/utils';
+import { sanitizeFilename, formatCurrency } from '@/lib/utils';
 import { Slider } from './ui/slider';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
@@ -109,6 +111,213 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     };
     const [imageTransform, setImageTransform] = useState<ImageTransform>(initialImageTransform);
     const [draggingImage, setDraggingImage] = useState(false);
+
+    // --- Beginner Flow Routing & States ---
+    const searchParams = useSearchParams();
+    const router = useRouter();
+    const isBeginnerFlow = searchParams.get('flow') === 'beginner';
+    const initialDecorationType = (searchParams.get('type') as 'dtf' | 'vinyl') || 'dtf';
+
+    const [showBeginnerConfig, setShowBeginnerConfig] = useState(false);
+    const [beginnerWidth, setBeginnerWidth] = useState('5');
+    const [beginnerHeight, setBeginnerHeight] = useState('5');
+    const [beginnerQty, setBeginnerQty] = useState(1);
+    const [beginnerIsGenerating, setBeginnerIsGenerating] = useState(false);
+    const [beginnerProgress, setBeginnerProgress] = useState(0);
+
+    const sqInchPriceQuery = useMemoFirebase(
+        () => (firestore ? query(collection(firestore, 'serviceAddOns'), where('type', '==', 'per_sq_inch')) : null),
+        [firestore]
+    );
+    const { data: sqInchPriceData } = useCollection<ServiceAddOn & { id: string }>(sqInchPriceQuery);
+    
+    const pricePerSqInch = useMemo(() => {
+        if (sqInchPriceData && sqInchPriceData.length > 0) {
+            return sqInchPriceData[0].price;
+        }
+        return 0.05; // Fallback to $0.05
+    }, [sqInchPriceData]);
+
+    useEffect(() => {
+        if (generatedImage) {
+            const aspect = generatedImage.naturalWidth / generatedImage.naturalHeight;
+            const w = 5;
+            const h = w / aspect;
+            setBeginnerWidth(String(w));
+            setBeginnerHeight(h.toFixed(2));
+        }
+    }, [generatedImage]);
+
+    const handleBeginnerDimensionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        const numValue = parseFloat(value);
+
+        if (generatedImage) {
+            const aspect = generatedImage.naturalWidth / generatedImage.naturalHeight;
+            if (name === 'width' && numValue > 0) {
+                const newHeight = numValue / aspect;
+                setBeginnerWidth(value);
+                setBeginnerHeight(newHeight.toFixed(2));
+            } else if (name === 'height' && numValue > 0) {
+                const newWidth = numValue * aspect;
+                setBeginnerWidth(newWidth.toFixed(2));
+                setBeginnerHeight(value);
+            } else {
+                if (name === 'width') setBeginnerWidth(value);
+                else setBeginnerHeight(value);
+            }
+        }
+    };
+
+    const beginnerCalculatedPrice = useMemo(() => {
+        const width = parseFloat(beginnerWidth);
+        const height = parseFloat(beginnerHeight);
+        if (width > 0 && height > 0 && pricePerSqInch > 0) {
+            return width * height * beginnerQty * pricePerSqInch;
+        }
+        return 0;
+    }, [beginnerWidth, beginnerHeight, beginnerQty, pricePerSqInch]);
+
+    const handleBeginnerAutoLayout = async () => {
+        const width = parseFloat(beginnerWidth);
+        const height = parseFloat(beginnerHeight);
+
+        if (!generatedImage || !(width > 0) || !(height > 0) || beginnerQty <= 0) {
+            toast({
+                variant: 'destructive',
+                title: 'Invalid Sizing',
+                description: 'Please specify valid width, height, and quantity.',
+            });
+            return;
+        }
+
+        setBeginnerIsGenerating(true);
+        setBeginnerProgress(20);
+
+        try {
+            const rollWidth = 22; // standard width in inches
+            const gap = 0.3; // gap in inches
+            const dpi = 300;
+
+            const cols = Math.max(1, Math.floor((rollWidth + gap) / (width + gap)));
+            const rows = Math.ceil(beginnerQty / cols);
+            const sheetHeight = rows * height + (rows - 1) * gap;
+
+            setBeginnerProgress(50);
+
+            // Construct Auto Layout Sheet
+            const canvasElement = document.createElement('canvas');
+            canvasElement.width = rollWidth * dpi;
+            canvasElement.height = sheetHeight * dpi;
+            const ctx = canvasElement.getContext('2d');
+            if (!ctx) throw new Error("Could not create canvas 2D context");
+
+            ctx.clearRect(0, 0, canvasElement.width, canvasElement.height);
+
+            setBeginnerProgress(70);
+
+            // Load composite editor artwork from the main editor canvas
+            const canvasSource = canvasRef.current;
+            if (!canvasSource) throw new Error("Editor canvas element not found");
+
+            const tempImg = new Image();
+            await new Promise<void>((resolve, reject) => {
+                tempImg.onload = () => resolve();
+                tempImg.onerror = () => reject(new Error("Failed to load editor composite image"));
+                tempImg.src = canvasSource.toDataURL('image/png');
+            });
+
+            setBeginnerProgress(85);
+
+            const artworksList: ArtworkOnCanvas[] = [];
+            for (let i = 0; i < beginnerQty; i++) {
+                const col = i % cols;
+                const row = Math.floor(i / cols);
+                const xInches = col * (width + gap);
+                const yInches = row * (height + gap);
+
+                ctx.drawImage(
+                    tempImg,
+                    xInches * dpi,
+                    yInches * dpi,
+                    width * dpi,
+                    height * dpi
+                );
+
+                artworksList.push({
+                    id: `art-ds-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
+                    name: sanitizeFilename(`${formData.subject || 'ai-design'}`),
+                    imageUrl: tempImg.src,
+                    width: width,
+                    height: height,
+                    dpi: dpi,
+                    x: xInches,
+                    y: yInches,
+                    rotation: 0,
+                    canvasWidth: width * dpi,
+                    canvasHeight: height * dpi,
+                    quantity: 1
+                });
+            }
+
+            setBeginnerProgress(95);
+
+            const finalSheetPreviewUrl = canvasElement.toDataURL('image/png');
+
+            const isAiGenerated = formData.style !== 'Custom';
+            if (isAiGenerated && aiDesignFeeProduct) {
+                addToCart({ ...aiDesignFeeProduct, quantity: 1 });
+            }
+
+            const cartItem: SheetCartItem = {
+                id: `GNG-AUTO-${Date.now()}`,
+                type: 'sheet',
+                sheetSize: {
+                    name: `Auto-Layout 22" x ${sheetHeight.toFixed(0)}" (${initialDecorationType.toUpperCase()})`,
+                    width: rollWidth,
+                    height: parseFloat(sheetHeight.toFixed(1)),
+                    price: beginnerCalculatedPrice,
+                    discount: 0,
+                    usage: 'Upload'
+                },
+                previewUrl: finalSheetPreviewUrl,
+                artworks: artworksList,
+                quantity: 1,
+            };
+
+            addToCart(cartItem);
+            setBeginnerProgress(100);
+
+            toast({
+                title: 'Gang Sheet Generated & Added!',
+                description: `Successfully arranged ${beginnerQty} copies onto a 22" x ${sheetHeight.toFixed(0)}" sheet and added to checkout.`,
+            });
+
+            // Reset design generator state
+            setView('generate');
+            setMode('select');
+            setGeneratedImage(null);
+            setGeneratedImageDataUri(null);
+            setTextItems([]);
+            setActiveTextId(null);
+            setFormData({ subject: '', style: '', colors: '', mood: '' });
+            setImageTransform(initialImageTransform);
+            setShowBeginnerConfig(false);
+
+            router.push('/cart');
+
+        } catch (err) {
+            console.error("Beginner auto layout generation failed:", err);
+            toast({
+                variant: 'destructive',
+                title: 'Generation Failed',
+                description: 'Failed to construct printable layout sheet. Please try again.',
+            });
+        } finally {
+            setBeginnerIsGenerating(false);
+            setBeginnerProgress(0);
+        }
+    };
 
 
     const addOnsQuery = useMemoFirebase(() => {
@@ -282,7 +491,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
     // --- Core Actions ---
     const handleGenerate = async () => {
         if (!user) {
-             toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to generate AI designs.' });
+             toast({ variant: 'destructive', title: 'Login Required', description: 'Please log in to generate designs.' });
              return;
         }
 
@@ -334,7 +543,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         const isAiGenerated = formData.style !== 'Custom';
         
         if (isAiGenerated && !aiDesignFeeProduct) {
-             toast({ variant: 'destructive', title: 'Cannot Proceed', description: 'AI Design fee is not configured.' });
+             toast({ variant: 'destructive', title: 'Cannot Proceed', description: 'Design studio fee is not configured.' });
              return;
         };
         
@@ -558,44 +767,64 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
         ? 'Loading pricing...'
         : aiDesignFeeProduct
         ? textContent.ai_designer_fee_text.replace('{price}', new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(aiDesignFeeProduct.price))
-        : 'AI design pricing not configured.';
+        : 'Design studio pricing not configured.';
 
     // --- Render Logic ---
     return (
         <div className="h-[calc(100vh-5rem)] flex flex-col overflow-hidden">
             <Card className="glass-panel border-border/10 flex-grow flex flex-col min-h-0">
-                {view === 'generate' && (
-                    <CardHeader className="text-center">
-                        <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center mb-4">
-                            <Sparkles className="w-8 h-8 text-primary" />
-                        </div>
-                        <CardTitle className="text-2xl font-bold text-foreground">{textContent.ai_designer_title}</CardTitle>
-                        <CardDescription className="text-muted-foreground">{generationFeeText}</CardDescription>
-                    </CardHeader>
-                )}
-                <CardContent className="flex-grow flex flex-col min-h-0">
+                <CardContent className="flex-grow flex flex-col justify-center min-h-0">
                     {view === 'generate' ? (
-                         <div className="space-y-6 max-w-2xl mx-auto w-full my-auto">
+                         <div className="max-w-[1400px] mx-auto w-full p-4">
                             {mode === 'select' && (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-center animate-in fade-in">
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-center animate-in fade-in">
+                                    {/* Upload Card */}
                                     <div 
                                         onClick={() => {
                                             setMode('upload');
                                             fileInputRef.current?.click();
                                         }}
-                                        className="glass-panel p-8 rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-1 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4"
+                                        className="relative rounded-[2rem] overflow-hidden min-h-[500px] flex flex-col justify-end p-8 sm:p-16 border border-zinc-200/50 shadow-md group transition-all duration-300 cursor-pointer"
                                     >
-                                        <Upload className="w-10 h-10 text-primary" />
-                                        <h3 className="text-xl font-bold text-foreground">Upload Your Image</h3>
-                                        <p className="text-sm text-muted-foreground">Bring your own artwork to edit and enhance.</p>
+                                        <div 
+                                            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                                            style={{ backgroundImage: "url('/dtf_upload_artwork.png')" }}
+                                        />
+                                        <div className="absolute inset-0 bg-black/50 group-hover:bg-black/45 transition-colors duration-300" />
+                                        <div className="relative z-10 text-left text-white space-y-4 flex flex-col items-start max-w-md">
+                                            <span className="text-[10px] font-mono tracking-widest text-zinc-300 uppercase">01 / CUSTOM ARTWORK</span>
+                                            <h3 className="text-4xl sm:text-5xl font-serif font-normal leading-tight">Upload Your Image</h3>
+                                            <p className="text-zinc-200 text-sm font-light leading-relaxed">
+                                                Bring your own design files to scale, adjust, and prepare for DTF transfers.
+                                            </p>
+                                            <button className="bg-white hover:bg-zinc-50 text-zinc-900 text-[10px] font-bold uppercase tracking-widest px-6 h-12 rounded-full flex items-center justify-between gap-3 transition-all mt-4 w-full sm:w-auto">
+                                                <span>SELECT FILE</span>
+                                                <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
+
+                                    {/* Create Card */}
                                     <div 
                                         onClick={() => setMode('ai')}
-                                        className="glass-panel p-8 rounded-2xl border border-border/30 hover:border-primary/50 hover:-translate-y-1 transition-all cursor-pointer flex flex-col items-center justify-center space-y-4"
+                                        className="relative rounded-[2rem] overflow-hidden min-h-[500px] flex flex-col justify-end p-8 sm:p-16 border border-zinc-200/50 shadow-md group transition-all duration-300 cursor-pointer"
                                     >
-                                        <Wand2 className="w-10 h-10 text-primary" />
-                                        <h3 className="text-xl font-bold text-foreground">Generate with AI</h3>
-                                        <p className="text-sm text-muted-foreground">Create a unique design from a text description.</p>
+                                        <div 
+                                            className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-105"
+                                            style={{ backgroundImage: "url('/dtf_create_design.png')" }}
+                                        />
+                                        <div className="absolute inset-0 bg-black/50 group-hover:bg-black/45 transition-colors duration-300" />
+                                        <div className="relative z-10 text-left text-white space-y-4 flex flex-col items-start max-w-md">
+                                            <span className="text-[10px] font-mono tracking-widest text-zinc-300 uppercase">02 / PROMPT STUDIO</span>
+                                            <h3 className="text-4xl sm:text-5xl font-serif font-normal leading-tight">Create Design</h3>
+                                            <p className="text-zinc-200 text-sm font-light leading-relaxed">
+                                                Generate completely new, unique artwork from a detailed text description.
+                                            </p>
+                                            <button className="bg-white hover:bg-zinc-50 text-zinc-900 text-[10px] font-bold uppercase tracking-widest px-6 h-12 rounded-full flex items-center justify-between gap-3 transition-all mt-4 w-full sm:w-auto">
+                                                <span>START CREATING</span>
+                                                <ArrowRight className="w-4 h-4" />
+                                            </button>
+                                        </div>
                                     </div>
                                 </div>
                             )}
@@ -625,15 +854,15 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     ) : !user && (
                                         <div className="bg-yellow-500/10 border border-yellow-500/20 rounded-xl p-4 flex flex-col items-center text-center">
                                             <User className="w-8 h-8 text-yellow-500 mb-2" />
-                                            <p className="text-sm font-medium text-foreground mb-2">Login to Create with AI</p>
-                                            <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate designs with AI.</p>
+                                            <p className="text-sm font-medium text-foreground mb-2">Login to Create Design</p>
+                                            <p className="text-xs text-muted-foreground mb-4">You need to be logged in to generate designs.</p>
                                             <Button asChild size="sm">
                                                 <Link href="/auth/login">Login or Sign Up</Link>
                                             </Button>
                                         </div>
                                     )}
                                     <div>
-                                        <Label>Subject (with AI)</Label>
+                                        <Label>Design Description</Label>
                                         <Input 
                                             placeholder="e.g., A robot surfing on a slice of pizza"
                                             value={formData.subject}
@@ -665,7 +894,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         </div>
                                     </div>
                                     <Button onClick={handleGenerate} disabled={isLoading || isLoadingService || (formData.style !== 'Custom' && !aiDesignFeeProduct) || !user} className="w-full mt-4 text-lg py-6">
-                                        {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : <><Wand2 className="w-5 h-5 mr-2" />Generate with AI</>}
+                                        {isLoading ? <Wand2 className="w-5 h-5 mr-2 animate-pulse" /> : <><Wand2 className="w-5 h-5 mr-2" />Generate Design</>}
                                     </Button>
                                 </div>
                             )}
@@ -673,13 +902,13 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                             {mode !== 'select' && (
                                  <div className="text-xs text-muted-foreground p-3 bg-secondary/50 rounded-lg flex items-start space-x-2 mt-6">
                                     <AlertTriangle className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5" />
-                                    <span>AI-generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
+                                    <span>Generated images are provided at 512x512 pixels (approx 300 DPI at 1.7"x1.7"). Larger sizes may result in quality loss.</span>
                                 </div>
                             )}
                         </div>
                     ) : (
-                        <div className="grid md:grid-cols-3 gap-8 flex-grow min-h-0">
-                            <div className="md:col-span-1 h-full flex flex-col min-h-0">
+                        <div className="grid md:grid-cols-12 gap-8 flex-grow min-h-0">
+                            <div className="md:col-span-4 lg:col-span-3 h-full flex flex-col min-h-0">
                                 <div className="flex-grow overflow-y-auto pr-2 -mr-2 space-y-4 builder-scroll">
                                     <Accordion type="multiple" defaultValue={['item-1', 'item-2', 'item-3', 'item-4']} className="w-full">
                                         <AccordionItem value="item-1" className="bg-secondary/50 rounded-xl border border-border px-4 mb-4">
@@ -845,8 +1074,11 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                     </Accordion>
                                 </div>
                             </div>
-                            <div className="md:col-span-2 flex flex-col items-center justify-center min-h-0">
-                                <div className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square max-w-lg w-full", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}>
+                            <div className="md:col-span-8 lg:col-span-9 flex flex-col items-center justify-center min-h-0">
+                                <div 
+                                    className={cn("checkerboard rounded-xl border border-border p-2 mx-auto aspect-square w-full", isRemovingBg ? 'cursor-eyedropper' : (draggingImage ? 'cursor-grabbing' : 'cursor-grab'))}
+                                    style={{ maxWidth: isBeginnerFlow && showBeginnerConfig ? 'min(100%, calc(100vh - 450px))' : 'min(100%, calc(100vh - 280px))' }}
+                                >
                                     <canvas
                                         ref={canvasRef}
                                         width={512}
@@ -858,21 +1090,107 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                                         onMouseLeave={handleCanvasMouseUp}
                                     />
                                 </div>
-                                <div className="space-y-4 mt-6 w-full max-w-lg shrink-0">
-                                    <div className="flex flex-col sm:flex-row justify-center gap-4">
-                                        <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
-                                            <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
-                                        </Button>
-                                        <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
-                                            <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
-                                        </Button>
-                                    </div>
-                                    <div className="flex justify-center">
-                                        <Button onClick={() => { setView('generate'); setMode('select'); }} variant="ghost" className="text-base">
-                                            <Wand2 className="w-5 h-5 mr-2" /> Start Over
-                                        </Button>
-                                    </div>
-                                </div>
+                                <div 
+                                    className="space-y-4 mt-6 w-full shrink-0 mx-auto"
+                                    style={{ maxWidth: isBeginnerFlow && showBeginnerConfig ? 'min(100%, calc(100vh - 450px))' : 'min(100%, calc(100vh - 280px))' }}
+                                >
+                                     {isBeginnerFlow ? (
+                                         <div className="space-y-4 w-full">
+                                             {showBeginnerConfig ? (
+                                                 <div className="bg-white border border-zinc-200/80 p-6 rounded-2xl text-left space-y-4 shadow-sm animate-in slide-in-from-bottom duration-300">
+                                                     {beginnerIsGenerating ? (
+                                                         <div className="flex flex-col items-center justify-center py-6 space-y-4 text-center">
+                                                             <div className="w-10 h-10 border-4 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                                                             <div className="space-y-1">
+                                                                 <p className="text-sm font-bold text-zinc-900">Generating Printable Sheet...</p>
+                                                                 <p className="text-[10px] text-zinc-500 font-mono">Progress: {beginnerProgress}%</p>
+                                                             </div>
+                                                         </div>
+                                                     ) : (
+                                                         <>
+                                                             <h4 className="font-bold text-zinc-900 text-base">Configure Size & Quantity</h4>
+                                                             
+                                                             <div className="grid grid-cols-2 gap-4">
+                                                                 <div>
+                                                                     <Label className="text-zinc-650 text-xs mb-1 block">Width (in)</Label>
+                                                                     <Input 
+                                                                         name="width" 
+                                                                         type="number" 
+                                                                         value={beginnerWidth} 
+                                                                         onChange={handleBeginnerDimensionChange}
+                                                                         className="bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-zinc-400 rounded-lg"
+                                                                     />
+                                                                 </div>
+                                                                 <div>
+                                                                     <Label className="text-zinc-650 text-xs mb-1 block">Height (in)</Label>
+                                                                     <Input 
+                                                                         name="height" 
+                                                                         type="number" 
+                                                                         value={beginnerHeight} 
+                                                                         onChange={handleBeginnerDimensionChange}
+                                                                         className="bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-zinc-400 rounded-lg"
+                                                                     />
+                                                                 </div>
+                                                             </div>
+
+                                                             <div>
+                                                                 <Label className="text-zinc-650 text-xs mb-1 block">Quantity</Label>
+                                                                 <Input 
+                                                                     type="number" 
+                                                                     min="1" 
+                                                                     value={beginnerQty} 
+                                                                     onChange={(e) => setBeginnerQty(Math.max(1, parseInt(e.target.value) || 1))}
+                                                                     className="bg-zinc-50 border-zinc-200 text-zinc-900 focus:border-zinc-400 rounded-lg"
+                                                                 />
+                                                             </div>
+
+                                                             <div className="bg-zinc-50 p-3 rounded-xl border border-zinc-200/60 text-xs flex justify-between items-center font-mono">
+                                                                 <span className="text-zinc-500">Total Price:</span>
+                                                                 <span className="font-bold text-zinc-900 text-sm">{formatCurrency(beginnerCalculatedPrice)}</span>
+                                                             </div>
+
+                                                             <div className="flex gap-3 pt-2">
+                                                                 <Button 
+                                                                     onClick={() => setShowBeginnerConfig(false)} 
+                                                                     variant="ghost" 
+                                                                     className="flex-1 text-zinc-650 hover:text-zinc-900 hover:bg-zinc-100 rounded-full"
+                                                                 >
+                                                                     Cancel
+                                                                 </Button>
+                                                                 <Button 
+                                                                     onClick={handleBeginnerAutoLayout} 
+                                                                     className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-400 hover:to-blue-400 text-white font-bold rounded-full"
+                                                                 >
+                                                                     Generate & Checkout
+                                                                 </Button>
+                                                             </div>
+                                                         </>
+                                                     )}
+                                                 </div>
+                                             ) : (
+                                                 <div className="flex justify-center">
+                                                     <Button onClick={() => setShowBeginnerConfig(true)} className="w-full text-base bg-gradient-to-r from-cyan-500 to-blue-500 text-white font-bold h-12" size="lg">
+                                                         Order Copies of Design <ArrowRight className="w-5 h-5 ml-2" />
+                                                     </Button>
+                                                 </div>
+                                             )}
+                                         </div>
+                                     ) : (
+                                         <div className="flex flex-col sm:flex-row justify-center gap-4">
+                                             <Button onClick={() => handleSendToPage('builder')} className="text-base" size="lg">
+                                                 <ImagePlus className="w-5 h-5 mr-2" /> Add to Gang Sheet
+                                             </Button>
+                                             <Button onClick={() => handleSendToPage('transfers')} className="text-base" size="lg" variant="secondary">
+                                                 <ArrowRight className="w-5 h-5 mr-2" /> Order as Single Transfer
+                                             </Button>
+                                         </div>
+                                     )}
+                                     <div className="flex justify-center">
+                                         <Button onClick={() => { setView('generate'); setMode('select'); setShowBeginnerConfig(false); }} variant="ghost" className="text-base">
+                                             <Wand2 className="w-5 h-5 mr-2" /> Start Over
+                                         </Button>
+                                     </div>
+                                 </div>
                             </div>
                         </div>
                     )}

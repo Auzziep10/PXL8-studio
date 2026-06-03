@@ -274,6 +274,7 @@ export default function CartPage() {
                             sheetWidth: 0,
                             sheetHeight: 0,
                             sheetPrice: item.price,
+                            artworks: []
                         };
                     }
                     
@@ -304,10 +305,11 @@ export default function CartPage() {
                         sheetWidth,
                         sheetHeight,
                         sheetPrice: itemPrice,
+                        artworks: item.type === 'sheet' ? item.artworks : []
                     };
                 })
             );
-            console.log("Step 2 Complete. All items processed.", finalOrderItems);
+            console.log("Step 2: Processing cart items complete.");
             
             const newOrderData = {
                 orderId: orderId,
@@ -346,7 +348,19 @@ export default function CartPage() {
                     quantity: item.quantity,
                 } as CartItem));
 
-                const result = await createCheckoutSession(lightweightItems, shippingCost, tax);
+                const result = await createCheckoutSession(
+                    lightweightItems, 
+                    shippingCost, 
+                    formData.email,
+                    {
+                        name: `${formData.firstName} ${formData.lastName}`,
+                        line1: formData.street,
+                        city: formData.city,
+                        state: formData.state,
+                        postal_code: formData.zip,
+                        country: 'US'
+                    }
+                );
                 if (result.success && result.url) {
                     window.location.href = result.url;
                     return; // Stop execution here so we don't route to success yet
