@@ -65,26 +65,75 @@ export async function createCheckoutSession(
       });
     }
 
+    let customerId: string | undefined = undefined;
+
+    if (customerEmail) {
+      try {
+        const customers = await stripe.customers.list({ email: customerEmail, limit: 1 });
+        if (customers.data.length > 0) {
+          customerId = customers.data[0].id;
+          if (shippingAddress) {
+            await stripe.customers.update(customerId, {
+              name: shippingAddress.name,
+              address: {
+                line1: shippingAddress.line1,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                postal_code: shippingAddress.postal_code,
+                country: shippingAddress.country,
+              },
+              shipping: {
+                name: shippingAddress.name,
+                address: {
+                  line1: shippingAddress.line1,
+                  city: shippingAddress.city,
+                  state: shippingAddress.state,
+                  postal_code: shippingAddress.postal_code,
+                  country: shippingAddress.country,
+                }
+              }
+            });
+          }
+        } else {
+          const customer = await stripe.customers.create({
+            email: customerEmail,
+            name: shippingAddress?.name,
+            address: shippingAddress ? {
+              line1: shippingAddress.line1,
+              city: shippingAddress.city,
+              state: shippingAddress.state,
+              postal_code: shippingAddress.postal_code,
+              country: shippingAddress.country,
+            } : undefined,
+            shipping: shippingAddress ? {
+              name: shippingAddress.name,
+              address: {
+                line1: shippingAddress.line1,
+                city: shippingAddress.city,
+                state: shippingAddress.state,
+                postal_code: shippingAddress.postal_code,
+                country: shippingAddress.country,
+              }
+            } : undefined,
+          });
+          customerId = customer.id;
+        }
+      } catch (e) {
+        console.warn("Failed to create or update Stripe customer, falling back to email:", e);
+      }
+    }
+
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: lineItems,
       mode: 'payment',
-      customer_email: customerEmail,
+      ...(customerId ? { customer: customerId } : { customer_email: customerEmail }),
       automatic_tax: {
         enabled: true,
       },
-      ...(shippingAddress && {
-        shipping_details: {
-          name: shippingAddress.name,
-          address: {
-            line1: shippingAddress.line1,
-            city: shippingAddress.city,
-            state: shippingAddress.state,
-            postal_code: shippingAddress.postal_code,
-            country: shippingAddress.country,
-          }
-        }
-      }),
+      shipping_address_collection: {
+        allowed_countries: ['US'],
+      },
       success_url: `${origin}/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/cart`,
     });
