@@ -164,6 +164,105 @@ const isVinylItem = (item: OrderItem): boolean => {
     return name.includes('(vinyl)') || name.includes('elevated flex');
 };
 
+// Helper function to trace contour paths from a canvas image (e.g. for vinyl vector outlines)
+const findContourPaths = (canvas: HTMLCanvasElement): string[] => {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return [];
+    const width = canvas.width;
+    const height = canvas.height;
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    const isSolid = (x: number, y: number): boolean => {
+        if (x < 0 || x >= width || y < 0 || y >= height) return false;
+        return data[(y * width + x) * 4 + 3] > 30; // Alpha threshold
+    };
+
+    const visited = new Uint8Array(width * height);
+    const paths: string[] = [];
+
+    // Direction offsets for Moore neighborhood
+    const dx = [-1, 0, 1, 1, 1, 0, -1, -1];
+    const dy = [-1, -1, -1, 0, 1, 1, 1, 0];
+
+    for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+            const idx = y * width + x;
+            if (isSolid(x, y) && !visited[idx]) {
+                let isBoundary = false;
+                for (let i = 0; i < 8; i++) {
+                    if (!isSolid(x + dx[i], y + dy[i])) {
+                        isBoundary = true;
+                        break;
+                    }
+                }
+
+                if (isBoundary) {
+                    const points: {x: number; y: number}[] = [];
+                    let currX = x;
+                    let currY = y;
+                    let prevX = x;
+                    let prevY = y - 1;
+                    
+                    let startX = currX;
+                    let startY = currY;
+                    let count = 0;
+                    const maxPoints = width * height;
+
+                    while (count < maxPoints) {
+                        points.push({ x: currX, y: currY });
+                        visited[currY * width + currX] = 1;
+
+                        let entryDir = -1;
+                        for (let d = 0; d < 8; d++) {
+                            if (currX + dx[d] === prevX && currY + dy[d] === prevY) {
+                                entryDir = d;
+                                break;
+                            }
+                        }
+
+                        let foundNext = false;
+                        let nextX = -1;
+                        let nextY = -1;
+                        
+                        for (let i = 1; i <= 8; i++) {
+                            const d = (entryDir + i) % 8;
+                            const tx = currX + dx[d];
+                            const ty = currY + dy[d];
+                            if (isSolid(tx, ty)) {
+                                nextX = tx;
+                                nextY = ty;
+                                foundNext = true;
+                                break;
+                            }
+                        }
+
+                        if (!foundNext || (nextX === startX && nextY === startY)) {
+                            break;
+                        }
+
+                        prevX = currX;
+                        prevY = currY;
+                        currX = nextX;
+                        currY = nextY;
+                        count++;
+                    }
+
+                    if (points.length >= 3) {
+                        let pathD = `M ${points[0].x} ${points[0].y}`;
+                        for (let i = 1; i < points.length; i++) {
+                            pathD += ` L ${points[i].x} ${points[i].y}`;
+                        }
+                        pathD += ' Z';
+                        paths.push(pathD);
+                    }
+                }
+            }
+        }
+    }
+    return paths;
+};
+
 // Generates both print-ready sheet (artworks + marks + header) and cut-ready sheet (cut paths + marks + header)
 const generateFinalSheetsForPrintAndCut = async (
     orderItem: OrderItem,
@@ -451,9 +550,186 @@ const generateFinalSheetsForPrintAndCut = async (
     drawGraphtecRegistrationMarks(printCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI, true);
     drawGraphtecRegistrationMarks(cutCtx, finalCanvasWidth, finalCanvasHeight, 0.5 * BASE_DPI, false);
 
+    // --- Generate SVG Cut File ---
+    let svgContent = `<svg xmlns="http://www.w3.org/2000/svg" width="${finalCanvasWidth}" height="${finalCanvasHeight}" viewBox="0 0 ${finalCanvasWidth} ${finalCanvasHeight}">\n`;
+    svgContent += `  <!-- Background -->\n`;
+    svgContent += `  <rect width="${finalCanvasWidth}" height="${finalCanvasHeight}" fill="white" />\n`;
+
+    const margin = 0.5 * BASE_DPI;
+    const markLength = 0.5 * BASE_DPI;
+    const thickness = 0.04 * BASE_DPI;
+    const xLeft = margin;
+    const xRight = finalCanvasWidth - margin;
+    const yTop = 0.5 * BASE_DPI;
+    const yBottom = finalCanvasHeight - margin;
+
+    svgContent += `  <!-- Graphtec Registration Marks -->\n`;
+    // Top-Left L-Mark
+    svgContent += `  <rect x="${xLeft}" y="${yTop}" width="${markLength}" height="${thickness}" fill="black" />\n`;
+    svgContent += `  <rect x="${xLeft}" y="${yTop}" width="${thickness}" height="${markLength}" fill="black" />\n`;
+    // Top-Right L-Mark
+    svgContent += `  <rect x="${xRight - markLength}" y="${yTop}" width="${markLength}" height="${thickness}" fill="black" />\n`;
+    svgContent += `  <rect x="${xRight - thickness}" y="${yTop}" width="${thickness}" height="${markLength}" fill="black" />\n`;
+    // Bottom-Left L-Mark
+    svgContent += `  <rect x="${xLeft}" y="${yBottom - thickness}" width="${markLength}" height="${thickness}" fill="black" />\n`;
+    svgContent += `  <rect x="${xLeft}" y="${yBottom - markLength}" width="${thickness}" height="${markLength}" fill="black" />\n`;
+    // Bottom-Right L-Mark
+    svgContent += `  <rect x="${xRight - markLength}" y="${yBottom - thickness}" width="${markLength}" height="${thickness}" fill="black" />\n`;
+    svgContent += `  <rect x="${xRight - thickness}" y="${yBottom - markLength}" width="${thickness}" height="${markLength}" fill="black" />\n`;
+
+    svgContent += `  <!-- Cut Paths -->\n`;
+    if (!isVinyl) {
+        if (isSingleTransferLayout) {
+            const SPACING_INCHES = 0.25;
+            const itemWidthInches = orderItem.sheetWidth;
+            const itemHeightInches = orderItem.sheetHeight;
+            const itemsPerRow = Math.floor((22 + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
+
+            let currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
+            let currentY = yOffset + (SPACING_INCHES * BASE_DPI);
+            let placedItems = 0;
+
+            for (let i = 0; i < orderItem.quantity; i++) {
+                if (placedItems > 0 && placedItems % itemsPerRow === 0) {
+                    currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
+                    currentY += (itemHeightInches + SPACING_INCHES) * BASE_DPI;
+                }
+
+                const paddingPx = 0.08 * BASE_DPI; // 24px (~2mm) margin from the design
+                const rectX = currentX - paddingPx;
+                const rectY = currentY - paddingPx;
+                const rectW = (itemWidthInches * BASE_DPI) + (2 * paddingPx);
+                const rectH = (itemHeightInches * BASE_DPI) + (2 * paddingPx);
+
+                svgContent += `  <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="none" stroke="black" stroke-width="6" />\n`;
+
+                currentX += (itemWidthInches + SPACING_INCHES) * BASE_DPI;
+                placedItems++;
+            }
+        } else {
+            const artworks = orderItem.artworks || [];
+            if (artworks.length > 0) {
+                artworks.forEach(art => {
+                    const centerX = (art.x + art.width / 2) * BASE_DPI + MARGIN_PX;
+                    const centerY = (art.y + art.height / 2) * BASE_DPI + yOffset;
+
+                    const targetPadding = 0.08 * BASE_DPI;
+                    const safePadding = calculateSafePadding(art, artworks, targetPadding);
+
+                    const wPx = art.width * BASE_DPI + (2 * safePadding);
+                    const hPx = art.height * BASE_DPI + (2 * safePadding);
+
+                    const rotation = art.rotation || 0;
+                    const rx = centerX - wPx / 2;
+                    const ry = centerY - hPx / 2;
+
+                    svgContent += `  <rect x="${rx}" y="${ry}" width="${wPx}" height="${hPx}" fill="none" stroke="black" stroke-width="6" transform="rotate(${rotation}, ${centerX}, ${centerY})" />\n`;
+                });
+            } else {
+                const contentMargin = 0.25 * BASE_DPI;
+                const rectX = MARGIN_PX + contentMargin;
+                const rectY = yOffset + contentMargin;
+                const rectW = (designWidthInches * BASE_DPI) - (contentMargin * 2);
+                const rectH = (orderItem.sheetHeight * BASE_DPI) - (contentMargin * 2);
+                svgContent += `  <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="none" stroke="black" stroke-width="6" />\n`;
+            }
+        }
+    } else {
+        // Trace contours from the source image
+        let traceWidth = 400;
+        let traceHeight = 400;
+        let contourPaths: string[] = [];
+
+        const imgW = sourceImage.naturalWidth || sourceImage.width || 400;
+        const imgH = sourceImage.naturalHeight || sourceImage.height || 400;
+        
+        const maxDim = 400;
+        if (imgW > imgH) {
+            traceWidth = maxDim;
+            traceHeight = Math.round(maxDim * imgH / imgW);
+        } else {
+            traceHeight = maxDim;
+            traceWidth = Math.round(maxDim * imgW / imgH);
+        }
+
+        const traceCanvas = document.createElement('canvas');
+        traceCanvas.width = traceWidth;
+        traceCanvas.height = traceHeight;
+        const traceCtx = traceCanvas.getContext('2d');
+        if (traceCtx) {
+            traceCtx.drawImage(sourceImage, 0, 0, traceWidth, traceHeight);
+            contourPaths = findContourPaths(traceCanvas);
+        }
+
+        if (isSingleTransferLayout) {
+            const SPACING_INCHES = 0.25;
+            const itemWidthInches = orderItem.sheetWidth;
+            const itemHeightInches = orderItem.sheetHeight;
+            const itemsPerRow = Math.floor((22 + SPACING_INCHES) / (itemWidthInches + SPACING_INCHES));
+
+            let currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
+            let currentY = yOffset + (SPACING_INCHES * BASE_DPI);
+            let placedItems = 0;
+
+            for (let i = 0; i < orderItem.quantity; i++) {
+                if (placedItems > 0 && placedItems % itemsPerRow === 0) {
+                    currentX = MARGIN_PX + (SPACING_INCHES * BASE_DPI);
+                    currentY += (itemHeightInches + SPACING_INCHES) * BASE_DPI;
+                }
+
+                const artW = itemWidthInches * BASE_DPI;
+                const artH = itemHeightInches * BASE_DPI;
+                const centerX = currentX + artW / 2;
+                const centerY = currentY + artH / 2;
+
+                const scaleX = artW / traceWidth;
+                const scaleY = artH / traceHeight;
+
+                svgContent += `  <g transform="translate(${centerX}, ${centerY}) scale(${scaleX}, ${scaleY}) translate(${-traceWidth / 2}, ${-traceHeight / 2})">\n`;
+                contourPaths.forEach(d => {
+                    svgContent += `    <path d="${d}" fill="black" stroke="black" stroke-width="${6 / Math.max(scaleX, scaleY)}" stroke-linejoin="round" />\n`;
+                });
+                svgContent += `  </g>\n`;
+
+                currentX += (itemWidthInches + SPACING_INCHES) * BASE_DPI;
+                placedItems++;
+            }
+        } else {
+            const artworks = orderItem.artworks || [];
+            if (artworks.length > 0) {
+                artworks.forEach(art => {
+                    const centerX = (art.x + art.width / 2) * BASE_DPI + MARGIN_PX;
+                    const centerY = (art.y + art.height / 2) * BASE_DPI + yOffset;
+                    const artW = art.width * BASE_DPI;
+                    const artH = art.height * BASE_DPI;
+
+                    const scaleX = artW / traceWidth;
+                    const scaleY = artH / traceHeight;
+                    const rotation = art.rotation || 0;
+
+                    svgContent += `  <g transform="translate(${centerX}, ${centerY}) rotate(${rotation}) scale(${scaleX}, ${scaleY}) translate(${-traceWidth / 2}, ${-traceHeight / 2})">\n`;
+                    contourPaths.forEach(d => {
+                        svgContent += `    <path d="${d}" fill="black" stroke="black" stroke-width="${6 / Math.max(scaleX, scaleY)}" stroke-linejoin="round" />\n`;
+                    });
+                    svgContent += `  </g>\n`;
+                });
+            } else {
+                const contentMargin = 0.25 * BASE_DPI;
+                const rectX = MARGIN_PX + contentMargin;
+                const rectY = yOffset + contentMargin;
+                const rectW = (designWidthInches * BASE_DPI) - (contentMargin * 2);
+                const rectH = (orderItem.sheetHeight * BASE_DPI) - (contentMargin * 2);
+                svgContent += `  <rect x="${rectX}" y="${rectY}" width="${rectW}" height="${rectH}" fill="black" />\n`;
+            }
+        }
+    }
+
+    svgContent += `</svg>`;
+    const cutDataUrl = 'data:image/svg+xml;base64,' + window.btoa(unescape(encodeURIComponent(svgContent)));
+
     return {
         printDataUrl: printCanvas.toDataURL('image/png'),
-        cutDataUrl: cutCanvas.toDataURL('image/png')
+        cutDataUrl: cutDataUrl
     };
 };
 
@@ -584,14 +860,14 @@ const AssetCard: React.FC<{
                         {item.cutReadyUrl && (
                             <a
                                 href={item.cutReadyUrl}
-                                download={`cut-sheet-${order.orderId}-${index + 1}.png`}
+                                download={`cut-sheet-${order.orderId}-${index + 1}.${item.cutReadyUrl.includes('.svg') ? 'svg' : 'png'}`}
                                 target="_blank"
                                 rel="noopener noreferrer"
                                 className="flex items-center px-3 py-1.5 bg-zinc-800 text-white text-xs font-bold rounded-lg hover:bg-zinc-700 transition-colors border border-white/10 cursor-pointer"
                                 onClick={(e) => e.stopPropagation()}
                             >
                                 <Download className="w-3 h-3 mr-1.5" />
-                                Cut File
+                                Cut File {item.cutReadyUrl.includes('.svg') ? '(Vector)' : ''}
                             </a>
                         )}
                     </div>
@@ -732,7 +1008,9 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
             }
 
             // 2. Upload Cut File
-            const cutReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-cut.png`);
+            const isSvg = cutDataUrl.startsWith('data:image/svg+xml');
+            const cutExtension = isSvg ? 'svg' : 'png';
+            const cutReadyStorageRef = ref(storage, `production-sheets/${selectedOrder.orderId}/${item.id}-cut.${cutExtension}`);
             const cutReadySnapshot = await uploadString(cutReadyStorageRef, cutDataUrl, 'data_url');
             const cutReadyDownloadURL = await getDownloadURL(cutReadySnapshot.ref);
 
@@ -946,7 +1224,8 @@ function AdminFulfillmentContent({ isAdmin }: { isAdmin: boolean }) {
                 try {
                     const response = await fetch(item.cutReadyUrl);
                     const blob = await response.blob();
-                    const fileName = `Cut-Sheet-${i + 1}-${targetOrder.orderId}.png`;
+                    const isSvgUrl = item.cutReadyUrl.includes('.svg');
+                    const fileName = `Cut-Sheet-${i + 1}-${targetOrder.orderId}.${isSvgUrl ? 'svg' : 'png'}`;
                     folder?.file(fileName, blob);
                 } catch (e) {
                     console.warn('Could not fetch cut asset for zipping', item.cutReadyUrl);
