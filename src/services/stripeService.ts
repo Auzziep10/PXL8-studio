@@ -129,7 +129,7 @@ export async function createCheckoutSession(
       mode: 'payment',
       ...(customerId ? { customer: customerId } : { customer_email: customerEmail }),
       automatic_tax: {
-        enabled: true,
+        enabled: false,
       },
       shipping_address_collection: {
         allowed_countries: ['US'],
