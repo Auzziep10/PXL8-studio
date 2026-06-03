@@ -189,6 +189,11 @@ const generateFinalSheetsForPrintAndCut = async (
     const cutCtx = cutCanvas.getContext('2d');
     if (!cutCtx) throw new Error('No cut context');
 
+    // Fill cut canvas with solid white background so that vector tracing software 
+    // only detects the black cut lines and registration marks.
+    cutCtx.fillStyle = 'white';
+    cutCtx.fillRect(0, 0, finalCanvasWidth, finalCanvasHeight);
+
     // Create transparent offscreen canvas for designs (to apply composite silhouette operations for vinyl)
     const designCanvas = document.createElement('canvas');
     designCanvas.width = designWidthInches * BASE_DPI;
@@ -400,7 +405,6 @@ const generateFinalSheetsForPrintAndCut = async (
     };
 
     drawHeader(printCtx, false);
-    drawHeader(cutCtx, true);
 
     // --- Draw Graphtec Registration Marks ---
     // Position top marks at 0.5 inches (150px) from top edge so they are printed above the QR code/header
