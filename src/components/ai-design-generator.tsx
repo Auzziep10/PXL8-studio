@@ -223,7 +223,7 @@ export default function AiDesignGenerator({ onDesignGenerated }: AiDesignGenerat
                 artworksList.push({
                     id: `art-ds-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
                     name: sanitizeFilename(`${formData.subject || 'ai-design'}`),
-                    imageUrl: tempImgSrc,
+                    imageUrl: "", // Prevent duplicating large Base64 data URLs in local storage
                     width: width,
                     height: height,
                     dpi: dpi,

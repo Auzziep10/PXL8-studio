@@ -43,19 +43,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
             // Check size. A 1MB data URL is roughly 1.37 million characters.
             if (item.previewUrl.length > 1000000) { 
-                 if (item.type === 'sheet') {
-                     const { previewUrl, artworks, ...rest } = item;
-                     return {
-                         ...rest,
-                         previewStripped: true
-                     };
-                 } else {
-                     const { previewUrl, ...rest } = item;
-                     return {
-                         ...rest,
-                         previewStripped: true
-                     };
-                 }
+                 const { previewUrl, ...rest } = item;
+                 return {
+                     ...rest,
+                     previewStripped: true
+                 };
             }
         }
         return item;

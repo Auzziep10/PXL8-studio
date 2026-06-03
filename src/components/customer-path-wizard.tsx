@@ -254,7 +254,7 @@ export default function CustomerPathWizard() {
                 artworksList.push({
                     id: `art-${Date.now()}-${i}-${Math.random().toString(36).substr(2, 9)}`,
                     name: file.name.replace(/\.[^/.]+$/, ""), // remove extension
-                    imageUrl: previewUrl,
+                    imageUrl: "", // Prevent duplicating large Base64 data URLs in local storage
                     width: width,
                     height: height,
                     dpi: dpi,
