@@ -168,7 +168,12 @@ function OrderDetailsContent() {
                             </div>
                             <div className="flex-1">
                                 <p className="font-bold text-foreground">{item.sheetSizeName}</p>
-                                <p className="text-sm text-muted-foreground">{item.sheetWidth}" x {item.sheetHeight}"</p>
+                                <p className="text-sm text-muted-foreground">
+                                    {item.sheetWidth}" x {item.sheetHeight}"
+                                    {item.artworks && item.artworks.length > 0 && (
+                                        <span> • {item.artworks.length} {item.artworks.length === 1 ? 'copy' : 'copies'}</span>
+                                    )}
+                                </p>
                                 <p className="text-sm text-muted-foreground">Quantity: {item.quantity}</p>
                             </div>
                             <p className="font-bold text-lg text-foreground">{formatCurrency(item.sheetPrice * item.quantity)}</p>

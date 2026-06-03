@@ -460,6 +460,12 @@ const AssetCard: React.FC<{
             </span>
             <span>•</span>
             <span>Qty: {item.quantity}</span>
+            {item.artworks && item.artworks.length > 0 && (
+              <>
+                <span>•</span>
+                <span>{item.artworks.length} {item.artworks.length === 1 ? 'copy' : 'copies'}</span>
+              </>
+            )}
             {item.id && (
               <>
                 <span>•</span>

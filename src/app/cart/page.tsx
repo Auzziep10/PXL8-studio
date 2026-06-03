@@ -426,7 +426,12 @@ export default function CartPage() {
                         <div className="flex justify-between">
                             <div>
                                 <h3 className="font-bold text-foreground">{name}</h3>
-                                <p className="text-xs text-muted-foreground">{width}" x {height}"</p>
+                                <p className="text-xs text-muted-foreground">
+                                    {width}" x {height}"
+                                    {item.type === 'sheet' && item.artworks && item.artworks.length > 0 && (
+                                        <span> • {item.artworks.length} {item.artworks.length === 1 ? 'copy' : 'copies'}</span>
+                                    )}
+                                </p>
                             </div>
                             <p className="font-bold text-foreground">{formatCurrency(price * item.quantity)}</p>
                         </div>
