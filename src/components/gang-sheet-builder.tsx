@@ -1470,7 +1470,7 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                  <button
                     disabled={items.length === 0 || isSheetOverflowing || isGenerating || !isLoaded}
                     onClick={handleProcessAndAddToCart}
-                    className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-black bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
+                    className="w-full flex items-center justify-center px-8 py-4 border border-transparent text-base font-bold rounded-xl text-primary-foreground bg-primary hover:bg-primary/90 disabled:opacity-50 disabled:cursor-not-allowed shadow-[0_0_20px_hsl(var(--primary)/0.3)] transition-all transform hover:-translate-y-0.5"
                 >
                     {isGenerating ? 'Generating...' : `Add to Cart - ${formatCurrency(selectedSheetPrice)}`}
                     {!isGenerating && <ArrowRight className="ml-2 w-5 h-5" />}
