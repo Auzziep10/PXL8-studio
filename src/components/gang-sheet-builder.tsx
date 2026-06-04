@@ -4,7 +4,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { GangSheetItem, CartItem, ArtworkOnCanvas, Artwork, SheetSize as SheetType, SheetCartItem, ServiceAddOn } from '@/lib/types';
 import { PPI } from '@/lib/constants';
-import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent, ChevronDown, Undo } from 'lucide-react';
+import { Upload, Trash2, AlertTriangle, Wand2, Info, ArrowRight, Plus, Copy, Move, ArrowLeftRight, ArrowUpDown, Save, QrCode, Droplet, RotateCw, X, Percent, ChevronDown, Undo, ChevronUp, Grid, Sparkles } from 'lucide-react';
 import { analyzeArtwork } from '@/app/actions';
 import { useCart } from '@/hooks/use-cart';
 import { useToast } from '@/hooks/use-toast';
@@ -40,6 +40,8 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
   const { toast } = useToast();
   const [items, setItems] = useState<ArtworkOnCanvas[]>([]);
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [snapGrid, setSnapGrid] = useState<boolean>(true);
+  const [snapSize, setSnapSize] = useState<number>(0.25); // snapping grid size in inches
   
   const { user, isUserLoading } = useUser();
   const firestore = useFirestore();
@@ -603,12 +605,14 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
       setSelectedItemId(id);
       setDraggingId(id);
 
-      // Calculate click offset within the item (in pixels relative to item top-left)
-      const rect = (e.target as Element).closest('.draggable-item')?.getBoundingClientRect();
-      if (rect) {
+      // Calculate click offset in inches relative to the item's unrotated top-left corner
+      const sheetRect = containerRef.current?.querySelector('.sheet-canvas')?.getBoundingClientRect();
+      if (sheetRect) {
+          const mouseXOnSheet = (e.clientX - sheetRect.left) / (scale * PPI);
+          const mouseYOnSheet = (e.clientY - sheetRect.top) / (scale * PPI);
           setDragOffset({
-              x: e.clientX - rect.left,
-              y: e.clientY - rect.top
+              x: mouseXOnSheet - item.x,
+              y: mouseYOnSheet - item.y
           });
       }
   };
@@ -660,19 +664,63 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
               newRotation = Math.round(newRotation / 45) * 45;
           }
 
-          updateItem(draggingId, { rotation: newRotation });
+          // Normalize rotation to 0-359
+          newRotation = (newRotation % 360 + 360) % 360;
+
+          const item = items.find(i => i.id === draggingId);
+          if (item) {
+              const tempItem = { ...item, rotation: newRotation };
+              const bbox = getRotatedBoundingBox(tempItem);
+              
+              let newX = item.x;
+              let newY = item.y;
+              
+              if (bbox.minX < 0) newX -= bbox.minX;
+              if (bbox.maxX > sheetConfig.width) newX -= (bbox.maxX - sheetConfig.width);
+              if (bbox.minY < 0) newY -= bbox.minY;
+              if (bbox.maxY > sheetConfig.height) newY -= (bbox.maxY - sheetConfig.height);
+              
+              updateItem(draggingId, { rotation: newRotation, x: newX, y: newY });
+          }
           return;
       }
 
       if (resizingState && draggingId) {
           const dx = (e.clientX - resizingState.initialX) / scale;
-          const newWidth = (resizingState.initialWidth * PPI + dx) / PPI;
+          let newWidth = (resizingState.initialWidth * PPI + dx) / PPI;
           
+          if (snapGrid) {
+              newWidth = Math.round(newWidth / snapSize) * snapSize;
+          }
+
           const item = items.find(i => i.id === draggingId);
           if (item && newWidth > 0.5) { // Minimum width 0.5 inch
               const ratio = item.canvasHeight / item.canvasWidth;
               const newHeight = newWidth * ratio;
-              updateItem(draggingId, { width: parseFloat(newWidth.toFixed(2)), height: parseFloat(newHeight.toFixed(2))});
+              
+              const tempItem = { ...item, width: newWidth, height: newHeight };
+              const bbox = getRotatedBoundingBox(tempItem);
+              
+              let adjX = item.x;
+              let adjY = item.y;
+              
+              if (bbox.minX < 0) adjX -= bbox.minX;
+              if (bbox.maxX > sheetConfig.width) adjX -= (bbox.maxX - sheetConfig.width);
+              if (bbox.minY < 0) adjY -= bbox.minY;
+              if (bbox.maxY > sheetConfig.height) adjY -= (bbox.maxY - sheetConfig.height);
+              
+              // Verify shifted bbox is in bounds
+              const shiftedItem = { ...tempItem, x: adjX, y: adjY };
+              const newBbox = getRotatedBoundingBox(shiftedItem);
+              
+              if (newBbox.minX >= 0 && newBbox.maxX <= sheetConfig.width && newBbox.minY >= 0 && newBbox.maxY <= sheetConfig.height) {
+                  updateItem(draggingId, { 
+                      width: parseFloat(newWidth.toFixed(2)), 
+                      height: parseFloat(newHeight.toFixed(2)),
+                      x: adjX,
+                      y: adjY
+                  });
+              }
           }
           return;
       }
@@ -685,33 +733,29 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
       const item = items.find(i => i.id === draggingId);
       if (!item) return;
 
-      const mouseXOnSheet = e.clientX - sheetRect.left;
-      const mouseYOnSheet = e.clientY - sheetRect.top;
+      const mouseXOnSheet = (e.clientX - sheetRect.left) / (scale * PPI);
+      const mouseYOnSheet = (e.clientY - sheetRect.top) / (scale * PPI);
 
-      const dragOffsetXInSheet = dragOffset.x;
-      const dragOffsetYInSheet = dragOffset.y;
+      let newX = mouseXOnSheet - dragOffset.x;
+      let newY = mouseYOnSheet - dragOffset.y;
 
-      // Proposed top-left in sheet pixels
-      const sheetPixelX = mouseXOnSheet - dragOffsetXInSheet;
-      const sheetPixelY = mouseYOnSheet - dragOffsetYInSheet;
+      if (snapGrid) {
+          newX = Math.round(newX / snapSize) * snapSize;
+          newY = Math.round(newY / snapSize) * snapSize;
+      }
 
-      // Convert to inches
-      let newX = sheetPixelX / (PPI * scale);
-      let newY = sheetPixelY / (PPI * scale);
-
-      // Get the bounding box of the rotated item at the new potential position
+      // Bounding box bounds clamping
       const tempItem = { ...item, x: newX, y: newY };
       const bbox = getRotatedBoundingBox(tempItem);
 
-      // Adjust newX and newY if the bounding box is out of bounds
       if (bbox.minX < 0) newX -= bbox.minX;
       if (bbox.maxX > sheetConfig.width) newX -= (bbox.maxX - sheetConfig.width);
       if (bbox.minY < 0) newY -= bbox.minY;
       if (bbox.maxY > sheetConfig.height) newY -= (bbox.maxY - sheetConfig.height);
 
-      setItems(prev => prev.map(i => i.id === draggingId ? { ...i, x: newX, y: newY } : i));
+      updateItem(draggingId, { x: newX, y: newY });
 
-  }, [draggingId, dragOffset, scale, sheetConfig, items, resizingState, rotatingState]);
+  }, [draggingId, dragOffset, scale, sheetConfig, items, resizingState, rotatingState, snapGrid, snapSize]);
 
   const handleMouseUp = () => {
       setDraggingId(null);
@@ -724,6 +768,217 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
     setResizingState(null);
     setRotatingState(null);
   }
+
+  // --- Toolbar & Canvas Helpers ---
+  const handleRotate90 = () => {
+      if (!selectedItem || !sheetConfig) return;
+      const newRotation = (selectedItem.rotation + 90) % 360;
+      
+      const tempItem = { ...selectedItem, rotation: newRotation };
+      const bbox = getRotatedBoundingBox(tempItem);
+      
+      let newX = selectedItem.x;
+      let newY = selectedItem.y;
+      
+      if (bbox.minX < 0) newX -= bbox.minX;
+      if (bbox.maxX > sheetConfig.width) newX -= (bbox.maxX - sheetConfig.width);
+      if (bbox.minY < 0) newY -= bbox.minY;
+      if (bbox.maxY > sheetConfig.height) newY -= (bbox.maxY - sheetConfig.height);
+      
+      updateItem(selectedItem.id, { rotation: newRotation, x: newX, y: newY });
+  };
+
+  const handleCenterHorizontal = () => {
+      if (!selectedItem || !sheetConfig) return;
+      const tempItemAtZero = { ...selectedItem, x: 0 };
+      const bboxAtZero = getRotatedBoundingBox(tempItemAtZero);
+      const bboxW = bboxAtZero.maxX - bboxAtZero.minX;
+      
+      const targetBBoxLeft = (sheetConfig.width - bboxW) / 2;
+      const newX = targetBBoxLeft - bboxAtZero.minX;
+      
+      updateItem(selectedItem.id, { x: newX });
+  };
+
+  const handleCenterVertical = () => {
+      if (!selectedItem || !sheetConfig) return;
+      const tempItemAtZero = { ...selectedItem, y: 0 };
+      const bboxAtZero = getRotatedBoundingBox(tempItemAtZero);
+      const bboxH = bboxAtZero.maxY - bboxAtZero.minY;
+      
+      const targetBBoxTop = (sheetConfig.height - bboxH) / 2;
+      const newY = targetBBoxTop - bboxAtZero.minY;
+      
+      updateItem(selectedItem.id, { y: newY });
+  };
+
+  const handleBringToFront = () => {
+      if (!selectedItemId) return;
+      setItems(prev => {
+          const item = prev.find(i => i.id === selectedItemId);
+          if (!item) return prev;
+          return [...prev.filter(i => i.id !== selectedItemId), item];
+      });
+  };
+
+  const handleSendToBack = () => {
+      if (!selectedItemId) return;
+      setItems(prev => {
+          const item = prev.find(i => i.id === selectedItemId);
+          if (!item) return prev;
+          return [item, ...prev.filter(i => i.id !== selectedItemId)];
+      });
+  };
+
+  const handleClearCanvas = () => {
+      if (window.confirm("Are you sure you want to clear the canvas?")) {
+          setItems([]);
+          setSelectedItemId(null);
+          toast({ title: 'Canvas Cleared', description: 'All items removed.' });
+      }
+  };
+
+  const autoArrangeItems = () => {
+      if (!sheetConfig || items.length === 0) return;
+
+      // Calculate rotated bounding boxes and dimensions for all items
+      const itemsWithBBox = items.map(item => {
+          const tempItemAtZero = { ...item, x: 0, y: 0 };
+          const bboxAtZero = getRotatedBoundingBox(tempItemAtZero);
+          const w = bboxAtZero.maxX - bboxAtZero.minX;
+          const h = bboxAtZero.maxY - bboxAtZero.minY;
+          return {
+              item,
+              bboxOffset: { x: bboxAtZero.minX, y: bboxAtZero.minY },
+              w,
+              h
+          };
+      });
+
+      // Sort items by height descending (standard packing heuristic)
+      itemsWithBBox.sort((a, b) => b.h - a.h);
+
+      const placed: Array<{ x: number, y: number, w: number, h: number }> = [];
+      const arrangedItems: ArtworkOnCanvas[] = [];
+      const margin = 0.15; // 0.15 inch margin between items for cut line safety
+      const step = 0.1; // 0.1 inch search step
+
+      let sheetWidth = sheetConfig.width;
+      let sheetHeight = sheetConfig.height;
+
+      for (const entry of itemsWithBBox) {
+          let placedPosition = null;
+          
+          for (let y = margin; y <= sheetHeight - entry.h - margin; y += step) {
+              for (let x = margin; x <= sheetWidth - entry.w - margin; x += step) {
+                  const hasCollision = placed.some(p => {
+                      return !(
+                          x + entry.w + margin <= p.x ||
+                          x >= p.x + p.w + margin ||
+                          y + entry.h + margin <= p.y ||
+                          y >= p.y + p.h + margin
+                      );
+                  });
+
+                  if (!hasCollision) {
+                      placedPosition = { x, y };
+                      break;
+                  }
+              }
+              if (placedPosition) break;
+          }
+
+          if (placedPosition) {
+              placed.push({ x: placedPosition.x, y: placedPosition.y, w: entry.w, h: entry.h });
+              arrangedItems.push({
+                  ...entry.item,
+                  x: placedPosition.x - entry.bboxOffset.x,
+                  y: placedPosition.y - entry.bboxOffset.y
+              });
+          } else {
+              let fallbackY = margin;
+              if (placed.length > 0) {
+                  fallbackY = Math.max(...placed.map(p => p.y + p.h)) + margin;
+              }
+              
+              placed.push({ x: margin, y: fallbackY, w: entry.w, h: entry.h });
+              arrangedItems.push({
+                  ...entry.item,
+                  x: margin - entry.bboxOffset.x,
+                  y: fallbackY - entry.bboxOffset.y
+              });
+          }
+      }
+
+      setItems(arrangedItems);
+      toast({ title: 'Items Arranged', description: 'Automatically packed all items to minimize sheet waste.' });
+  };
+
+  // Keyboard Shortcuts Effect
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+        const activeEl = document.activeElement;
+        if (activeEl && (activeEl.tagName === 'INPUT' || activeEl.tagName === 'TEXTAREA' || activeEl.getAttribute('contenteditable') === 'true')) {
+            return;
+        }
+
+        if (!selectedItemId) return;
+        const item = items.find(i => i.id === selectedItemId);
+        if (!item) return;
+
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            e.preventDefault();
+            removeItem(selectedItemId);
+            return;
+        }
+
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            setSelectedItemId(null);
+            return;
+        }
+
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd') {
+            e.preventDefault();
+            handleBulkDuplicate(item, 1);
+            return;
+        }
+
+        if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+            e.preventDefault();
+            const nudgeAmount = e.shiftKey ? 0.5 : 0.1;
+            let newX = item.x;
+            let newY = item.y;
+
+            if (e.key === 'ArrowLeft') newX -= nudgeAmount;
+            if (e.key === 'ArrowRight') newX += nudgeAmount;
+            if (e.key === 'ArrowUp') newY -= nudgeAmount;
+            if (e.key === 'ArrowDown') newY += nudgeAmount;
+
+            if (snapGrid) {
+                newX = Math.round(newX / snapSize) * snapSize;
+                newY = Math.round(newY / snapSize) * snapSize;
+            }
+
+            const tempItem = { ...item, x: newX, y: newY };
+            const bbox = getRotatedBoundingBox(tempItem);
+
+            if (sheetConfig) {
+                if (bbox.minX < 0) newX -= bbox.minX;
+                if (bbox.maxX > sheetConfig.width) newX -= (bbox.maxX - sheetConfig.width);
+                if (bbox.minY < 0) newY -= bbox.minY;
+                if (bbox.maxY > sheetConfig.height) newY -= (bbox.maxY - sheetConfig.height);
+                
+                updateItem(selectedItemId, { x: newX, y: newY });
+            }
+        }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedItemId, items, sheetConfig, snapGrid, snapSize]);
 
   const handleMouseDownOnResizeHandle = (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
@@ -1224,18 +1479,146 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
           </div>
 
           {/* Right Preview */}
-          <div ref={containerRef} className="lg:col-span-2 glass-panel rounded-2xl border border-border p-8 flex flex-col items-center relative overflow-hidden">
-            <div className="flex justify-between w-full max-w-2xl mb-4 z-10">
-                <span className="text-muted-foreground font-medium text-sm flex items-center">
-                    <Info className="w-4 h-4 mr-1 text-muted-foreground" />
+          <div ref={containerRef} className="lg:col-span-2 glass-panel rounded-2xl border border-border p-6 flex flex-col items-center relative overflow-hidden">
+            <div className="flex justify-between w-full max-w-2xl mb-2 z-10 text-xs">
+                <span className="text-muted-foreground font-medium flex items-center">
+                    <Info className="w-3.5 h-3.5 mr-1 text-muted-foreground" />
                     Preview Scale: {(scale * 100).toFixed(0)}%
                 </span>
                 {isSheetOverflowing && (
-                    <span className="text-red-500 font-bold text-sm flex items-center animate-pulse">
-                        <AlertTriangle className="w-4 h-4 mr-1" />
+                    <span className="text-red-500 font-bold flex items-center animate-pulse">
+                        <AlertTriangle className="w-3.5 h-3.5 mr-1" />
                         Items outside print area!
                     </span>
                 )}
+            </div>
+
+            {/* Canvas Toolbar */}
+            <div className="w-full max-w-2xl bg-background/80 backdrop-blur-md border border-border p-1.5 rounded-xl flex flex-wrap items-center justify-between gap-2 mb-4 shadow-sm z-20">
+                {/* Left Side: Canvas Global Actions */}
+                <div className="flex items-center gap-1">
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={autoArrangeItems} 
+                        className="text-xs font-semibold hover:bg-secondary h-8 px-2.5 flex items-center gap-1"
+                        title="Auto-Arrange Items"
+                        disabled={items.length === 0}
+                    >
+                        <Sparkles className="w-3.5 h-3.5 text-primary" />
+                        <span>Arrange</span>
+                    </Button>
+                    
+                    <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        onClick={handleClearCanvas} 
+                        className="text-xs font-semibold hover:bg-red-50 hover:text-red-500 h-8 px-2.5 flex items-center gap-1"
+                        title="Clear All Items"
+                        disabled={items.length === 0}
+                    >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Clear</span>
+                    </Button>
+
+                    <div className="w-px h-4 bg-border mx-1" />
+
+                    {/* Snapping Toggle */}
+                    <div className="flex items-center gap-1">
+                        <Button
+                            variant={snapGrid ? "secondary" : "ghost"}
+                            size="sm"
+                            onClick={() => setSnapGrid(!snapGrid)}
+                            className="text-xs h-8 px-2.5 flex items-center gap-1"
+                            title="Toggle Grid Snapping"
+                        >
+                            <Grid className="w-3.5 h-3.5" />
+                            <span>Snap</span>
+                        </Button>
+                        {snapGrid && (
+                            <select
+                                value={snapSize}
+                                onChange={(e) => setSnapSize(parseFloat(e.target.value))}
+                                className="bg-transparent border-0 text-xs font-semibold outline-none text-muted-foreground pr-1 cursor-pointer h-8"
+                            >
+                                <option value="0.1">0.1"</option>
+                                <option value="0.25">0.25"</option>
+                                <option value="0.5">0.5"</option>
+                            </select>
+                        )}
+                    </div>
+                </div>
+
+                {/* Right Side: Selected Item Quick Actions */}
+                <div className="flex items-center gap-1">
+                    {selectedItem ? (
+                        <>
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleRotate90} 
+                                className="h-8 w-8 hover:bg-secondary flex items-center justify-center"
+                                title="Rotate 90°"
+                            >
+                                <RotateCw className="w-3.5 h-3.5" />
+                            </Button>
+                            
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleCenterHorizontal} 
+                                className="h-8 w-8 hover:bg-secondary flex items-center justify-center"
+                                title="Center Horizontally"
+                            >
+                                <ArrowLeftRight className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleCenterVertical} 
+                                className="h-8 w-8 hover:bg-secondary flex items-center justify-center"
+                                title="Center Vertically"
+                            >
+                                <ArrowUpDown className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleBringToFront} 
+                                className="h-8 w-8 hover:bg-secondary flex items-center justify-center"
+                                title="Bring to Front"
+                            >
+                                <ChevronUp className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={handleSendToBack} 
+                                className="h-8 w-8 hover:bg-secondary flex items-center justify-center"
+                                title="Send to Back"
+                            >
+                                <ChevronDown className="w-3.5 h-3.5" />
+                            </Button>
+
+                            <div className="w-px h-4 bg-border mx-1" />
+
+                            <Button 
+                                variant="ghost" 
+                                size="icon"
+                                onClick={() => removeItem(selectedItem.id)} 
+                                className="h-8 w-8 hover:bg-red-50 hover:text-red-500 flex items-center justify-center text-muted-foreground"
+                                title="Delete Design"
+                            >
+                                <X className="w-3.5 h-3.5" />
+                            </Button>
+                        </>
+                    ) : (
+                        <span className="text-[11px] text-muted-foreground px-2 italic">Select a design to edit</span>
+                    )}
+                </div>
             </div>
 
             {/* The Sheet Canvas */}
@@ -1254,6 +1637,18 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                     }}
                     onMouseDown={() => { if(!isRemovingBg) setSelectedItemId(null); }} // Deselect if clicking background
                  >
+                    {/* Grid Overlay */}
+                    {snapGrid && (
+                        <div 
+                            className="absolute inset-0 pointer-events-none z-0 opacity-20"
+                            style={{
+                                backgroundImage: `radial-gradient(circle, hsl(var(--foreground)/0.4) 1.2px, transparent 1.2px)`,
+                                backgroundSize: `${PPI * scale}px ${PPI * scale}px`,
+                                backgroundPosition: '0 0'
+                            }}
+                        />
+                    )}
+
                     {items.map((item) => {
                         const isSelected = selectedItemId === item.id;
                         
@@ -1288,10 +1683,11 @@ export default function GangSheetBuilder({ usage }: { usage: 'Builder' }) {
                                 onClick={(e) => isRemovingBg && handleCanvasClickForBgRemoval(e)}
                             >
                                 <div className={`w-full h-full relative transition-all duration-150`}>
-                                    <div className={`absolute -inset-0.5 border-2 rounded transition-all duration-150 pointer-events-none 
-                                        ${isSelected ? 'border-primary' : 'border-transparent'}
-                                        ${(isColliding || isOutOfBounds) ? '!border-red-500' : ''}
-                                    `}></div>
+                                    <div className={cn(
+                                        "absolute -inset-0.5 border-2 rounded transition-all duration-150 pointer-events-none z-10",
+                                        isSelected ? "border-primary shadow-[0_0_8px_hsl(var(--primary)/0.5)] scale-[1.01]" : "border-transparent",
+                                        (isColliding || isOutOfBounds) ? "!border-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]" : ""
+                                    )}></div>
 
                                     {item.imageUrl ? (
                                       <img 
