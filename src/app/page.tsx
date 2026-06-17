@@ -9,7 +9,7 @@ export default function Home() {
   const isMule = uiMode === 'stickermule';
 
   return (
-    <div className={isMule ? "min-h-[calc(100vh-5rem)] flex flex-col justify-between bg-background" : "h-[calc(100vh-5rem)] flex flex-col justify-between bg-background overflow-hidden"}>
+    <div className={isMule ? "min-h-[calc(100vh-4rem)] flex flex-col justify-between bg-background" : "h-[calc(100vh-4rem)] flex flex-col justify-between bg-background overflow-hidden"}>
       {/* Visually hidden H1 for SEO */}
       <h1 className="sr-only">PXL8 Studio — Premium Direct-to-Film (DTF) Transfers Portal</h1>
       

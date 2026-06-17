@@ -108,17 +108,17 @@ export default function Header() {
         "fixed top-0 z-50 w-full transition-all duration-300",
         isScrolled ? 'bg-[#FAF9F6]/95 backdrop-blur-md border-b border-zinc-200/40' : 'bg-transparent'
     )}>
-      <div className="flex h-20 items-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
-        <Link href="/" className="mr-6 flex items-center space-x-3">
-          <span className="font-serif text-2xl font-bold text-zinc-900 tracking-tight">PXL8</span>
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[9px] font-sans font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 tracking-wider">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+      <div className="flex h-12 items-center px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto w-full">
+        <Link href="/" className="mr-6 flex items-center space-x-2.5">
+          <span className="font-serif text-xl font-bold text-zinc-900 tracking-tight">PXL8</span>
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[8px] font-sans font-semibold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 tracking-wider">
+            <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse" />
             DESIGN PORTALS OPEN
           </span>
         </Link>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center space-x-6 ml-4">
+        <nav className="hidden md:flex items-center space-x-5 ml-4">
           {activeNavLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -126,7 +126,7 @@ export default function Header() {
                 key={link.href}
                 href={link.href}
                 className={cn(
-                  "text-[10px] font-bold tracking-widest uppercase transition-all duration-200",
+                  "text-[9px] font-bold tracking-widest uppercase transition-all duration-200",
                   isActive 
                     ? "text-zinc-900 border-b border-zinc-900 pb-0.5" 
                     : "text-zinc-400 hover:text-zinc-900"
@@ -138,36 +138,36 @@ export default function Header() {
           })}
         </nav>
 
-        <div className="flex-grow flex justify-end items-center space-x-6">
+        <div className="flex-grow flex justify-end items-center space-x-4">
           <div className="hidden md:flex flex-col items-end text-right font-mono pr-2">
-            <span className="text-[8px] text-zinc-400 tracking-widest uppercase">Local Time</span>
-            <span className="text-xs font-semibold text-zinc-800">{time}</span>
+            <span className="text-[7.5px] text-zinc-400 tracking-widest uppercase">Local Time</span>
+            <span className="text-[10px] font-semibold text-zinc-800">{time}</span>
           </div>
 
           <div className="flex items-center space-x-2">
             {(isUserLoading || isProfileLoading) ? (
-              <div className='w-24 h-9 bg-zinc-250 rounded-full animate-pulse' />
+              <div className='w-20 h-8 bg-zinc-250 rounded-full animate-pulse' />
             ) : isAuthenticated ? (
               <>
-                <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
+                <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[9px] font-semibold px-3.5 h-8">
                   <Link href="/dashboard">Dashboard</Link>
                 </Button>
-                <Button variant="outline" onClick={handleLogout} className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
-                  <LogOut className="mr-1.5 h-3.5 w-3.5" />
+                <Button variant="outline" onClick={handleLogout} className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[9px] font-semibold px-3.5 h-8">
+                  <LogOut className="mr-1.5 h-3 w-3" />
                   Logout
                 </Button>
               </>
             ) : (
-              <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[10px] font-semibold px-4 h-9">
+              <Button variant="outline" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 tracking-wider uppercase text-[9px] font-semibold px-3.5 h-8">
                 <Link href="/auth/login">Login</Link>
               </Button>
             )}
 
-            <Button variant="outline" size="icon" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 relative w-9 h-9">
+            <Button variant="outline" size="icon" asChild className="rounded-full border-zinc-300 text-zinc-850 bg-white hover:bg-zinc-50 relative w-8 h-8">
               <Link href="/cart">
-                <ShoppingCart className="h-4 w-4" />
+                <ShoppingCart className="h-3.5 w-3.5" />
                 {cartItemCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-zinc-900 text-[9px] font-bold text-white">
+                  <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-zinc-900 text-[8px] font-bold text-white">
                     {cartItemCount}
                   </span>
                 )}

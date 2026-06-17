@@ -25,7 +25,7 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   return (
     <UiModeProvider>
       {showHeader && <Header />}
-      <main className={cn('flex-grow', showHeader && 'pt-[5rem]')}>{children}</main>
+      <main className={cn('flex-grow', showHeader && 'pt-[3rem]')}>{children}</main>
       <UiModeToggle />
     </UiModeProvider>
   );
