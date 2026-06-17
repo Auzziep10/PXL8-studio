@@ -1,16 +1,21 @@
 'use client';
 
 import CustomerPathWizard from '@/components/customer-path-wizard';
+import ProductsCatalog from '@/components/products-catalog';
+import { useUiMode } from '@/hooks/use-ui-mode';
 
 export default function Home() {
+  const { uiMode } = useUiMode();
+  const isMule = uiMode === 'stickermule';
+
   return (
-    <div className="h-[calc(100vh-5rem)] flex flex-col justify-between bg-background overflow-hidden">
+    <div className={isMule ? "min-h-[calc(100vh-5rem)] flex flex-col justify-between bg-background" : "h-[calc(100vh-5rem)] flex flex-col justify-between bg-background overflow-hidden"}>
       {/* Visually hidden H1 for SEO */}
       <h1 className="sr-only">PXL8 Studio — Premium Direct-to-Film (DTF) Transfers Portal</h1>
       
       {/* Main Wizard Area */}
       <div className="flex-grow flex items-stretch">
-        <CustomerPathWizard />
+        {isMule ? <ProductsCatalog /> : <CustomerPathWizard />}
       </div>
       
       {/* Clean Brand Footer */}
@@ -21,3 +26,4 @@ export default function Home() {
     </div>
   );
 }
+

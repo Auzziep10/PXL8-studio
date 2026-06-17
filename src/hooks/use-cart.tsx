@@ -40,7 +40,7 @@ export function CartProvider({ children }: { children: ReactNode }) {
       const storableItems = items.map(item => {
         // Only strip large data if it's a data URL and likely very large.
         // Keep permanent URLs.
-        if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl.startsWith('data:')) {
+        if ((item.type === 'sheet' || item.type === 'dynamic_sheet') && item.previewUrl && item.previewUrl.startsWith('data:')) {
             // Check size. A 1MB data URL is roughly 1.37 million characters.
             if (item.previewUrl.length > 1000000) { 
                  const { previewUrl, ...rest } = item;

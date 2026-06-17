@@ -215,6 +215,76 @@ export default function CustomerPathWizard() {
         return 0;
     }, [dimensions, quantity, pricePerSqInch]);
 
+    // Helper function to draw tiled preview of gang sheet layout
+    const generateGangSheetPreview = (
+        imageUrl: string,
+        width: number,
+        height: number,
+        quantity: number,
+        rollWidth: number,
+        gap: number,
+        sheetHeight: number
+    ): Promise<string> => {
+        return new Promise((resolve) => {
+            const img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = () => {
+                const ppi = 30; // 30 pixels per inch for a compact preview
+                const canvas = document.createElement('canvas');
+                canvas.width = rollWidth * ppi;
+                canvas.height = sheetHeight * ppi;
+                
+                const ctx = canvas.getContext('2d');
+                if (!ctx) {
+                    resolve(imageUrl);
+                    return;
+                }
+
+                // Draw checkerboard background for transparent prints
+                ctx.fillStyle = '#FAF9F6';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                // Draw grid pattern to resemble checkerboard
+                const gridSize = 10;
+                ctx.fillStyle = '#f0f0f0';
+                for (let y = 0; y < canvas.height; y += gridSize * 2) {
+                    for (let x = 0; x < canvas.width; x += gridSize * 2) {
+                        ctx.fillRect(x, y, gridSize, gridSize);
+                        ctx.fillRect(x + gridSize, y + gridSize, gridSize, gridSize);
+                    }
+                }
+
+                // Draw grid line borders for the roll
+                ctx.strokeStyle = '#e4e4e7';
+                ctx.lineWidth = 1;
+                ctx.strokeRect(0, 0, canvas.width, canvas.height);
+
+                // Calculate grid layout
+                const cols = Math.max(1, Math.floor((rollWidth + gap) / (width + gap)));
+                
+                // Draw each item
+                for (let i = 0; i < quantity; i++) {
+                    const col = i % cols;
+                    const row = Math.floor(i / cols);
+                    
+                    const x = col * (width + gap) * ppi;
+                    const y = row * (height + gap) * ppi;
+                    const w = width * ppi;
+                    const h = height * ppi;
+                    
+                    ctx.drawImage(img, x, y, w, h);
+                }
+
+                // Convert to URL
+                resolve(canvas.toDataURL('image/png'));
+            };
+            img.onerror = () => {
+                resolve(imageUrl); // fallback
+            };
+            img.src = imageUrl;
+        });
+    };
+
     // --- Auto Layout Engine (Canvas) ---
     const handleGenerateSheetAndCheckout = async () => {
         const width = parseFloat(dimensions.width);
@@ -242,7 +312,7 @@ export default function CustomerPathWizard() {
             const rows = Math.ceil(quantity / cols);
             const sheetHeight = rows * height + (rows - 1) * gap;
 
-            setGenerationProgress(70);
+            setGenerationProgress(60);
 
             const artworksList: ArtworkOnCanvas[] = [];
             for (let i = 0; i < quantity; i++) {
@@ -267,9 +337,19 @@ export default function CustomerPathWizard() {
                 });
             }
 
-            setGenerationProgress(95);
+            setGenerationProgress(80);
 
-            const finalSheetPreviewUrl = previewUrl;
+            const finalSheetPreviewUrl = await generateGangSheetPreview(
+                previewUrl,
+                width,
+                height,
+                quantity,
+                rollWidth,
+                gap,
+                sheetHeight
+            );
+
+            setGenerationProgress(95);
 
             const cartItem: SheetCartItem = {
                 id: `GNG-AUTO-${Date.now()}`,

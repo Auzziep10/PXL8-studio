@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation';
 import Header from '@/components/header';
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { UiModeProvider } from '@/hooks/use-ui-mode';
+import UiModeToggle from '@/components/ui-mode-toggle';
 
 export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -12,13 +14,20 @@ export function LayoutProvider({ children }: { children: React.ReactNode }) {
   const showHeader = !isDashboard;
 
   if (isDashboard) {
-    return <main className="flex-grow">{children}</main>;
+    return (
+      <UiModeProvider>
+        <main className="flex-grow">{children}</main>
+        <UiModeToggle />
+      </UiModeProvider>
+    );
   }
 
   return (
-    <>
+    <UiModeProvider>
       {showHeader && <Header />}
       <main className={cn('flex-grow', showHeader && 'pt-[5rem]')}>{children}</main>
-    </>
+      <UiModeToggle />
+    </UiModeProvider>
   );
 }
+
