@@ -79,7 +79,7 @@ export default function ProductsCatalog() {
                             className="bg-white border border-zinc-200/50 rounded-[1.5rem] overflow-hidden shadow-2xs hover:shadow-lg hover:border-zinc-300 transition-all duration-300 flex flex-col justify-between group"
                         >
                             {/* Product Image Box */}
-                            <div className="aspect-[16/10] w-full relative overflow-hidden bg-zinc-50 border-b border-zinc-150/40">
+                            <div className="aspect-[4/3] w-full relative overflow-hidden bg-zinc-50 border-b border-zinc-150/40">
                                 <img 
                                     src={product.imageSrc} 
                                     alt={product.title}
@@ -94,9 +94,9 @@ export default function ProductsCatalog() {
                             </div>
 
                             {/* Card Details */}
-                            <div className="p-4 sm:p-5 flex-grow flex flex-col justify-between space-y-4">
-                                <div className="space-y-2">
-                                    <div className="space-y-0.5">
+                            <div className="p-5 sm:p-6 flex-grow flex flex-col justify-between space-y-6">
+                                <div className="space-y-3">
+                                    <div className="space-y-1">
                                         <span className="text-[8px] font-mono tracking-wider text-zinc-400 uppercase">
                                             {product.subtitle}
                                         </span>
@@ -104,7 +104,7 @@ export default function ProductsCatalog() {
                                             {product.title}
                                         </h3>
                                     </div>
-                                    <p className="text-[11px] text-zinc-450 font-light leading-relaxed min-h-[50px]">
+                                    <p className="text-[11px] text-zinc-450 font-light leading-relaxed min-h-[66px]">
                                         {product.description}
                                     </p>
                                 </div>
